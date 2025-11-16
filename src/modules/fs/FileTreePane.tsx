@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import { ChevronDown, ChevronRight, FileCode2, Folder } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileCode2,
+  Folder,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useFs } from "./store";
 import type { VirtualFile } from "./types";
 
@@ -121,15 +129,90 @@ function TreeRow({ node, depth, activePath, onSelect }: TreeRowProps) {
 }
 
 export function FileTreePane() {
-  const { filesByPath } = useFs();
+  const { filesByPath, createFile, deleteFile, renameFile } = useFs();
   const [activePath, setActivePath] = useState<string | null>(null);
 
   const tree = useMemo(() => buildTree(filesByPath), [filesByPath]);
+
+  const handleNewFile = () => {
+    const path = window.prompt("Enter new file path (e.g., /src/NewFile.tsx):");
+    if (!path) return;
+    if (!path.startsWith("/")) {
+      alert("Path must start with /");
+      return;
+    }
+    if (filesByPath[path]) {
+      alert("File already exists");
+      return;
+    }
+    createFile(path, "// New file\n");
+    setActivePath(path);
+  };
+
+  const handleRename = () => {
+    if (!activePath || !filesByPath[activePath]) {
+      alert("Please select a file first");
+      return;
+    }
+    const newPath = window.prompt("Enter new path:", activePath);
+    if (!newPath || newPath === activePath) return;
+    if (!newPath.startsWith("/")) {
+      alert("Path must start with /");
+      return;
+    }
+    if (filesByPath[newPath]) {
+      alert("A file with that path already exists");
+      return;
+    }
+    renameFile(activePath, newPath);
+    setActivePath(newPath);
+  };
+
+  const handleDelete = () => {
+    if (!activePath || !filesByPath[activePath]) {
+      alert("Please select a file first");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Delete ${activePath}?\nThis cannot be undone.`
+    );
+    if (!confirmed) return;
+    deleteFile(activePath);
+    setActivePath(null);
+  };
 
   return (
     <div className="flex h-full w-full flex-col bg-neutral-950/80 text-neutral-100">
       <div className="flex items-center justify-between border-b border-neutral-800/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
         <span>Files</span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleNewFile}
+            className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 transition-colors"
+            title="New file"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleRename}
+            disabled={!activePath}
+            className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Rename file"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={!activePath}
+            className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-red-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Delete file"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
       <ScrollArea.Root className="flex-1">
         <ScrollArea.Viewport className="h-full w-full">
