@@ -1,32 +1,21 @@
-import { Sandpack } from "@codesandbox/sandpack-react";
 import "./App.css";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { ChatPane } from "./modules/chat/ChatPane";
+import { PreviewPane } from "./modules/preview/PreviewPane";
 
 export default function App() {
 	return (
-		<div className="w-screen h-screen p-12">
-			<Sandpack
-				files={{
-					"/Wrapper.js": `export default () => "";`,
-
-					"/Button.js": {
-						code: `export default () => {
-	return <button>Hello</button>
-  };`,
-						readOnly: true, // Set as non-editable, defaults to `false`
-						active: true, // Set as main file, defaults to `false`
-						hidden: false, // Tab visibility, defaults to `false`
-					},
-				}}
-				template="react"
-				options={{
-					editorHeight: "800px",
-					layout: "preview",
-					showConsole: true,
-					showTabs: true,
-					showNavigator: true,
-					showLineNumbers: true,
-				}}
-			/>
+		<div className="w-screen h-screen bg-neutral-950 text-neutral-100">
+			<PanelGroup direction="horizontal" className="h-full">
+				<Panel defaultSize={20} minSize={10}>
+					<ChatPane />
+				</Panel>
+				<PanelResizeHandle className="w-px bg-neutral-800/80" />
+				<PanelResizeHandle className="w-px bg-neutral-800/80" />
+				<Panel defaultSize={80} minSize={25}>
+					<PreviewPane />
+				</Panel>
+			</PanelGroup>
 		</div>
 	);
 }
