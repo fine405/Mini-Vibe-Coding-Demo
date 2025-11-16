@@ -129,7 +129,7 @@ function TreeRow({ node, depth, activePath, onSelect }: TreeRowProps) {
 }
 
 export function FileTreePane() {
-  const { filesByPath, activeFilePath, createFile, deleteFile, renameFile, setActiveFile } = useFs();
+  const { filesByPath, activeFilePath, createFile, deleteFile, renameFile, setActiveFile, resetFs } = useFs();
 
   const tree = useMemo(() => buildTree(filesByPath), [filesByPath]);
 
@@ -180,10 +180,29 @@ export function FileTreePane() {
     setActiveFile(null);
   };
 
+  const handleNewProject = () => {
+    const confirmed = window.confirm(
+      "Reset to a new project?\nAll current files will be lost."
+    );
+    if (!confirmed) return;
+    resetFs();
+    setActiveFile(null);
+  };
+
   return (
     <div className="flex h-full w-full flex-col bg-neutral-950/80 text-neutral-100">
       <div className="flex items-center justify-between border-b border-neutral-800/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-        <span>Files</span>
+        <div className="flex items-center gap-2">
+          <span>Files</span>
+          <button
+            type="button"
+            onClick={handleNewProject}
+            className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-neutral-800/60 text-neutral-300 hover:bg-neutral-700 hover:text-neutral-100 transition-colors"
+            title="New Project"
+          >
+            New Project
+          </button>
+        </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
