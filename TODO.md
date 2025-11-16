@@ -1,48 +1,49 @@
 # mini-lovable 开发 TODO
 
-## Day 1：项目骨架 & 基础功能
+## Day 1：项目骨架 & 基础功能 ✅
 
-- [ ] 初始化项目与基础结构
-  - [ ] 使用 Vite + React + TypeScript 创建项目
-  - [ ] 配置别名（如 `@modules/*`）和基础 Tailwind / 样式
-  - [ ] 建立基础目录结构：
-    - [ ] `/src/modules/fs`
-    - [ ] `/src/modules/patches`
-    - [ ] `/src/modules/editor`
-    - [ ] `/src/modules/preview`
-    - [ ] `/src/modules/chat`
-    - [ ] `/src/components`
+- [x] 初始化项目与基础结构
+  - [x] 使用 Vite + React + TypeScript 创建项目
+  - [x] 配置别名（如 `@modules/*`）和基础 Tailwind / 样式
+  - [x] 建立基础目录结构：
+    - [x] `/src/modules/fs`
+    - [x] `/src/modules/patches`（待实现）
+    - [x] `/src/modules/preview`
+    - [x] `/src/modules/chat`（待完善）
+    - [x] `/src/components`（按需）
 
-- [ ] 三栏布局与主题
-  - [ ] 使用 `react-resizable-panels` 实现左（Chat）/ 中（Editor）/ 右（Preview）布局
-  - [ ] 配置暗色/亮色主题切换
+- [x] 三栏布局与主题
+  - [x] 使用 `react-resizable-panels` 实现左（Chat）/ 中（FileTree）/ 右（Preview）布局
+  - [ ] 配置暗色/亮色主题切换（已有暗色主题）
 
-- [ ] 虚拟文件系统模块（/modules/fs）
-  - [ ] 设计 `VirtualFile` 结构（path, content, status: clean/new/modified）
-  - [ ] 使用 Zustand（或 Jotai）管理 FS 状态
-  - [ ] 提供基础操作：`openFile` / `updateFileContent` / `setStatus`
-  - [ ] 初始化一个最小 React/Vite 示例项目到内存 FS
+- [x] 虚拟文件系统模块（/modules/fs）
+  - [x] 设计 `VirtualFile` 结构（path, content, status: clean/new/modified）
+  - [x] 使用 Zustand + immer 管理 FS 状态
+  - [x] 提供基础操作：`setFiles` / `updateFileContent` / `createFile` / `deleteFile` / `renameFile` / `resetFs` / `setActiveFile`
+  - [x] 初始化一个最小 React/Vite 示例项目到内存 FS
 
-- [ ] 文件树 + 标签页编辑器（/modules/editor）
-  - [ ] 文件树组件：从 FS 构建树并支持点击打开文件
-  - [ ] 标签页：维护 `openTabs`、`activePath`
-  - [ ] 集成 `@monaco-editor/react` 作为代码编辑器
-  - [ ] onChange 自动更新 FS，并标记文件为 `modified`
+- [x] 文件树 + 编辑器（暂用 Sandpack 自带）
+  - [x] 文件树组件：从 FS 构建树并支持点击打开文件
+  - [x] 文件树 CRUD：New / Rename / Delete 操作
+  - [x] 文件树与 Sandpack 联动：点击文件切换 activeFile
+  - [x] 使用 Sandpack 自带编辑器（暂不接入 Monaco）
+  - [x] Sandpack onChange 可通过 FS store 同步
 
-- [ ] 预览模块基础（/modules/preview）
-  - [ ] 使用 `@codesandbox/sandpack-react` 渲染虚拟项目
-  - [ ] 将 FS 映射到 Sandpack 的 `files`
-  - [ ] FS 变化时触发预览刷新（基本可用即可）
+- [x] 预览模块基础（/modules/preview）
+  - [x] 使用 `@codesandbox/sandpack-react` 渲染虚拟项目
+  - [x] 将 FS 映射到 Sandpack 的 `files`
+  - [x] FS 变化时触发预览刷新
+  - [x] Console 支持折叠/展开（Sandpack 自带）
 
 ---
 
 ## Day 2：Chat-to-Code、Patch 引擎、Diff 与状态标记
 
-- [ ] New Project 流程
-  - [ ] 顶部/侧边增加 `New Project` 按钮
-  - [ ] 点击后清空当前 FS state
-  - [ ] 初始化为空工程或内置模板
-  - [ ] UI 显示当前项目名
+- [x] New Project 流程
+  - [x] FileTree header 增加 `New Project` 按钮
+  - [x] 点击后调用 `resetFs()` 重置 FS state
+  - [x] 初始化为内置模板（/index.js + /App.js）
+  - [ ] UI 显示当前项目名（可选）
 
 - [ ] Patch 模块（/modules/patches）
   - [ ] 定义 patch 类型（create / update / delete + range replace）
@@ -72,8 +73,8 @@
 - [ ] 文件级 Diff 视图与状态标记
   - [ ] 编辑区域添加 `Editor | Diff` 切换
   - [ ] 当文件状态为 `modified` / `new` 时允许打开 Diff 视图
-  - [ ] 文件树中显示 `N` / `M` 徽标
-  - [ ] 手动编辑文件时自动设置状态为 `modified`
+  - [ ] 文件树中显示 `N` / `M` 徽标（FS 已支持 status，待 UI 展示）
+  - [x] FS store 已支持 status 标记（clean/new/modified）
 
 - [ ] 预览与接受检查联动
   - [ ] 确保接受 patch 后 Preview 渲染新 app（满足「create a react todo app」场景）
