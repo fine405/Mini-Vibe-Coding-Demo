@@ -31,18 +31,24 @@ const cloneInitialFiles = (): Record<string, VirtualFile> =>
 	);
 
 interface FsStore extends VirtualFileSystemState {
+	activeFilePath: string | null;
 	setFiles: (files: Record<string, VirtualFile>) => void;
 	updateFileContent: (path: string, content: string) => void;
 	createFile: (path: string, content?: string) => void;
 	deleteFile: (path: string) => void;
 	renameFile: (oldPath: string, newPath: string) => void;
 	resetFs: () => void;
+	setActiveFile: (path: string | null) => void;
 }
 
 const stateCreator = immer<FsStore>((set) => ({
 	filesByPath: cloneInitialFiles(),
+	activeFilePath: null,
 	setFiles(files) {
 		set({ filesByPath: files });
+	},
+	setActiveFile(path) {
+		set({ activeFilePath: path });
 	},
 	updateFileContent(path, content) {
 		set((state) => {

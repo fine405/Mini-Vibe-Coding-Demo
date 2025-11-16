@@ -4,7 +4,7 @@ import {
 import { useFs } from "../fs/store";
 
 export function PreviewPane() {
-	const { filesByPath } = useFs();
+	const { filesByPath, activeFilePath } = useFs();
 
 	const files = Object.fromEntries(
 		Object.entries(filesByPath).map(([path, file]) => [
@@ -24,7 +24,7 @@ export function PreviewPane() {
       files={files}
       template="react"
 				options={{
-          
+					activeFile: activeFilePath || undefined,
 					editorHeight: "calc(100vh - 32px)",
 					showConsole: true,
 					showConsoleButton: true,

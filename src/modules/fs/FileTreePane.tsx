@@ -129,8 +129,7 @@ function TreeRow({ node, depth, activePath, onSelect }: TreeRowProps) {
 }
 
 export function FileTreePane() {
-  const { filesByPath, createFile, deleteFile, renameFile } = useFs();
-  const [activePath, setActivePath] = useState<string | null>(null);
+  const { filesByPath, activeFilePath, createFile, deleteFile, renameFile, setActiveFile } = useFs();
 
   const tree = useMemo(() => buildTree(filesByPath), [filesByPath]);
 
@@ -146,16 +145,16 @@ export function FileTreePane() {
       return;
     }
     createFile(path, "// New file\n");
-    setActivePath(path);
+    setActiveFile(path);
   };
 
   const handleRename = () => {
-    if (!activePath || !filesByPath[activePath]) {
+    if (!activeFilePath || !filesByPath[activeFilePath]) {
       alert("Please select a file first");
       return;
     }
-    const newPath = window.prompt("Enter new path:", activePath);
-    if (!newPath || newPath === activePath) return;
+    const newPath = window.prompt("Enter new path:", activeFilePath);
+    if (!newPath || newPath === activeFilePath) return;
     if (!newPath.startsWith("/")) {
       alert("Path must start with /");
       return;
@@ -164,21 +163,21 @@ export function FileTreePane() {
       alert("A file with that path already exists");
       return;
     }
-    renameFile(activePath, newPath);
-    setActivePath(newPath);
+    renameFile(activeFilePath, newPath);
+    setActiveFile(newPath);
   };
 
   const handleDelete = () => {
-    if (!activePath || !filesByPath[activePath]) {
+    if (!activeFilePath || !filesByPath[activeFilePath]) {
       alert("Please select a file first");
       return;
     }
     const confirmed = window.confirm(
-      `Delete ${activePath}?\nThis cannot be undone.`
+      `Delete ${activeFilePath}?\nThis cannot be undone.`
     );
     if (!confirmed) return;
-    deleteFile(activePath);
-    setActivePath(null);
+    deleteFile(activeFilePath);
+    setActiveFile(null);
   };
 
   return (
@@ -197,7 +196,7 @@ export function FileTreePane() {
           <button
             type="button"
             onClick={handleRename}
-            disabled={!activePath}
+            disabled={!activeFilePath}
             className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="Rename file"
           >
@@ -206,7 +205,7 @@ export function FileTreePane() {
           <button
             type="button"
             onClick={handleDelete}
-            disabled={!activePath}
+            disabled={!activeFilePath}
             className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-red-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="Delete file"
           >
@@ -222,8 +221,8 @@ export function FileTreePane() {
                 key={node.path}
                 node={node}
                 depth={0}
-                activePath={activePath}
-                onSelect={setActivePath}
+                activePath={activeFilePath}
+                onSelect={setActiveFile}
               />
             ))}
           </div>
