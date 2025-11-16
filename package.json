@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@codesandbox/sandpack-react": "^2.20.0",
+    "@radix-ui/react-scroll-area": "^1.2.10",
     "@redux-devtools/extension": "^3.3.0",
     "@tailwindcss/vite": "^4.1.17",
     "immer": "^10.2.0",
+    "lucide-react": "^0.553.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-resizable-panels": "^3.0.6",
