@@ -8,7 +8,12 @@ export async function loadPatches(): Promise<Patch[]> {
 	// For now, we'll manually import known patches
 	const patches: Patch[] = [];
 
-	const patchFiles = ["todo-app.json", "add-filters.json"];
+	const patchFiles = [
+		"todo-app.json",
+		"add-filters.json",
+		"add-localstorage.json",
+		"refactor-structure.json",
+	];
 
 	for (const file of patchFiles) {
 		try {
