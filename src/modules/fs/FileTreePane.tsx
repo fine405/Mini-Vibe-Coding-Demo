@@ -27,37 +27,48 @@ interface TreeNode {
 }
 
 function buildTree(filesByPath: Record<string, VirtualFile>): TreeNode[] {
-	const root: Record<string, TreeNode> = {};
+	// Build a map of all nodes (files and directories)
+	const nodeMap = new Map<string, TreeNode>();
 
+	// First pass: create all nodes
 	Object.values(filesByPath).forEach((file) => {
 		const segments = file.path.split("/").filter(Boolean);
-		let currentLevel = root;
 		let currentPath = "";
 
 		segments.forEach((segment, index) => {
 			const isLast = index === segments.length - 1;
-			currentPath = `${currentPath}/${segment}`;
-			const key = currentPath;
+			currentPath = currentPath ? `${currentPath}/${segment}` : `/${segment}`;
 
-			if (!currentLevel[key]) {
-				currentLevel[key] = {
+			if (!nodeMap.has(currentPath)) {
+				nodeMap.set(currentPath, {
 					name: segment,
 					path: currentPath,
 					isDir: !isLast,
 					children: !isLast ? [] : undefined,
-				};
-			}
-
-			if (!isLast && currentLevel[key].children) {
-				const nextLevel: Record<string, TreeNode> = {};
-				currentLevel[key].children.forEach((child) => {
-					nextLevel[child.path] = child;
 				});
-				currentLevel = nextLevel;
 			}
 		});
 	});
 
+	// Second pass: build parent-child relationships
+	const rootNodes: TreeNode[] = [];
+
+	nodeMap.forEach((node) => {
+		const parentPath = node.path.substring(0, node.path.lastIndexOf("/"));
+
+		if (!parentPath) {
+			// Root level node
+			rootNodes.push(node);
+		} else {
+			// Add to parent's children
+			const parent = nodeMap.get(parentPath);
+			if (parent?.children) {
+				parent.children.push(node);
+			}
+		}
+	});
+
+	// Sort nodes recursively
 	const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
 		const sorted = [...nodes].sort((a, b) => {
 			if (a.isDir && !b.isDir) return -1;
@@ -70,7 +81,7 @@ function buildTree(filesByPath: Record<string, VirtualFile>): TreeNode[] {
 		return sorted;
 	};
 
-	return sortNodes(Object.values(root));
+	return sortNodes(rootNodes);
 }
 
 interface TreeRowProps {
@@ -91,6 +102,21 @@ function TreeRow({
 	const [expanded, setExpanded] = useState(true);
 	const isActive = activePath === node.path;
 	const fileStatus = !node.isDir ? filesByPath[node.path]?.status : null;
+
+	// Check if folder has any modified or new files
+	const hasChanges = useMemo(() => {
+		if (!node.isDir) return false;
+
+		const checkNode = (n: TreeNode): boolean => {
+			if (!n.isDir) {
+				const status = filesByPath[n.path]?.status;
+				return status === "new" || status === "modified";
+			}
+			return n.children?.some(checkNode) ?? false;
+		};
+
+		return node.children?.some(checkNode) ?? false;
+	}, [node, filesByPath]);
 
 	const handleClick = () => {
 		if (node.isDir) {
@@ -125,6 +151,16 @@ function TreeRow({
 					<FileCode2 className="mr-1 h-3 w-3 text-neutral-500" />
 				)}
 				<span className="truncate flex-1">{node.name}</span>
+				{/* Folder change indicator */}
+				{node.isDir && hasChanges && (
+					<span
+						className="ml-auto flex items-center justify-center px-1 py-0.5"
+						title="Contains modified files"
+					>
+						<span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+					</span>
+				)}
+				{/* File status badge */}
 				{!node.isDir && fileStatus && fileStatus !== "clean" && (
 					<span
 						className={`ml-auto text-[9px] font-semibold px-1 py-0.5 rounded ${
@@ -262,7 +298,7 @@ export function FileTreePane() {
 							className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-neutral-800/60 text-neutral-300 hover:bg-neutral-700 hover:text-neutral-100 transition-colors"
 							title="New Project"
 						>
-							New Project
+							1 New Project
 						</button>
 						<button
 							type="button"
