@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
+import { clearWorkspace, loadWorkspace, saveWorkspace } from "./persistence";
 import type { VirtualFile, VirtualFileSystemState } from "./types";
 
 const INITIAL_FILES: Record<string, VirtualFile> = {
@@ -39,6 +40,8 @@ interface FsStore extends VirtualFileSystemState {
 	renameFile: (oldPath: string, newPath: string) => void;
 	resetFs: () => void;
 	setActiveFile: (path: string | null) => void;
+	loadFromPersistence: () => Promise<boolean>;
+	saveToIndexedDB: () => Promise<void>;
 }
 
 const stateCreator = immer<FsStore>((set) => ({
@@ -46,6 +49,8 @@ const stateCreator = immer<FsStore>((set) => ({
 	activeFilePath: null,
 	setFiles(files) {
 		set({ filesByPath: files });
+		// Auto-save to IndexedDB
+		saveWorkspace(files).catch(console.error);
 	},
 	setActiveFile(path) {
 		set({ activeFilePath: path });
@@ -57,6 +62,9 @@ const stateCreator = immer<FsStore>((set) => ({
 			existing.content = content;
 			existing.status = "modified";
 		});
+		// Auto-save to IndexedDB
+		const state = useFs.getState();
+		saveWorkspace(state.filesByPath).catch(console.error);
 	},
 	createFile(path, content = "") {
 		set((state) => {
@@ -66,6 +74,9 @@ const stateCreator = immer<FsStore>((set) => ({
 				status: "new",
 			};
 		});
+		// Auto-save to IndexedDB
+		const state = useFs.getState();
+		saveWorkspace(state.filesByPath).catch(console.error);
 	},
 	deleteFile(path) {
 		set((state) => {
@@ -73,6 +84,9 @@ const stateCreator = immer<FsStore>((set) => ({
 				delete state.filesByPath[path];
 			}
 		});
+		// Auto-save to IndexedDB
+		const state = useFs.getState();
+		saveWorkspace(state.filesByPath).catch(console.error);
 	},
 	renameFile(oldPath, newPath) {
 		set((state) => {
@@ -85,9 +99,31 @@ const stateCreator = immer<FsStore>((set) => ({
 				status: existing.status === "new" ? "new" : "modified",
 			};
 		});
+		// Auto-save to IndexedDB
+		const state = useFs.getState();
+		saveWorkspace(state.filesByPath).catch(console.error);
 	},
 	resetFs() {
 		set({ filesByPath: cloneInitialFiles() });
+		// Clear IndexedDB when resetting
+		clearWorkspace().catch(console.error);
+	},
+	async loadFromPersistence() {
+		try {
+			const data = await loadWorkspace();
+			if (data?.filesByPath) {
+				set({ filesByPath: data.filesByPath });
+				return true;
+			}
+			return false;
+		} catch (error) {
+			console.error("Failed to load from persistence:", error);
+			return false;
+		}
+	},
+	async saveToIndexedDB() {
+		const state = useFs.getState();
+		await saveWorkspace(state.filesByPath);
 	},
 }));
 
