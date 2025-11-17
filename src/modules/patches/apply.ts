@@ -19,17 +19,19 @@ function applyRangeReplace(
 
 /**
  * Apply a single patch change to the file system
+ * Returns a new object with the change applied (for testing)
  */
-function applyChange(
+export function applyChange(
 	filesByPath: Record<string, VirtualFile>,
 	change: PatchChange,
-): void {
+): Record<string, VirtualFile> {
+	const result = { ...filesByPath };
 	switch (change.op) {
 		case "create": {
 			if (!change.content) {
 				throw new Error(`Create operation for ${change.path} missing content`);
 			}
-			filesByPath[change.path] = {
+			result[change.path] = {
 				path: change.path,
 				content: change.content,
 				status: "new",
@@ -38,7 +40,7 @@ function applyChange(
 		}
 
 		case "update": {
-			const existing = filesByPath[change.path];
+			const existing = result[change.path];
 			if (!existing) {
 				throw new Error(`Cannot update non-existent file: ${change.path}`);
 			}
@@ -63,7 +65,7 @@ function applyChange(
 				);
 			}
 
-			filesByPath[change.path] = {
+			result[change.path] = {
 				...existing,
 				content: newContent,
 				status: "modified",
@@ -72,10 +74,10 @@ function applyChange(
 		}
 
 		case "delete": {
-			if (!filesByPath[change.path]) {
+			if (!result[change.path]) {
 				throw new Error(`Cannot delete non-existent file: ${change.path}`);
 			}
-			delete filesByPath[change.path];
+			delete result[change.path];
 			break;
 		}
 
@@ -84,6 +86,7 @@ function applyChange(
 			throw new Error(`Unknown operation type: ${exhaustiveCheck}`);
 		}
 	}
+	return result;
 }
 
 /**
@@ -95,17 +98,12 @@ export function applyPatchToFs(
 	patch: Patch,
 ): ApplyPatchResult {
 	try {
-		// Create a deep copy to avoid mutating the original
-		const newFilesByPath: Record<string, VirtualFile> = {};
-		for (const [path, file] of Object.entries(filesByPath)) {
-			newFilesByPath[path] = { ...file };
-		}
-
+		let newFilesByPath = filesByPath;
 		const affectedPaths: string[] = [];
 
 		// Apply each change
 		for (const change of patch.changes) {
-			applyChange(newFilesByPath, change);
+			newFilesByPath = applyChange(newFilesByPath, change);
 			affectedPaths.push(change.path);
 		}
 
