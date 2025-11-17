@@ -1,10 +1,10 @@
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { Loader2, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { cn } from "../../utils/cn";
-import { useFs } from "../fs/store";
-import { loadPatches, matchPatchByTrigger } from "../patches/loader";
-import type { Patch } from "../patches/types";
+import { useFs } from "@/modules/fs/store";
+import { loadPatches, matchPatchByTrigger } from "@/modules/patches/loader";
+import type { Patch } from "@/modules/patches/types";
+import { cn } from "@/utils/cn";
 import { DiffReviewModal } from "./DiffReviewModal";
 import { useChatStore } from "./store";
 

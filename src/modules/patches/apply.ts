@@ -1,4 +1,4 @@
-import type { VirtualFile } from "../fs/types";
+import type { VirtualFile } from "@/modules/fs/types";
 import type { ApplyPatchResult, Patch, PatchOperation } from "./types";
 
 /**

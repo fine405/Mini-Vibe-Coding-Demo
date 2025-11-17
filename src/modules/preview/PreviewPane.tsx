@@ -1,5 +1,5 @@
 import { Sandpack } from "@codesandbox/sandpack-react";
-import { useFs } from "../fs/store";
+import { useFs } from "@/modules/fs/store";
 
 export function PreviewPane() {
 	const { filesByPath, activeFilePath } = useFs();

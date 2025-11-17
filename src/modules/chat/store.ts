@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import type { Patch } from "../patches/types";
+import type { Patch } from "@/modules/patches/types";
 
 export interface ChatMessage {
 	id: string;
