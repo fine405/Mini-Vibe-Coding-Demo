@@ -13,6 +13,7 @@ import {
 	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
 	exportProjectAsJSON,
 	importProjectFromJSON,
@@ -344,17 +345,23 @@ export function FileTreePane() {
 
 	const handleNewProject = () => {
 		const confirmed = window.confirm(
-			"Reset to a new project?\nAll current files will be lost.",
+			"Start a new project?\nThis will clear all current files and storage.",
 		);
 		if (!confirmed) return;
 		resetFs();
 		setActiveFile(null);
+		toast.success("New project created", {
+			description: "All files and storage cleared",
+		});
 	};
 
 	const handleExport = () => {
 		const projectName = window.prompt("Enter project name:", "my-project");
 		if (!projectName) return;
 		exportProjectAsJSON(filesByPath, projectName);
+		toast.success("Project exported", {
+			description: `${projectName}.json downloaded`,
+		});
 	};
 
 	const handleImport = async () => {
@@ -368,11 +375,16 @@ export function FileTreePane() {
 			const importedFiles = await importProjectFromJSON(file);
 			setFiles(importedFiles);
 			setActiveFile(null);
-			alert("Project imported successfully!");
+			const fileCount = Object.keys(importedFiles).length;
+			toast.success("Project imported successfully", {
+				description: `${fileCount} files loaded and saved to storage`,
+			});
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message : "Failed to import project";
-			alert(`Import failed: ${message}`);
+			toast.error("Import failed", {
+				description: message,
+			});
 		}
 	};
 
