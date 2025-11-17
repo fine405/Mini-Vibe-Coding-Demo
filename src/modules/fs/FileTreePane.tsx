@@ -7,8 +7,10 @@ import {
 	Folder,
 	Pencil,
 	Plus,
+	Search,
 	Trash2,
 	Upload,
+	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -16,6 +18,7 @@ import {
 	importProjectFromJSON,
 	selectProjectFile,
 } from "./export";
+import { fuzzyMatch } from "./fuzzyMatch";
 import { useFs } from "./store";
 import type { VirtualFile } from "./types";
 
@@ -84,12 +87,86 @@ function buildTree(filesByPath: Record<string, VirtualFile>): TreeNode[] {
 	return sortNodes(rootNodes);
 }
 
+/**
+ * Filter tree nodes based on fuzzy search query
+ * Returns nodes that match or have children that match
+ */
+function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
+	if (!query) return nodes;
+
+	const filtered: TreeNode[] = [];
+
+	for (const node of nodes) {
+		if (node.isDir && node.children) {
+			// For directories, recursively filter children
+			const filteredChildren = filterTree(node.children, query);
+			if (filteredChildren.length > 0) {
+				filtered.push({
+					...node,
+					children: filteredChildren,
+				});
+			}
+		} else {
+			// For files, check if path matches the query
+			const matchResult = fuzzyMatch(query, node.path);
+			if (matchResult.matched) {
+				filtered.push(node);
+			}
+		}
+	}
+
+	return filtered;
+}
+
+/**
+ * Highlight matched characters in text
+ */
+function HighlightedText({ text, query }: { text: string; query: string }) {
+	if (!query) {
+		return <>{text}</>;
+	}
+
+	const matchResult = fuzzyMatch(query, text);
+	if (!matchResult.matched) {
+		return <>{text}</>;
+	}
+
+	const parts: React.ReactNode[] = [];
+	let lastIndex = 0;
+
+	matchResult.matchedIndices.forEach((index) => {
+		// Add text before match
+		if (index > lastIndex) {
+			parts.push(
+				<span key={`text-${lastIndex}-${index}`}>
+					{text.substring(lastIndex, index)}
+				</span>,
+			);
+		}
+		// Add highlighted character
+		parts.push(
+			<span key={`match-${index}`} className="bg-yellow-500/30 text-yellow-200">
+				{text[index]}
+			</span>,
+		);
+		lastIndex = index + 1;
+	});
+
+	// Add remaining text
+	if (lastIndex < text.length) {
+		parts.push(<span key="text-end">{text.substring(lastIndex)}</span>);
+	}
+
+	return <>{parts}</>;
+}
+
 interface TreeRowProps {
 	node: TreeNode;
 	depth: number;
 	activePath: string | null;
 	onSelect: (path: string) => void;
 	filesByPath: Record<string, VirtualFile>;
+	searchQuery?: string;
 }
 
 function TreeRow({
@@ -98,6 +175,7 @@ function TreeRow({
 	activePath,
 	onSelect,
 	filesByPath,
+	searchQuery,
 }: TreeRowProps) {
 	const [expanded, setExpanded] = useState(true);
 	const isActive = activePath === node.path;
@@ -150,7 +228,13 @@ function TreeRow({
 				) : (
 					<FileCode2 className="mr-1 h-3 w-3 text-neutral-500" />
 				)}
-				<span className="truncate flex-1">{node.name}</span>
+				<span className="truncate flex-1">
+					{searchQuery && !node.isDir ? (
+						<HighlightedText text={node.path} query={searchQuery} />
+					) : (
+						node.name
+					)}
+				</span>
 				{/* Folder change indicator */}
 				{node.isDir && hasChanges && (
 					<span
@@ -183,6 +267,7 @@ function TreeRow({
 							activePath={activePath}
 							onSelect={onSelect}
 							filesByPath={filesByPath}
+							searchQuery={searchQuery}
 						/>
 					))}
 				</div>
@@ -203,7 +288,12 @@ export function FileTreePane() {
 		resetFs,
 	} = useFs();
 
+	const [searchQuery, setSearchQuery] = useState("");
 	const tree = useMemo(() => buildTree(filesByPath), [filesByPath]);
+	const filteredTree = useMemo(
+		() => filterTree(tree, searchQuery),
+		[tree, searchQuery],
+	);
 
 	const handleNewFile = () => {
 		const path = window.prompt("Enter new file path (e.g., /src/NewFile.tsx):");
@@ -347,19 +437,49 @@ export function FileTreePane() {
 					</button>
 				</div>
 			</div>
+			{/* Search Input */}
+			<div className="px-2 py-2 border-b border-neutral-800/60">
+				<div className="relative">
+					<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-neutral-500" />
+					<input
+						type="text"
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						placeholder="Search files..."
+						className="w-full pl-7 pr-7 py-1.5 text-xs bg-neutral-900 border border-neutral-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-neutral-100 placeholder:text-neutral-500"
+					/>
+					{searchQuery && (
+						<button
+							type="button"
+							onClick={() => setSearchQuery("")}
+							className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-neutral-700 text-neutral-500 hover:text-neutral-300 transition-colors"
+							title="Clear search"
+						>
+							<X className="h-3 w-3" />
+						</button>
+					)}
+				</div>
+			</div>
 			<ScrollArea.Root className="flex-1">
 				<ScrollArea.Viewport className="h-full w-full">
 					<div className="py-1 text-xs">
-						{tree.map((node) => (
-							<TreeRow
-								key={node.path}
-								node={node}
-								depth={0}
-								activePath={activeFilePath}
-								onSelect={setActiveFile}
-								filesByPath={filesByPath}
-							/>
-						))}
+						{filteredTree.length > 0 ? (
+							filteredTree.map((node) => (
+								<TreeRow
+									key={node.path}
+									node={node}
+									depth={0}
+									activePath={activeFilePath}
+									onSelect={setActiveFile}
+									filesByPath={filesByPath}
+									searchQuery={searchQuery}
+								/>
+							))
+						) : (
+							<div className="px-3 py-8 text-center text-neutral-500 text-xs">
+								{searchQuery ? "No files match your search" : "No files"}
+							</div>
+						)}
 					</div>
 				</ScrollArea.Viewport>
 				<ScrollArea.Scrollbar
