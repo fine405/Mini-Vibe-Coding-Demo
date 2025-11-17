@@ -116,13 +116,16 @@ export function ChatPane() {
 	return (
 		<div className="h-full w-full flex flex-col border-r border-neutral-800/60 bg-neutral-950/80 text-neutral-100">
 			{/* Header */}
-			<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800/60">
+			<div className="shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800/60">
 				Chat
 			</div>
 
 			{/* Messages */}
-			<ScrollArea.Root className="flex-1">
-				<ScrollArea.Viewport className="h-full w-full" ref={scrollRef}>
+			<ScrollArea.Root className="flex-1 overflow-hidden">
+				<ScrollArea.Viewport
+					className="h-full w-full overflow-y-auto"
+					ref={scrollRef}
+				>
 					<div className="p-3 space-y-3">
 						{messages.length === 0 && (
 							<div className="text-xs text-neutral-500 text-center py-8">
@@ -172,7 +175,7 @@ export function ChatPane() {
 			</ScrollArea.Root>
 
 			{/* Input */}
-			<div className="p-3 border-t border-neutral-800/60">
+			<div className="shrink-0 p-3 border-t border-neutral-800/60">
 				<div className="flex gap-2">
 					<input
 						type="text"
