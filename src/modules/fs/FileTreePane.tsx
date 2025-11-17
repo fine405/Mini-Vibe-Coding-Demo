@@ -71,11 +71,19 @@ interface TreeRowProps {
 	depth: number;
 	activePath: string | null;
 	onSelect: (path: string) => void;
+	filesByPath: Record<string, VirtualFile>;
 }
 
-function TreeRow({ node, depth, activePath, onSelect }: TreeRowProps) {
+function TreeRow({
+	node,
+	depth,
+	activePath,
+	onSelect,
+	filesByPath,
+}: TreeRowProps) {
 	const [expanded, setExpanded] = useState(true);
 	const isActive = activePath === node.path;
+	const fileStatus = !node.isDir ? filesByPath[node.path]?.status : null;
 
 	const handleClick = () => {
 		if (node.isDir) {
@@ -109,7 +117,18 @@ function TreeRow({ node, depth, activePath, onSelect }: TreeRowProps) {
 				) : (
 					<FileCode2 className="mr-1 h-3 w-3 text-neutral-500" />
 				)}
-				<span className="truncate">{node.name}</span>
+				<span className="truncate flex-1">{node.name}</span>
+				{!node.isDir && fileStatus && fileStatus !== "clean" && (
+					<span
+						className={`ml-auto text-[9px] font-semibold px-1 py-0.5 rounded ${
+							fileStatus === "new"
+								? "bg-green-500/20 text-green-400"
+								: "bg-blue-500/20 text-blue-400"
+						}`}
+					>
+						{fileStatus === "new" ? "N" : "M"}
+					</span>
+				)}
 			</button>
 			{node.isDir && expanded && node.children && node.children.length > 0 && (
 				<div>
@@ -120,6 +139,7 @@ function TreeRow({ node, depth, activePath, onSelect }: TreeRowProps) {
 							depth={depth + 1}
 							activePath={activePath}
 							onSelect={onSelect}
+							filesByPath={filesByPath}
 						/>
 					))}
 				</div>
@@ -250,6 +270,7 @@ export function FileTreePane() {
 								depth={0}
 								activePath={activeFilePath}
 								onSelect={setActiveFile}
+								filesByPath={filesByPath}
 							/>
 						))}
 					</div>
