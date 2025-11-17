@@ -8,13 +8,17 @@ export async function loadPatches(): Promise<Patch[]> {
 	// For now, we'll manually import known patches
 	const patches: Patch[] = [];
 
-	try {
-		const todoAppPatch = await fetch("/patches/todo-app.json");
-		if (todoAppPatch.ok) {
-			patches.push(await todoAppPatch.json());
+	const patchFiles = ["todo-app.json", "add-filters.json"];
+
+	for (const file of patchFiles) {
+		try {
+			const response = await fetch(`/patches/${file}`);
+			if (response.ok) {
+				patches.push(await response.json());
+			}
+		} catch (error) {
+			console.warn(`Failed to load ${file}:`, error);
 		}
-	} catch (error) {
-		console.warn("Failed to load todo-app patch:", error);
 	}
 
 	return patches;
