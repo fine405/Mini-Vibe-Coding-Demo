@@ -2,11 +2,14 @@ import "./App.css";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useState } from "react";
 import { Save, FolderOpen, CheckCheck } from "lucide-react";
+import { toast } from "sonner";
 import { PersistenceLoader } from "./components/PersistenceLoader";
 import {
 	CommandPalette,
 	type CommandAction,
 } from "./components/CommandPalette";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Toaster } from "./components/ui/toaster";
 import { ChatPane } from "./modules/chat/ChatPane";
 import { FileTreePane } from "./modules/fs/FileTreePane";
 import { PreviewPane } from "./modules/preview/PreviewPane";
@@ -25,8 +28,13 @@ export default function App() {
 			description: "Save all files to browser storage",
 			icon: <Save className="h-4 w-4" />,
 			action: async () => {
-				await saveToIndexedDB();
-				// Could add a toast notification here
+				const promise = saveToIndexedDB();
+				toast.promise(promise, {
+					loading: "Saving workspace...",
+					success: "Workspace saved successfully!",
+					error: "Failed to save workspace",
+				});
+				await promise;
 			},
 			shortcut: "⌘S",
 			group: "File",
@@ -49,6 +57,7 @@ export default function App() {
 			icon: <CheckCheck className="h-4 w-4" />,
 			action: () => {
 				acceptAllChanges();
+				toast.success("All changes accepted");
 			},
 			shortcut: "⌘⇧A",
 			group: "Edit",
@@ -73,35 +82,44 @@ export default function App() {
 			key: "s",
 			metaKey: true,
 			action: async () => {
-				await saveToIndexedDB();
+				const promise = saveToIndexedDB();
+				toast.promise(promise, {
+					loading: "Saving workspace...",
+					success: "Workspace saved successfully!",
+					error: "Failed to save workspace",
+				});
+				await promise;
 			},
 			description: "Save workspace",
 		},
 	]);
 
 	return (
-		<PersistenceLoader>
-			<div className="w-screen h-screen bg-neutral-950 text-neutral-100">
-				<PanelGroup direction="horizontal" className="h-full">
-					<Panel defaultSize={18} minSize={10}>
-						<ChatPane />
-					</Panel>
-					<PanelResizeHandle className="w-px bg-neutral-800/80" />
-					<Panel defaultSize={24} minSize={15}>
-						<FileTreePane />
-					</Panel>
-					<PanelResizeHandle className="w-px bg-neutral-800/80" />
-					<Panel defaultSize={58} minSize={25}>
-						<PreviewPane />
-					</Panel>
-				</PanelGroup>
+		<ErrorBoundary>
+			<PersistenceLoader>
+				<div className="w-screen h-screen bg-neutral-950 text-neutral-100">
+					<PanelGroup direction="horizontal" className="h-full">
+						<Panel defaultSize={18} minSize={10}>
+							<ChatPane />
+						</Panel>
+						<PanelResizeHandle className="w-px bg-neutral-800/80" />
+						<Panel defaultSize={24} minSize={15}>
+							<FileTreePane />
+						</Panel>
+						<PanelResizeHandle className="w-px bg-neutral-800/80" />
+						<Panel defaultSize={58} minSize={25}>
+							<PreviewPane />
+						</Panel>
+					</PanelGroup>
 
-				<CommandPalette
-					isOpen={commandPaletteOpen}
-					onClose={() => setCommandPaletteOpen(false)}
-					customActions={commandActions}
-				/>
-			</div>
-		</PersistenceLoader>
+					<CommandPalette
+						isOpen={commandPaletteOpen}
+						onClose={() => setCommandPaletteOpen(false)}
+						customActions={commandActions}
+					/>
+					<Toaster />
+				</div>
+			</PersistenceLoader>
+		</ErrorBoundary>
 	);
 }

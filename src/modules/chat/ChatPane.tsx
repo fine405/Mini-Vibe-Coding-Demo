@@ -1,6 +1,7 @@
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { Loader2, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useFs } from "@/modules/fs/store";
 import { applyPatchToFs } from "@/modules/patches/apply";
 import { loadPatches, matchPatchByTrigger } from "@/modules/patches/loader";
@@ -109,12 +110,24 @@ export function ChatPane() {
 			// Add confirmation message
 			const appliedCount =
 				selectedIndices?.size ?? reviewingPatch.changes.length;
+
+			toast.success(
+				`Applied ${appliedCount} of ${reviewingPatch.changes.length} changes`,
+				{
+					description: "Check the preview on the right",
+				},
+			);
+
 			addMessage({
 				role: "assistant",
 				content: `✅ Applied ${appliedCount} of ${reviewingPatch.changes.length} changes successfully! Check the preview on the right.`,
 			});
 		} else {
 			// Handle error
+			toast.error("Failed to apply changes", {
+				description: result.error,
+			});
+
 			addMessage({
 				role: "assistant",
 				content: `❌ Failed to apply changes: ${result.error}`,
