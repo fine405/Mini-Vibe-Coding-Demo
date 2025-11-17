@@ -1,56 +1,88 @@
 import type { VirtualFile } from "@/modules/fs/types";
-import type { ApplyPatchResult, Patch, PatchOperation } from "./types";
+import type { ApplyPatchResult, Patch, PatchChange } from "./types";
 
 /**
- * Apply a single patch operation to the file system
+ * Apply range replacement to file content
  */
-function applyOperation(
+function applyRangeReplace(
+	content: string,
+	startLine: number,
+	endLine: number,
+	newContent: string,
+): string {
+	const lines = content.split("\n");
+	// Lines are 1-indexed in the spec
+	const before = lines.slice(0, startLine - 1);
+	const after = lines.slice(endLine);
+	return [...before, newContent, ...after].join("\n");
+}
+
+/**
+ * Apply a single patch change to the file system
+ */
+function applyChange(
 	filesByPath: Record<string, VirtualFile>,
-	operation: PatchOperation,
+	change: PatchChange,
 ): void {
-	switch (operation.type) {
+	switch (change.op) {
 		case "create": {
-			if (!operation.content) {
-				throw new Error(
-					`Create operation for ${operation.path} missing content`,
-				);
+			if (!change.content) {
+				throw new Error(`Create operation for ${change.path} missing content`);
 			}
-			filesByPath[operation.path] = {
-				path: operation.path,
-				content: operation.content,
+			filesByPath[change.path] = {
+				path: change.path,
+				content: change.content,
 				status: "new",
 			};
 			break;
 		}
 
 		case "update": {
-			if (!operation.content) {
+			const existing = filesByPath[change.path];
+			if (!existing) {
+				throw new Error(`Cannot update non-existent file: ${change.path}`);
+			}
+
+			let newContent: string;
+
+			// Support both full-file replacement and range replacement
+			if (change.patch) {
+				// Range-based update
+				newContent = applyRangeReplace(
+					existing.content,
+					change.patch.startLine,
+					change.patch.endLine,
+					change.patch.content,
+				);
+			} else if (change.content !== undefined) {
+				// Full-file replacement
+				newContent = change.content;
+			} else {
 				throw new Error(
-					`Update operation for ${operation.path} missing content`,
+					`Update operation for ${change.path} missing content or patch`,
 				);
 			}
-			const existing = filesByPath[operation.path];
-			if (!existing) {
-				throw new Error(`Cannot update non-existent file: ${operation.path}`);
-			}
-			filesByPath[operation.path] = {
+
+			filesByPath[change.path] = {
 				...existing,
-				content: operation.content,
+				content: newContent,
 				status: "modified",
 			};
 			break;
 		}
 
 		case "delete": {
-			if (!filesByPath[operation.path]) {
-				throw new Error(`Cannot delete non-existent file: ${operation.path}`);
+			if (!filesByPath[change.path]) {
+				throw new Error(`Cannot delete non-existent file: ${change.path}`);
 			}
-			delete filesByPath[operation.path];
+			delete filesByPath[change.path];
 			break;
 		}
 
-		default:
-			throw new Error(`Unknown operation type: ${(operation as any).type}`);
+		default: {
+			const exhaustiveCheck: never = change.op;
+			throw new Error(`Unknown operation type: ${exhaustiveCheck}`);
+		}
 	}
 }
 
@@ -71,10 +103,10 @@ export function applyPatchToFs(
 
 		const affectedPaths: string[] = [];
 
-		// Apply each operation
-		for (const operation of patch.operations) {
-			applyOperation(newFilesByPath, operation);
-			affectedPaths.push(operation.path);
+		// Apply each change
+		for (const change of patch.changes) {
+			applyChange(newFilesByPath, change);
+			affectedPaths.push(change.path);
 		}
 
 		return {
@@ -102,16 +134,16 @@ export function previewPatch(patch: Patch): {
 	const updates: string[] = [];
 	const deletes: string[] = [];
 
-	for (const op of patch.operations) {
-		switch (op.type) {
+	for (const change of patch.changes) {
+		switch (change.op) {
 			case "create":
-				creates.push(op.path);
+				creates.push(change.path);
 				break;
 			case "update":
-				updates.push(op.path);
+				updates.push(change.path);
 				break;
 			case "delete":
-				deletes.push(op.path);
+				deletes.push(change.path);
 				break;
 		}
 	}

@@ -70,26 +70,26 @@ export function ChatPane() {
 
 		// Apply patch to FS
 		const newFilesByPath = { ...filesByPath };
-		for (const op of reviewingPatch.operations) {
-			switch (op.type) {
+		for (const change of reviewingPatch.changes) {
+			switch (change.op) {
 				case "create":
-					newFilesByPath[op.path] = {
-						path: op.path,
-						content: op.content || "",
+					newFilesByPath[change.path] = {
+						path: change.path,
+						content: change.content || "",
 						status: "new",
 					};
 					break;
 				case "update":
-					if (newFilesByPath[op.path]) {
-						newFilesByPath[op.path] = {
-							...newFilesByPath[op.path],
-							content: op.content || "",
+					if (newFilesByPath[change.path]) {
+						newFilesByPath[change.path] = {
+							...newFilesByPath[change.path],
+							content: change.content || "",
 							status: "modified",
 						};
 					}
 					break;
 				case "delete":
-					delete newFilesByPath[op.path];
+					delete newFilesByPath[change.path];
 					break;
 			}
 		}

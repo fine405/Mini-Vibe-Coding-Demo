@@ -4,12 +4,23 @@
 export type PatchOperationType = "create" | "update" | "delete";
 
 /**
- * Single file operation in a patch
+ * Range replacement for partial file updates
  */
-export interface PatchOperation {
-	type: PatchOperationType;
+export interface ReplaceRange {
+	type: "replace-range";
+	startLine: number;
+	endLine: number;
+	content: string;
+}
+
+/**
+ * Single file change in a patch
+ */
+export interface PatchChange {
+	op: PatchOperationType;
 	path: string;
-	content?: string; // For create/update operations
+	content?: string; // For create or full-file update
+	patch?: ReplaceRange; // For range-based update
 }
 
 /**
@@ -19,7 +30,7 @@ export interface Patch {
 	id: string;
 	trigger: string; // User input that triggers this patch
 	summary: string; // Human-readable description
-	operations: PatchOperation[];
+	changes: PatchChange[];
 }
 
 /**
