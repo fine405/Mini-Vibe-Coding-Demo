@@ -1,6 +1,4 @@
-import {
-  Sandpack,
-} from "@codesandbox/sandpack-react";
+import { Sandpack } from "@codesandbox/sandpack-react";
 import { useFs } from "../fs/store";
 
 export function PreviewPane() {
@@ -21,8 +19,8 @@ export function PreviewPane() {
 				<span>Preview</span>
 			</div>
 			<Sandpack
-      files={files}
-      template="react"
+				files={files}
+				template="react"
 				options={{
 					activeFile: activeFilePath || undefined,
 					editorHeight: "calc(100vh - 32px)",

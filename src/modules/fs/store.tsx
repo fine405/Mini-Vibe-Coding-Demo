@@ -22,7 +22,7 @@ const INITIAL_FILES: Record<string, VirtualFile> = {
 			"export default function App(){\n" +
 			"  return (<div style={{ padding: 16 }}><h1>Hello from virtual FS</h1></div>);\n" +
 			"}\n",
-  },
+	},
 };
 
 const cloneInitialFiles = (): Record<string, VirtualFile> =>

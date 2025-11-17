@@ -1,7 +1,7 @@
+import { FileCode2, FileEdit, FilePlus, FileX, X } from "lucide-react";
 import { useState } from "react";
-import { X, FileCode2, FilePlus, FileEdit, FileX } from "lucide-react";
-import type { Patch } from "../patches/types";
 import { previewPatch } from "../patches/apply";
+import type { Patch } from "../patches/types";
 
 interface DiffReviewModalProps {
 	patch: Patch;

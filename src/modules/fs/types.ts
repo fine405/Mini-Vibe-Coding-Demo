@@ -1,11 +1,11 @@
 export type FileStatus = "clean" | "new" | "modified";
 
 export interface VirtualFile {
-  path: string;
-  content: string;
-  status: FileStatus;
+	path: string;
+	content: string;
+	status: FileStatus;
 }
 
 export interface VirtualFileSystemState {
-  filesByPath: Record<string, VirtualFile>;
+	filesByPath: Record<string, VirtualFile>;
 }

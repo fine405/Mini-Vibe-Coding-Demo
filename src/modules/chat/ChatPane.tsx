@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { Send, Loader2 } from "lucide-react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import { useChatStore } from "./store";
-import { loadPatches, matchPatchByTrigger } from "../patches/loader";
-import { useFs } from "../fs/store";
-import { DiffReviewModal } from "./DiffReviewModal";
-import type { Patch } from "../patches/types";
+import { Loader2, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../utils/cn";
+import { useFs } from "../fs/store";
+import { loadPatches, matchPatchByTrigger } from "../patches/loader";
+import type { Patch } from "../patches/types";
+import { DiffReviewModal } from "./DiffReviewModal";
+import { useChatStore } from "./store";
 
 export function ChatPane() {
 	const { messages, isLoading, addMessage, setLoading } = useChatStore();
@@ -22,6 +22,7 @@ export function ChatPane() {
 	}, []);
 
 	// Auto-scroll to bottom when messages change
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		if (scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;

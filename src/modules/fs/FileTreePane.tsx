@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import {
 	ChevronDown,
@@ -9,6 +8,7 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useFs } from "./store";
 import type { VirtualFile } from "./types";
 

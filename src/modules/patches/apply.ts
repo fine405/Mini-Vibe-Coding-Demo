@@ -1,5 +1,5 @@
 import type { VirtualFile } from "../fs/types";
-import type { Patch, PatchOperation, ApplyPatchResult } from "./types";
+import type { ApplyPatchResult, Patch, PatchOperation } from "./types";
 
 /**
  * Apply a single patch operation to the file system
@@ -11,7 +11,9 @@ function applyOperation(
 	switch (operation.type) {
 		case "create": {
 			if (!operation.content) {
-				throw new Error(`Create operation for ${operation.path} missing content`);
+				throw new Error(
+					`Create operation for ${operation.path} missing content`,
+				);
 			}
 			filesByPath[operation.path] = {
 				path: operation.path,
@@ -23,7 +25,9 @@ function applyOperation(
 
 		case "update": {
 			if (!operation.content) {
-				throw new Error(`Update operation for ${operation.path} missing content`);
+				throw new Error(
+					`Update operation for ${operation.path} missing content`,
+				);
 			}
 			const existing = filesByPath[operation.path];
 			if (!existing) {
