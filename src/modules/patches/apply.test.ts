@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VirtualFile } from "../fs/types";
-import { applyChange } from "./apply";
+import { applyChange, applyPatchToFs } from "./apply";
 import type { PatchChange } from "./types";
 
 describe("Patch Application", () => {
@@ -118,5 +118,101 @@ describe("Patch Application", () => {
 		};
 		filesByPath = applyChange(filesByPath, del);
 		expect(filesByPath["/app.js"]).toBeUndefined();
+	});
+});
+
+describe("Partial Patch Application", () => {
+	it("should apply only selected changes", () => {
+		const filesByPath: Record<string, VirtualFile> = {
+			"/file1.js": {
+				path: "/file1.js",
+				content: "old content 1",
+				status: "clean",
+			},
+			"/file2.js": {
+				path: "/file2.js",
+				content: "old content 2",
+				status: "clean",
+			},
+		};
+
+		const patch = {
+			id: "test-patch",
+			trigger: "test",
+			summary: "Test patch",
+			changes: [
+				{
+					op: "update" as const,
+					path: "/file1.js",
+					content: "new content 1",
+				},
+				{
+					op: "update" as const,
+					path: "/file2.js",
+					content: "new content 2",
+				},
+				{
+					op: "create" as const,
+					path: "/file3.js",
+					content: "new file",
+				},
+			],
+		};
+
+		// Apply only changes at indices 0 and 2 (skip index 1)
+		const selectedIndices = new Set([0, 2]);
+		const result = applyPatchToFs(filesByPath, patch, selectedIndices);
+
+		expect(result.success).toBe(true);
+		expect(result.affectedPaths).toEqual(["/file1.js", "/file3.js"]);
+	});
+
+	it("should apply all changes when no selection provided", () => {
+		const filesByPath: Record<string, VirtualFile> = {};
+
+		const patch = {
+			id: "test-patch",
+			trigger: "test",
+			summary: "Test patch",
+			changes: [
+				{
+					op: "create" as const,
+					path: "/file1.js",
+					content: "content 1",
+				},
+				{
+					op: "create" as const,
+					path: "/file2.js",
+					content: "content 2",
+				},
+			],
+		};
+
+		const result = applyPatchToFs(filesByPath, patch);
+
+		expect(result.success).toBe(true);
+		expect(result.affectedPaths).toEqual(["/file1.js", "/file2.js"]);
+	});
+
+	it("should handle empty selection", () => {
+		const filesByPath: Record<string, VirtualFile> = {};
+
+		const patch = {
+			id: "test-patch",
+			trigger: "test",
+			summary: "Test patch",
+			changes: [
+				{
+					op: "create" as const,
+					path: "/file1.js",
+					content: "content 1",
+				},
+			],
+		};
+
+		const result = applyPatchToFs(filesByPath, patch, new Set());
+
+		expect(result.success).toBe(true);
+		expect(result.affectedPaths).toEqual([]);
 	});
 });

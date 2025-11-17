@@ -1,11 +1,10 @@
 import { FileCode2, FileEdit, FilePlus, FileX, X } from "lucide-react";
 import { useState } from "react";
-import { previewPatch } from "@/modules/patches/apply";
 import type { Patch } from "@/modules/patches/types";
 
 interface DiffReviewModalProps {
 	patch: Patch;
-	onAccept: () => void;
+	onAccept: (selectedIndices?: Set<number>) => void;
 	onCancel: () => void;
 }
 
@@ -15,13 +14,33 @@ export function DiffReviewModal({
 	onCancel,
 }: DiffReviewModalProps) {
 	const [isApplying, setIsApplying] = useState(false);
-	const preview = previewPatch(patch);
+	const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
+		new Set(patch.changes.map((_, i) => i)),
+	);
+
+	const toggleChange = (index: number) => {
+		const newSelected = new Set(selectedIndices);
+		if (newSelected.has(index)) {
+			newSelected.delete(index);
+		} else {
+			newSelected.add(index);
+		}
+		setSelectedIndices(newSelected);
+	};
+
+	const toggleAll = () => {
+		if (selectedIndices.size === patch.changes.length) {
+			setSelectedIndices(new Set());
+		} else {
+			setSelectedIndices(new Set(patch.changes.map((_, i) => i)));
+		}
+	};
 
 	const handleAccept = async () => {
 		setIsApplying(true);
 		// Small delay for UX
 		await new Promise((resolve) => setTimeout(resolve, 300));
-		onAccept();
+		onAccept(selectedIndices);
 		setIsApplying(false);
 	};
 
@@ -49,68 +68,84 @@ export function DiffReviewModal({
 				{/* Content */}
 				<div className="flex-1 overflow-y-auto px-4 py-3">
 					<div className="space-y-3">
-						{/* Creates */}
-						{preview.creates.length > 0 && (
-							<div>
-								<div className="flex items-center gap-2 text-xs font-medium text-green-400 mb-2">
-									<FilePlus className="h-3.5 w-3.5" />
-									<span>New Files ({preview.creates.length})</span>
-								</div>
-								<ul className="space-y-1">
-									{preview.creates.map((path) => (
-										<li
-											key={path}
-											className="flex items-center gap-2 text-xs text-neutral-300 bg-green-500/10 border border-green-500/20 rounded px-2 py-1.5"
-										>
-											<FileCode2 className="h-3 w-3 text-green-400" />
-											<span className="font-mono">{path}</span>
-										</li>
-									))}
-								</ul>
-							</div>
-						)}
+						{/* Select All Toggle */}
+						<div className="flex items-center justify-between pb-2 border-b border-neutral-700/50">
+							<span className="text-xs text-neutral-400">
+								{selectedIndices.size} of {patch.changes.length} changes
+								selected
+							</span>
+							<button
+								type="button"
+								onClick={toggleAll}
+								className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+							>
+								{selectedIndices.size === patch.changes.length
+									? "Deselect All"
+									: "Select All"}
+							</button>
+						</div>
 
-						{/* Updates */}
-						{preview.updates.length > 0 && (
-							<div>
-								<div className="flex items-center gap-2 text-xs font-medium text-blue-400 mb-2">
-									<FileEdit className="h-3.5 w-3.5" />
-									<span>Modified Files ({preview.updates.length})</span>
-								</div>
-								<ul className="space-y-1">
-									{preview.updates.map((path) => (
-										<li
-											key={path}
-											className="flex items-center gap-2 text-xs text-neutral-300 bg-blue-500/10 border border-blue-500/20 rounded px-2 py-1.5"
-										>
-											<FileCode2 className="h-3 w-3 text-blue-400" />
-											<span className="font-mono">{path}</span>
-										</li>
-									))}
-								</ul>
-							</div>
-						)}
+						{/* Individual Changes */}
+						{patch.changes.map((change, index) => {
+							const isSelected = selectedIndices.has(index);
+							let Icon = FileCode2;
+							let colorClass = "text-neutral-400";
+							let bgClass = "bg-neutral-500/10";
+							let borderClass = "border-neutral-500/20";
 
-						{/* Deletes */}
-						{preview.deletes.length > 0 && (
-							<div>
-								<div className="flex items-center gap-2 text-xs font-medium text-red-400 mb-2">
-									<FileX className="h-3.5 w-3.5" />
-									<span>Deleted Files ({preview.deletes.length})</span>
+							if (change.op === "create") {
+								Icon = FilePlus;
+								colorClass = "text-green-400";
+								bgClass = "bg-green-500/10";
+								borderClass = "border-green-500/20";
+							} else if (change.op === "update") {
+								Icon = FileEdit;
+								colorClass = "text-blue-400";
+								bgClass = "bg-blue-500/10";
+								borderClass = "border-blue-500/20";
+							} else if (change.op === "delete") {
+								Icon = FileX;
+								colorClass = "text-red-400";
+								bgClass = "bg-red-500/10";
+								borderClass = "border-red-500/20";
+							}
+
+							return (
+								// biome-ignore lint/a11y/useSemanticElements: <explanation>
+								<div
+									key={`${change.path}-${index}`}
+									className={`flex items-center gap-2 text-xs ${bgClass} border ${borderClass} rounded px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity ${
+										!isSelected ? "opacity-40" : ""
+									}`}
+									onClick={() => toggleChange(index)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											toggleChange(index);
+										}
+									}}
+									role="button"
+									tabIndex={0}
+								>
+									<input
+										type="checkbox"
+										checked={isSelected}
+										onChange={() => toggleChange(index)}
+										className="h-3.5 w-3.5 rounded border-neutral-600 bg-neutral-800 text-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+										onClick={(e) => e.stopPropagation()}
+									/>
+									<Icon className={`h-3 w-3 ${colorClass}`} />
+									<span className="font-mono text-neutral-300 flex-1">
+										{change.path}
+									</span>
+									<span
+										className={`text-[10px] uppercase font-medium ${colorClass}`}
+									>
+										{change.op}
+									</span>
 								</div>
-								<ul className="space-y-1">
-									{preview.deletes.map((path) => (
-										<li
-											key={path}
-											className="flex items-center gap-2 text-xs text-neutral-300 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5"
-										>
-											<FileCode2 className="h-3 w-3 text-red-400" />
-											<span className="font-mono">{path}</span>
-										</li>
-									))}
-								</ul>
-							</div>
-						)}
+							);
+						})}
 					</div>
 				</div>
 

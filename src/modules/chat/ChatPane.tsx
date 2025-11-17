@@ -2,6 +2,7 @@ import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { Loader2, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useFs } from "@/modules/fs/store";
+import { applyPatchToFs } from "@/modules/patches/apply";
 import { loadPatches, matchPatchByTrigger } from "@/modules/patches/loader";
 import type { Patch } from "@/modules/patches/types";
 import { cn } from "@/utils/cn";
@@ -22,7 +23,7 @@ export function ChatPane() {
 	}, []);
 
 	// Auto-scroll to bottom when messages change
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+	// biome-ignore lint/correctness/useExhaustiveDependencies: only want to trigger on messages change
 	useEffect(() => {
 		if (scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -65,44 +66,60 @@ export function ChatPane() {
 		setLoading(false);
 	};
 
-	const handleAcceptPatch = () => {
+	const handleAcceptPatch = (selectedIndices?: Set<number>) => {
 		if (!reviewingPatch) return;
 
-		// Apply patch to FS
-		const newFilesByPath = { ...filesByPath };
-		for (const change of reviewingPatch.changes) {
-			switch (change.op) {
-				case "create":
-					newFilesByPath[change.path] = {
-						path: change.path,
-						content: change.content || "",
-						status: "new",
-					};
-					break;
-				case "update":
-					if (newFilesByPath[change.path]) {
+		// Apply patch to FS using the applyPatchToFs function
+		const result = applyPatchToFs(filesByPath, reviewingPatch, selectedIndices);
+
+		if (result.success) {
+			// Get the updated filesByPath by reapplying changes
+			const newFilesByPath = { ...filesByPath };
+			const changesToApply = selectedIndices
+				? reviewingPatch.changes.filter((_, i) => selectedIndices.has(i))
+				: reviewingPatch.changes;
+
+			for (const change of changesToApply) {
+				switch (change.op) {
+					case "create":
 						newFilesByPath[change.path] = {
-							...newFilesByPath[change.path],
+							path: change.path,
 							content: change.content || "",
-							status: "modified",
+							status: "new",
 						};
-					}
-					break;
-				case "delete":
-					delete newFilesByPath[change.path];
-					break;
+						break;
+					case "update":
+						if (newFilesByPath[change.path]) {
+							newFilesByPath[change.path] = {
+								...newFilesByPath[change.path],
+								content: change.content || "",
+								status: "modified",
+							};
+						}
+						break;
+					case "delete":
+						delete newFilesByPath[change.path];
+						break;
+				}
 			}
+
+			setFiles(newFilesByPath);
+			setReviewingPatch(null);
+
+			// Add confirmation message
+			const appliedCount =
+				selectedIndices?.size ?? reviewingPatch.changes.length;
+			addMessage({
+				role: "assistant",
+				content: `✅ Applied ${appliedCount} of ${reviewingPatch.changes.length} changes successfully! Check the preview on the right.`,
+			});
+		} else {
+			// Handle error
+			addMessage({
+				role: "assistant",
+				content: `❌ Failed to apply changes: ${result.error}`,
+			});
 		}
-
-		setFiles(newFilesByPath);
-		setReviewingPatch(null);
-
-		// Add confirmation message
-		addMessage({
-			role: "assistant",
-			content:
-				"✅ Changes applied successfully! Check the preview on the right.",
-		});
 	};
 
 	const handleKeyPress = (e: React.KeyboardEvent) => {

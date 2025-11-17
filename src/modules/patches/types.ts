@@ -41,3 +41,11 @@ export interface ApplyPatchResult {
 	error?: string;
 	affectedPaths: string[];
 }
+
+/**
+ * Partial patch with selected changes
+ */
+export interface PartialPatch {
+	patch: Patch;
+	selectedChangeIndices: Set<number>;
+}

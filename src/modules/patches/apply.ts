@@ -96,13 +96,20 @@ export function applyChange(
 export function applyPatchToFs(
 	filesByPath: Record<string, VirtualFile>,
 	patch: Patch,
+	selectedIndices?: Set<number>,
 ): ApplyPatchResult {
 	try {
 		let newFilesByPath = filesByPath;
 		const affectedPaths: string[] = [];
 
-		// Apply each change
-		for (const change of patch.changes) {
+		// Apply each change (optionally filtered by selectedIndices)
+		for (let i = 0; i < patch.changes.length; i++) {
+			// Skip if selectedIndices is provided and this index is not selected
+			if (selectedIndices && !selectedIndices.has(i)) {
+				continue;
+			}
+
+			const change = patch.changes[i];
 			newFilesByPath = applyChange(newFilesByPath, change);
 			affectedPaths.push(change.path);
 		}
