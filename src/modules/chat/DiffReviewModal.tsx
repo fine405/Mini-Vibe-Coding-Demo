@@ -111,21 +111,13 @@ export function DiffReviewModal({
 							}
 
 							return (
-								// biome-ignore lint/a11y/useSemanticElements: <explanation>
-								<div
+								<button
+									type="button"
 									key={`${change.path}-${index}`}
-									className={`flex items-center gap-2 text-xs ${bgClass} border ${borderClass} rounded px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity ${
+									className={`flex w-full items-center gap-2 text-left text-xs ${bgClass} border ${borderClass} rounded px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity ${
 										!isSelected ? "opacity-40" : ""
 									}`}
 									onClick={() => toggleChange(index)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" || e.key === " ") {
-											e.preventDefault();
-											toggleChange(index);
-										}
-									}}
-									role="button"
-									tabIndex={0}
 								>
 									<input
 										type="checkbox"
@@ -143,7 +135,7 @@ export function DiffReviewModal({
 									>
 										{change.op}
 									</span>
-								</div>
+								</button>
 							);
 						})}
 					</div>

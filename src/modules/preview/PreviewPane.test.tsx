@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useFs } from "../fs/store";
+import type { VirtualFile } from "../fs/types";
 import { PreviewPane } from "./PreviewPane";
 
 // Mock Sandpack component
@@ -22,6 +23,12 @@ vi.mock("../fs/store", () => ({
 	useFs: vi.fn(),
 }));
 
+function mockFsState(filesByPath: Record<string, VirtualFile>) {
+	return {
+		filesByPath,
+	} as unknown as ReturnType<typeof useFs>;
+}
+
 describe("Preview Refresh", () => {
 	it("should render preview with initial files", () => {
 		const mockFilesByPath = {
@@ -32,9 +39,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue({
-			filesByPath: mockFilesByPath,
-		} as any);
+		vi.mocked(useFs).mockReturnValue(mockFsState(mockFilesByPath));
 
 		render(<PreviewPane />);
 
@@ -53,9 +58,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue({
-			filesByPath: mockFilesByPath,
-		} as any);
+		vi.mocked(useFs).mockReturnValue(mockFsState(mockFilesByPath));
 
 		const { rerender } = render(<PreviewPane />);
 
@@ -70,9 +73,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue({
-			filesByPath: updatedFilesByPath,
-		} as any);
+		vi.mocked(useFs).mockReturnValue(mockFsState(updatedFilesByPath));
 
 		rerender(<PreviewPane />);
 
@@ -98,9 +99,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue({
-			filesByPath: mockFilesByPath,
-		} as any);
+		vi.mocked(useFs).mockReturnValue(mockFsState(mockFilesByPath));
 
 		render(<PreviewPane />);
 
@@ -118,9 +117,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue({
-			filesByPath: initialFiles,
-		} as any);
+		vi.mocked(useFs).mockReturnValue(mockFsState(initialFiles));
 
 		const { rerender } = render(<PreviewPane />);
 
@@ -136,9 +133,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue({
-			filesByPath: updatedFiles,
-		} as any);
+		vi.mocked(useFs).mockReturnValue(mockFsState(updatedFiles));
 
 		rerender(<PreviewPane />);
 
@@ -162,9 +157,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue({
-			filesByPath: initialFiles,
-		} as any);
+		vi.mocked(useFs).mockReturnValue(mockFsState(initialFiles));
 
 		const { rerender } = render(<PreviewPane />);
 
@@ -175,9 +168,7 @@ describe("Preview Refresh", () => {
 			"/index.js": initialFiles["/index.js"],
 		};
 
-		vi.mocked(useFs).mockReturnValue({
-			filesByPath: updatedFiles,
-		} as any);
+		vi.mocked(useFs).mockReturnValue(mockFsState(updatedFiles));
 
 		rerender(<PreviewPane />);
 

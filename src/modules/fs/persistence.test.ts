@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { WorkspaceData } from "./persistence";
 import {
 	clearWorkspace,
 	hasWorkspace,
@@ -7,78 +8,111 @@ import {
 } from "./persistence";
 import type { VirtualFile } from "./types";
 
+type MockStore = Record<string, WorkspaceData | undefined>;
+
+const WORKSPACE_KEY = "current-workspace";
+
+function createEventTargetShim(): Pick<
+	EventTarget,
+	"addEventListener" | "removeEventListener" | "dispatchEvent"
+> {
+	return {
+		addEventListener: (
+			_type: string,
+			_listener: EventListenerOrEventListenerObject | null,
+			_options?: boolean | AddEventListenerOptions,
+		) => undefined,
+		removeEventListener: (
+			_type: string,
+			_listener: EventListenerOrEventListenerObject | null,
+			_options?: boolean | EventListenerOptions,
+		) => undefined,
+		dispatchEvent: (_event: Event) => true,
+	};
+}
+
+function createRequest<T>(result: T): IDBRequest<T> {
+	return {
+		...createEventTargetShim(),
+		result,
+		error: null,
+		readyState: "pending" as IDBRequestReadyState,
+		source: null,
+		transaction: null,
+		onsuccess: null,
+		onerror: null,
+	} as IDBRequest<T>;
+}
+
+function createOpenRequest(db: IDBDatabase): IDBOpenDBRequest {
+	return {
+		...createRequest(db),
+		onblocked: null,
+		onupgradeneeded: null,
+	} as IDBOpenDBRequest;
+}
+
+function createObjectStore(mockStore: MockStore) {
+	return {
+		get: vi.fn((key: IDBValidKey) => {
+			const getRequest = createRequest(mockStore[String(key)]);
+			setTimeout(() => {
+				getRequest.onsuccess?.call(getRequest, new Event("success"));
+			}, 0);
+			return getRequest;
+		}),
+		put: vi.fn((value: WorkspaceData, key: IDBValidKey) => {
+			const putRequest = createRequest<undefined>(undefined);
+			mockStore[String(key)] = value;
+			setTimeout(() => {
+				putRequest.onsuccess?.call(putRequest, new Event("success"));
+			}, 0);
+			return putRequest;
+		}),
+		delete: vi.fn((key: IDBValidKey) => {
+			const deleteRequest = createRequest<undefined>(undefined);
+			delete mockStore[String(key)];
+			setTimeout(() => {
+				deleteRequest.onsuccess?.call(deleteRequest, new Event("success"));
+			}, 0);
+			return deleteRequest;
+		}),
+	} as unknown as IDBObjectStore;
+}
+
 describe("Persistence", () => {
-	// Mock IndexedDB
-	let mockStore: Record<string, any> = {};
+	let mockStore: MockStore = {};
 
 	beforeEach(() => {
 		mockStore = {};
 
+		const objectStore = createObjectStore(mockStore);
+		const mockDatabase = {
+			transaction: vi.fn(
+				() =>
+					({
+						objectStore: () => objectStore,
+					}) as IDBTransaction,
+			),
+			createObjectStore: vi.fn(),
+			objectStoreNames: {
+				length: 1,
+				item: () => null,
+				contains: () => true,
+			} as unknown as DOMStringList,
+		} as unknown as IDBDatabase;
+
 		// Mock indexedDB
 		global.indexedDB = {
 			open: vi.fn(() => {
-				const request = {
-					onsuccess: null as any,
-					onerror: null as any,
-					onupgradeneeded: null as any,
-					result: {
-						transaction: vi.fn(() => ({
-							objectStore: vi.fn(() => ({
-								get: vi.fn((key: string) => {
-									const getRequest = {
-										onsuccess: null as any,
-										onerror: null as any,
-										result: mockStore[key],
-									};
-									setTimeout(() => {
-										if (getRequest.onsuccess) {
-											getRequest.onsuccess({ target: getRequest });
-										}
-									}, 0);
-									return getRequest;
-								}),
-								put: vi.fn((value: any, key: string) => {
-									const putRequest = {
-										onsuccess: null as any,
-										onerror: null as any,
-									};
-									mockStore[key] = value;
-									setTimeout(() => {
-										if (putRequest.onsuccess) {
-											putRequest.onsuccess({});
-										}
-									}, 0);
-									return putRequest;
-								}),
-								delete: vi.fn((key: string) => {
-									const deleteRequest = {
-										onsuccess: null as any,
-										onerror: null as any,
-									};
-									delete mockStore[key];
-									setTimeout(() => {
-										if (deleteRequest.onsuccess) {
-											deleteRequest.onsuccess({});
-										}
-									}, 0);
-									return deleteRequest;
-								}),
-							})),
-						})),
-						createObjectStore: vi.fn(),
-					},
-				};
+				const request = createOpenRequest(mockDatabase);
 				setTimeout(() => {
-					if (request.onsuccess) {
-						request.onsuccess({ target: request });
-					}
+					request.onsuccess?.call(request, new Event("success"));
 				}, 0);
 				return request;
 			}),
-		} as any;
+		} as unknown as IDBFactory;
 	});
-
-	const WORKSPACE_KEY = "current-workspace";
 
 	it("should save workspace to IndexedDB", async () => {
 		const filesByPath: Record<string, VirtualFile> = {

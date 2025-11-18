@@ -1,4 +1,4 @@
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
@@ -26,4 +26,4 @@ const indexedDB = {
 	}),
 };
 
-global.indexedDB = indexedDB as any;
+global.indexedDB = indexedDB as unknown as IDBFactory;
