@@ -1,5 +1,12 @@
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import { Loader2, Send } from "lucide-react";
+import {
+	ChevronLeft,
+	ChevronRight,
+	Loader2,
+	Send,
+	Sparkles,
+	X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useFs } from "@/modules/fs/store";
@@ -16,7 +23,9 @@ export function ChatPane() {
 	const [input, setInput] = useState("");
 	const [patches, setPatches] = useState<Patch[]>([]);
 	const [reviewingPatch, setReviewingPatch] = useState<Patch | null>(null);
+	const [showSuggestions, setShowSuggestions] = useState(true);
 	const scrollRef = useRef<HTMLDivElement>(null);
+	const suggestionsScrollRef = useRef<HTMLDivElement>(null);
 
 	// Load patches on mount
 	useEffect(() => {
@@ -143,6 +152,19 @@ export function ChatPane() {
 
 	const sendDisabled = !input.trim() || isLoading;
 
+	const scrollSuggestions = (direction: "left" | "right") => {
+		if (suggestionsScrollRef.current) {
+			const scrollAmount = 200;
+			const newScrollLeft =
+				suggestionsScrollRef.current.scrollLeft +
+				(direction === "right" ? scrollAmount : -scrollAmount);
+			suggestionsScrollRef.current.scrollTo({
+				left: newScrollLeft,
+				behavior: "smooth",
+			});
+		}
+	};
+
 	return (
 		<div className="h-full w-full flex flex-col border-r border-neutral-800/60 bg-neutral-950/80 text-neutral-100">
 			{/* Header */}
@@ -205,36 +227,111 @@ export function ChatPane() {
 			</ScrollArea.Root>
 
 			{/* Input */}
-			<div className="shrink-0 p-3 border-t border-neutral-800/60">
-				<div className="flex gap-2">
-					<input
-						type="text"
-						value={input}
-						onChange={(e) => setInput(e.target.value)}
-						onKeyDown={handleKeyPress}
-						placeholder="Ask me to create something..."
-						disabled={isLoading}
-						className="flex-1 px-2.5 py-1.5 text-xs bg-neutral-900 border border-neutral-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-neutral-100 placeholder:text-neutral-500 disabled:opacity-50"
-					/>
-					<button
-						type="button"
-						onClick={handleSend}
-						disabled={sendDisabled}
-						className={cn(
-							"py-1.5 px-4  bg-blue-500 rounded text-white transition-colors`",
-							{
-								"hover:bg-blue-600": !sendDisabled,
-								"opacity-50 cursor-not-allowed": sendDisabled,
-							},
-						)}
-						title="Send (⌘+Enter)"
-					>
-						<Send className="h-3.5 w-3.5" />
-					</button>
+			<div className="shrink-0">
+				{/* Suggestions */}
+				{patches.length > 0 && showSuggestions && (
+					<div className="relative  py-4">
+						{/* Header with close button */}
+						<div className="flex items-center justify-between px-4 mb-3">
+							<div className="flex items-center gap-2">
+								<Sparkles className="h-4 w-4 text-neutral-400" />
+								<span className="text-sm font-normal text-neutral-300">
+									Suggestions
+								</span>
+							</div>
+							<button
+								type="button"
+								onClick={() => setShowSuggestions(false)}
+								className="p-1 hover:bg-neutral-700/50 rounded transition-colors"
+								title="Close suggestions"
+							>
+								<X className="h-4 w-4 text-neutral-400 hover:text-neutral-200" />
+							</button>
+						</div>
+
+						{/* Scrollable suggestions */}
+						<div className="relative">
+							{/* Left gradient mask */}
+							<div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-[black] via-[black]/80 to-transparent z-[5] pointer-events-none" />
+
+							{/* Left arrow */}
+							<button
+								type="button"
+								onClick={() => scrollSuggestions("left")}
+								className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-1 hover:bg-neutral-700/90 rounded-full transition-colors"
+								title="Scroll left"
+							>
+								<ChevronLeft className="h-3 w-3 text-neutral-300" />
+							</button>
+
+							{/* Suggestions container */}
+							<div
+								ref={suggestionsScrollRef}
+								className="overflow-x-auto scroll-smooth hide-scrollbar"
+							>
+								<div className="flex gap-2 px-12">
+									{patches.map((patch) => (
+										<button
+											key={patch.id}
+											type="button"
+											onClick={() => setInput(patch.trigger)}
+											disabled={isLoading}
+											className="shrink-0 text-[10px] px-2 py-1 bg-neutral-700/40 hover:bg-neutral-600/50 rounded-full text-neutral-200 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap font-normal"
+											title={patch.summary}
+										>
+											{patch.trigger}
+										</button>
+									))}
+								</div>
+							</div>
+
+							{/* Right gradient mask */}
+							<div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[black] via-[black]/80 to-transparent z-[5] pointer-events-none" />
+
+							{/* Right arrow */}
+							<button
+								type="button"
+								onClick={() => scrollSuggestions("right")}
+								className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-1 hover:bg-neutral-700/90 rounded-full transition-colors"
+								title="Scroll right"
+							>
+								<ChevronRight className="h-3 w-3 text-neutral-300" />
+							</button>
+						</div>
+					</div>
+				)}
+
+				<div className="p-3">
+					<div className="flex gap-2">
+						<input
+							type="text"
+							value={input}
+							onChange={(e) => setInput(e.target.value)}
+							onKeyDown={handleKeyPress}
+							placeholder="Ask me to create something..."
+							disabled={isLoading}
+							className="flex-1 px-2.5 py-1.5 text-xs bg-neutral-900 border border-neutral-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-neutral-100 placeholder:text-neutral-500 disabled:opacity-50"
+						/>
+						<button
+							type="button"
+							onClick={handleSend}
+							disabled={sendDisabled}
+							className={cn(
+								"py-1.5 px-4  bg-blue-500 rounded text-white transition-colors`",
+								{
+									"hover:bg-blue-600": !sendDisabled,
+									"opacity-50 cursor-not-allowed": sendDisabled,
+								},
+							)}
+							title="Send (⌘+Enter)"
+						>
+							<Send className="h-3.5 w-3.5" />
+						</button>
+					</div>
+					<p className="text-[10px] text-neutral-500 mt-1.5">
+						Press ⌘+Enter to send
+					</p>
 				</div>
-				<p className="text-[10px] text-neutral-500 mt-1.5">
-					Press ⌘+Enter to send
-				</p>
 			</div>
 
 			{/* Diff Review Modal */}
