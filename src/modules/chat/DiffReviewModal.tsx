@@ -1,5 +1,15 @@
-import { FileCode2, FileEdit, FilePlus, FileX, X } from "lucide-react";
+import {
+	ChevronDown,
+	ChevronRight,
+	FileCode2,
+	FileEdit,
+	FilePlus,
+	FileX,
+	X,
+} from "lucide-react";
 import { useState } from "react";
+import { DiffViewer } from "@/components/DiffViewer";
+import { useFs } from "@/modules/fs/store";
 import type { Patch } from "@/modules/patches/types";
 
 interface DiffReviewModalProps {
@@ -13,9 +23,13 @@ export function DiffReviewModal({
 	onAccept,
 	onCancel,
 }: DiffReviewModalProps) {
+	const { filesByPath } = useFs();
 	const [isApplying, setIsApplying] = useState(false);
 	const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
 		new Set(patch.changes.map((_, i) => i)),
+	);
+	const [expandedIndices, setExpandedIndices] = useState<Set<number>>(
+		new Set(),
 	);
 
 	const toggleChange = (index: number) => {
@@ -34,6 +48,16 @@ export function DiffReviewModal({
 		} else {
 			setSelectedIndices(new Set(patch.changes.map((_, i) => i)));
 		}
+	};
+
+	const toggleExpand = (index: number) => {
+		const newExpanded = new Set(expandedIndices);
+		if (newExpanded.has(index)) {
+			newExpanded.delete(index);
+		} else {
+			newExpanded.add(index);
+		}
+		setExpandedIndices(newExpanded);
 	};
 
 	const handleAccept = async () => {
@@ -88,6 +112,7 @@ export function DiffReviewModal({
 						{/* Individual Changes */}
 						{patch.changes.map((change, index) => {
 							const isSelected = selectedIndices.has(index);
+							const isExpanded = expandedIndices.has(index);
 							let Icon = FileCode2;
 							let colorClass = "text-neutral-400";
 							let bgClass = "bg-neutral-500/10";
@@ -110,32 +135,72 @@ export function DiffReviewModal({
 								borderClass = "border-red-500/20";
 							}
 
+							const oldContent = filesByPath[change.path]?.content || "";
+							const newContent = change.content || "";
+
 							return (
-								<button
-									type="button"
+								<div
 									key={`${change.path}-${index}`}
-									className={`flex w-full items-center gap-2 text-left text-xs ${bgClass} border ${borderClass} rounded px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity ${
+									className={`border ${borderClass} rounded overflow-hidden ${
 										!isSelected ? "opacity-40" : ""
 									}`}
-									onClick={() => toggleChange(index)}
 								>
-									<input
-										type="checkbox"
-										checked={isSelected}
-										onChange={() => toggleChange(index)}
-										className="h-3.5 w-3.5 rounded border-neutral-600 bg-neutral-800 text-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
-										onClick={(e) => e.stopPropagation()}
-									/>
-									<Icon className={`h-3 w-3 ${colorClass}`} />
-									<span className="font-mono text-neutral-300 flex-1">
-										{change.path}
-									</span>
-									<span
-										className={`text-[10px] uppercase font-medium ${colorClass}`}
+									<button
+										type="button"
+										className={`flex w-full items-center gap-2 text-left text-xs ${bgClass} px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity`}
+										onClick={() => toggleChange(index)}
 									>
-										{change.op}
-									</span>
-								</button>
+										<input
+											type="checkbox"
+											checked={isSelected}
+											onChange={() => toggleChange(index)}
+											className="h-3.5 w-3.5 rounded border-neutral-600 bg-neutral-800 text-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+											onClick={(e) => e.stopPropagation()}
+										/>
+										<Icon className={`h-3 w-3 ${colorClass}`} />
+										<span className="font-mono text-neutral-300 flex-1">
+											{change.path}
+										</span>
+										<span
+											className={`text-[10px] uppercase font-medium ${colorClass}`}
+										>
+											{change.op}
+										</span>
+										<button
+											type="button"
+											onClick={(e) => {
+												e.stopPropagation();
+												toggleExpand(index);
+											}}
+											className="p-0.5 hover:bg-neutral-700/50 rounded transition-colors"
+											title={isExpanded ? "Collapse" : "Expand"}
+										>
+											{isExpanded ? (
+												<ChevronDown className="h-3 w-3 text-neutral-400" />
+											) : (
+												<ChevronRight className="h-3 w-3 text-neutral-400" />
+											)}
+										</button>
+									</button>
+
+									{/* Diff View */}
+									{isExpanded && change.op !== "delete" && (
+										<div className="border-t border-neutral-700/50 max-h-64 overflow-auto">
+											<DiffViewer
+												oldContent={change.op === "create" ? "" : oldContent}
+												newContent={newContent}
+												fileName={change.path}
+											/>
+										</div>
+									)}
+
+									{/* Delete message */}
+									{isExpanded && change.op === "delete" && (
+										<div className="border-t border-neutral-700/50 px-3 py-2 text-xs text-red-400">
+											This file will be deleted
+										</div>
+									)}
+								</div>
 							);
 						})}
 					</div>

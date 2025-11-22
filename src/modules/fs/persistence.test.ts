@@ -41,7 +41,7 @@ function createRequest<T>(result: T): IDBRequest<T> {
 		transaction: null,
 		onsuccess: null,
 		onerror: null,
-	} as IDBRequest<T>;
+	} as unknown as IDBRequest<T>;
 }
 
 function createOpenRequest(db: IDBDatabase): IDBOpenDBRequest {
@@ -49,7 +49,7 @@ function createOpenRequest(db: IDBDatabase): IDBOpenDBRequest {
 		...createRequest(db),
 		onblocked: null,
 		onupgradeneeded: null,
-	} as IDBOpenDBRequest;
+	} as unknown as IDBOpenDBRequest;
 }
 
 function createObjectStore(mockStore: MockStore) {
@@ -92,7 +92,7 @@ describe("Persistence", () => {
 				() =>
 					({
 						objectStore: () => objectStore,
-					}) as IDBTransaction,
+					}) as unknown as IDBTransaction,
 			),
 			createObjectStore: vi.fn(),
 			objectStoreNames: {
@@ -127,6 +127,7 @@ describe("Persistence", () => {
 
 		const stored = mockStore[WORKSPACE_KEY];
 		expect(stored).toBeDefined();
+		if (!stored) throw new Error("expected stored to be defined");
 		expect(stored.filesByPath).toEqual(filesByPath);
 		expect(stored.timestamp).toBeGreaterThan(0);
 	});
