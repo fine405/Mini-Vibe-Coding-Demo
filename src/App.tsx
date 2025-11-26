@@ -17,9 +17,13 @@ import { PreviewPane } from "./modules/preview/PreviewPane";
 import { useFs } from "./modules/fs/store";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
+import { Header } from "./components/Header";
+import { useLayoutStore } from "./modules/layout/store";
+
 export default function App() {
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const { saveToIndexedDB, acceptAllChanges } = useFs();
+	const { showChat } = useLayoutStore();
 
 	// Define command actions
 	const commandActions: CommandAction[] = [
@@ -98,24 +102,31 @@ export default function App() {
 	return (
 		<ErrorBoundary>
 			<PersistenceLoader>
-				<div className="w-screen h-screen bg-neutral-950 text-neutral-100">
-					<PanelGroup direction="horizontal" className="h-full">
-						<Panel defaultSize={16} minSize={10}>
-							<ChatPane />
-						</Panel>
-						<PanelResizeHandle className="w-px bg-neutral-800/80" />
-						<Panel defaultSize={14} minSize={10}>
-							<FileTreePane />
-						</Panel>
-						<PanelResizeHandle className="w-px bg-neutral-800/80" />
-						<Panel defaultSize={35} minSize={20}>
-							<EditorPane />
-						</Panel>
-						<PanelResizeHandle className="w-px bg-neutral-800/80" />
-						<Panel defaultSize={35} minSize={20}>
-							<PreviewPane />
-						</Panel>
-					</PanelGroup>
+				<div className="w-screen h-screen bg-neutral-950 text-neutral-100 flex flex-col">
+					<Header />
+					<div className="flex-1 overflow-hidden">
+						<PanelGroup direction="horizontal" className="h-full">
+							{showChat && (
+								<>
+									<Panel defaultSize={20} minSize={15} order={1}>
+										<ChatPane />
+									</Panel>
+									<PanelResizeHandle className="w-px bg-neutral-800/80" />
+								</>
+							)}
+							<Panel defaultSize={15} minSize={10} order={2}>
+								<FileTreePane />
+							</Panel>
+							<PanelResizeHandle className="w-px bg-neutral-800/80" />
+							<Panel defaultSize={35} minSize={20} order={3}>
+								<EditorPane />
+							</Panel>
+							<PanelResizeHandle className="w-px bg-neutral-800/80" />
+							<Panel defaultSize={30} minSize={20} order={4}>
+								<PreviewPane />
+							</Panel>
+						</PanelGroup>
+					</div>
 
 					<CommandPalette
 						isOpen={commandPaletteOpen}

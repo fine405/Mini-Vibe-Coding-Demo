@@ -7,6 +7,7 @@ import { RefreshCw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useFs } from "@/modules/fs/store";
+import { useLayoutStore } from "@/modules/layout/store";
 import { ConsolePanel } from "./ConsolePanel";
 
 function RefreshButton() {
@@ -36,6 +37,7 @@ function RefreshButton() {
 
 export function PreviewPane() {
 	const { filesByPath } = useFs();
+	const { showConsole } = useLayoutStore();
 
 	const files = useMemo(
 		() =>
@@ -79,7 +81,7 @@ export function PreviewPane() {
 					<RefreshButton />
 				</div>
 				<PanelGroup direction="vertical" className="flex-1 overflow-hidden">
-					<Panel defaultSize={75} minSize={30}>
+					<Panel defaultSize={showConsole ? 75 : 100} minSize={30}>
 						<div className="h-full overflow-hidden">
 							<SandpackPreview
 								showOpenInCodeSandbox={false}
@@ -88,10 +90,14 @@ export function PreviewPane() {
 							/>
 						</div>
 					</Panel>
-					<PanelResizeHandle className="h-px bg-neutral-800/60 hover:bg-blue-500 transition-colors cursor-row-resize" />
-					<Panel defaultSize={25} minSize={10}>
-						<ConsolePanel />
-					</Panel>
+					{showConsole && (
+						<>
+							<PanelResizeHandle className="h-px bg-neutral-800/60 hover:bg-blue-500 transition-colors cursor-row-resize" />
+							<Panel defaultSize={25} minSize={10}>
+								<ConsolePanel />
+							</Panel>
+						</>
+					)}
 				</PanelGroup>
 			</SandpackProvider>
 		</div>
