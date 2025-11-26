@@ -38,6 +38,8 @@ interface FsStore extends VirtualFileSystemState {
 	createFile: (path: string, content?: string) => void;
 	deleteFile: (path: string) => void;
 	renameFile: (oldPath: string, newPath: string) => void;
+	deleteDirectory: (dirPath: string) => void;
+	renameDirectory: (oldDirPath: string, newDirPath: string) => void;
 	resetFs: () => void;
 	setActiveFile: (path: string | null) => void;
 	loadFromPersistence: () => Promise<boolean>;
@@ -101,6 +103,50 @@ const stateCreator = immer<FsStore>((set) => ({
 			};
 		});
 		// Auto-save to IndexedDB
+		const state = useFs.getState();
+		saveWorkspace(state.filesByPath).catch(console.error);
+	},
+	deleteDirectory(dirPath) {
+		set((state) => {
+			const prefix = dirPath.endsWith("/") ? dirPath : `${dirPath}/`;
+			for (const path of Object.keys(state.filesByPath)) {
+				if (path.startsWith(prefix)) {
+					delete state.filesByPath[path];
+				}
+			}
+		});
+		const state = useFs.getState();
+		saveWorkspace(state.filesByPath).catch(console.error);
+	},
+	renameDirectory(oldDirPath, newDirPath) {
+		set((state) => {
+			if (oldDirPath === newDirPath) return;
+			const prefix = oldDirPath.endsWith("/") ? oldDirPath : `${oldDirPath}/`;
+			const newPrefix = newDirPath.endsWith("/")
+				? newDirPath
+				: `${newDirPath}/`;
+			const toRename: Array<{ oldPath: string; newPath: string }> = [];
+			for (const path of Object.keys(state.filesByPath)) {
+				if (path.startsWith(prefix)) {
+					const relativePath = path.slice(prefix.length);
+					toRename.push({
+						oldPath: path,
+						newPath: `${newPrefix}${relativePath}`,
+					});
+				}
+			}
+			for (const { oldPath, newPath } of toRename) {
+				const existing = state.filesByPath[oldPath];
+				if (existing) {
+					delete state.filesByPath[oldPath];
+					state.filesByPath[newPath] = {
+						...existing,
+						path: newPath,
+						status: existing.status === "new" ? "new" : "modified",
+					};
+				}
+			}
+		});
 		const state = useFs.getState();
 		saveWorkspace(state.filesByPath).catch(console.error);
 	},

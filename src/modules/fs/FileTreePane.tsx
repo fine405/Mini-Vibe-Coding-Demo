@@ -21,8 +21,16 @@ import { useFs } from "./store";
 import { buildTree, filterTree } from "./tree";
 
 export function FileTreePane() {
-	const { filesByPath, createFile, deleteFile, renameFile, setFiles, resetFs } =
-		useFs();
+	const {
+		filesByPath,
+		createFile,
+		deleteFile,
+		renameFile,
+		deleteDirectory,
+		renameDirectory,
+		setFiles,
+		resetFs,
+	} = useFs();
 
 	const { openFile, activeFilePath, closeAllFiles, closeFile } = useEditor();
 
@@ -88,12 +96,12 @@ export function FileTreePane() {
 		handleNewFileDialogChange(false);
 	};
 
-	const handleRename = (path: string) => {
-		if (!filesByPath[path]) return;
+	const handleRename = (path: string, isDir: boolean) => {
+		if (!isDir && !filesByPath[path]) return;
 		setRenamingPath(path);
 	};
 
-	const onRenameSubmit = (oldPath: string, newPath: string) => {
+	const onRenameSubmit = (oldPath: string, newPath: string, isDir: boolean) => {
 		setRenamingPath(null);
 		if (oldPath === newPath) return;
 
@@ -101,31 +109,66 @@ export function FileTreePane() {
 			alert("Path must start with /");
 			return;
 		}
-		if (filesByPath[newPath]) {
-			alert("A file with that path already exists");
-			return;
-		}
-		renameFile(oldPath, newPath);
-		if (activeFilePath === oldPath) {
-			openFile(newPath);
+
+		if (isDir) {
+			// Check if any file would conflict with new directory path
+			const oldPrefix = oldPath.endsWith("/") ? oldPath : `${oldPath}/`;
+			const newPrefix = newPath.endsWith("/") ? newPath : `${newPath}/`;
+			const hasConflict = Object.keys(filesByPath).some(
+				(p) => !p.startsWith(oldPrefix) && p.startsWith(newPrefix),
+			);
+			if (hasConflict) {
+				alert("A directory or file with that path already exists");
+				return;
+			}
+			renameDirectory(oldPath, newPath);
+			// Update active file path if it was inside the renamed directory
+			if (activeFilePath?.startsWith(oldPrefix)) {
+				const newActivePath = `${newPrefix}${activeFilePath.slice(oldPrefix.length)}`;
+				openFile(newActivePath);
+			}
+		} else {
+			if (filesByPath[newPath]) {
+				alert("A file with that path already exists");
+				return;
+			}
+			renameFile(oldPath, newPath);
+			if (activeFilePath === oldPath) {
+				openFile(newPath);
+			}
 		}
 	};
 
-	const handleDelete = (path: string) => {
-		if (!filesByPath[path]) return;
+	const [isDeleteDir, setIsDeleteDir] = useState(false);
+
+	const handleDelete = (path: string, isDir: boolean) => {
+		if (!isDir && !filesByPath[path]) return;
 		setFileToDelete(path);
+		setIsDeleteDir(isDir);
 		setDeleteDialogOpen(true);
 	};
 
 	const confirmDelete = () => {
 		if (fileToDelete) {
-			deleteFile(fileToDelete);
-			if (activeFilePath === fileToDelete) {
-				closeFile(fileToDelete);
+			if (isDeleteDir) {
+				deleteDirectory(fileToDelete);
+				// Close any open files inside the deleted directory
+				const prefix = fileToDelete.endsWith("/")
+					? fileToDelete
+					: `${fileToDelete}/`;
+				if (activeFilePath?.startsWith(prefix)) {
+					closeFile(activeFilePath);
+				}
+			} else {
+				deleteFile(fileToDelete);
+				if (activeFilePath === fileToDelete) {
+					closeFile(fileToDelete);
+				}
 			}
 		}
 		setDeleteDialogOpen(false);
 		setFileToDelete(null);
+		setIsDeleteDir(false);
 	};
 
 	const handleNewProject = () => {
@@ -330,11 +373,14 @@ export function FileTreePane() {
 					}}
 				>
 					<DialogHeader>
-						<DialogTitle>Delete File</DialogTitle>
+						<DialogTitle>
+							Delete {isDeleteDir ? "Directory" : "File"}
+						</DialogTitle>
 						<DialogDescription>
 							Are you sure you want to delete{" "}
 							<span className="font-mono text-neutral-300">{fileToDelete}</span>
-							? This action cannot be undone.
+							{isDeleteDir && " and all its contents"}? This action cannot be
+							undone.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>

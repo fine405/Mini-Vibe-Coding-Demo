@@ -60,10 +60,10 @@ export interface TreeRowProps {
 	onSelect: (path: string) => void;
 	filesByPath: Record<string, VirtualFile>;
 	searchQuery?: string;
-	onRename: (path: string) => void;
-	onDelete: (path: string) => void;
+	onRename: (path: string, isDir: boolean) => void;
+	onDelete: (path: string, isDir: boolean) => void;
 	renamingPath: string | null;
-	onRenameSubmit: (oldPath: string, newPath: string) => void;
+	onRenameSubmit: (oldPath: string, newPath: string, isDir: boolean) => void;
 	onRenameCancel: () => void;
 }
 
@@ -123,33 +123,32 @@ export function TreeRow({
 	const handleClick = () => {
 		if (node.isDir) {
 			setExpanded((v) => !v);
-		} else {
-			onSelect(node.path);
 		}
+		onSelect(node.path);
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter" && isActive && !node.isDir && !isRenaming) {
+		if (e.key === "Enter" && isActive && !isRenaming) {
 			e.preventDefault();
 			e.stopPropagation();
-			onRename(node.path);
+			onRename(node.path, node.isDir);
 		}
 		if (e.key === "Backspace" && e.metaKey && isActive && !isRenaming) {
 			e.preventDefault();
 			e.stopPropagation();
-			onDelete(node.path);
+			onDelete(node.path, node.isDir);
 		}
 	};
 
 	const handleRenameBlur = () => {
-		onRenameSubmit(node.path, renameValue);
+		onRenameSubmit(node.path, renameValue, node.isDir);
 	};
 
 	const handleRenameKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter") {
 			e.preventDefault();
 			e.stopPropagation();
-			onRenameSubmit(node.path, renameValue);
+			onRenameSubmit(node.path, renameValue, node.isDir);
 		} else if (e.key === "Escape") {
 			e.preventDefault();
 			e.stopPropagation();
@@ -256,11 +255,11 @@ export function TreeRow({
 						Copy Relative Path <ContextMenuShortcut>⇧⌥⌘C</ContextMenuShortcut>
 					</ContextMenuItem>
 					<ContextMenuSeparator />
-					<ContextMenuItem onClick={() => onRename(node.path)}>
+					<ContextMenuItem onClick={() => onRename(node.path, node.isDir)}>
 						Rename... <ContextMenuShortcut>Enter</ContextMenuShortcut>
 					</ContextMenuItem>
 					<ContextMenuItem
-						onClick={() => onDelete(node.path)}
+						onClick={() => onDelete(node.path, node.isDir)}
 						className="text-red-400 focus:text-red-400"
 					>
 						Delete <ContextMenuShortcut>⌫</ContextMenuShortcut>
