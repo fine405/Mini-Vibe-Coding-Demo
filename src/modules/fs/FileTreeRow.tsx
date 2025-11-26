@@ -57,7 +57,8 @@ export interface TreeRowProps {
 	node: TreeNode;
 	depth: number;
 	activePath: string | null;
-	onSelect: (path: string) => void;
+	selectedPath: string | null;
+	onSelect: (path: string, isDir: boolean) => void;
 	filesByPath: Record<string, VirtualFile>;
 	searchQuery?: string;
 	onRename: (path: string, isDir: boolean) => void;
@@ -71,6 +72,7 @@ export function TreeRow({
 	node,
 	depth,
 	activePath,
+	selectedPath,
 	onSelect,
 	filesByPath,
 	searchQuery,
@@ -81,6 +83,7 @@ export function TreeRow({
 	onRenameCancel,
 }: TreeRowProps) {
 	const [expanded, setExpanded] = useState(true);
+	const isSelected = selectedPath === node.path;
 	const isActive = activePath === node.path;
 	const fileStatus = !node.isDir ? filesByPath[node.path]?.status : null;
 	const isRenaming = renamingPath === node.path;
@@ -124,16 +127,16 @@ export function TreeRow({
 		if (node.isDir) {
 			setExpanded((v) => !v);
 		}
-		onSelect(node.path);
+		onSelect(node.path, node.isDir);
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter" && isActive && !isRenaming) {
+		if (e.key === "Enter" && isSelected && !isRenaming) {
 			e.preventDefault();
 			e.stopPropagation();
 			onRename(node.path, node.isDir);
 		}
-		if (e.key === "Backspace" && e.metaKey && isActive && !isRenaming) {
+		if (e.key === "Backspace" && e.metaKey && isSelected && !isRenaming) {
 			e.preventDefault();
 			e.stopPropagation();
 			onDelete(node.path, node.isDir);
@@ -165,12 +168,10 @@ export function TreeRow({
 						onClick={handleClick}
 						onKeyDown={handleKeyDown}
 						onContextMenu={() => {
-							if (!node.isDir) {
-								onSelect(node.path);
-							}
+							onSelect(node.path, node.isDir);
 						}}
 						className={`flex w-full items-center gap-1 px-2 py-1.5 text-xs text-left hover:bg-neutral-800/60 ${
-							isActive && !isRenaming
+							(isSelected || isActive) && !isRenaming
 								? "bg-neutral-800/80 text-neutral-50"
 								: "text-neutral-300"
 						}`}
@@ -274,6 +275,7 @@ export function TreeRow({
 							node={child}
 							depth={depth + 1}
 							activePath={activePath}
+							selectedPath={selectedPath}
 							onSelect={onSelect}
 							filesByPath={filesByPath}
 							searchQuery={searchQuery}

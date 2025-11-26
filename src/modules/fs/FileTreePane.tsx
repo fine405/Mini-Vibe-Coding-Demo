@@ -32,10 +32,19 @@ export function FileTreePane() {
 		resetFs,
 	} = useFs();
 
-	const { openFile, activeFilePath, closeAllFiles, closeFile } = useEditor();
+	const {
+		openFile,
+		activeFilePath,
+		closeAllFiles,
+		closeFile,
+		closeFilesInDirectory,
+		renameOpenFile,
+		renameOpenFilesInDirectory,
+	} = useEditor();
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [renamingPath, setRenamingPath] = useState<string | null>(null);
+	const [selectedPath, setSelectedPath] = useState<string | null>(null);
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 	const [fileToDelete, setFileToDelete] = useState<string | null>(null);
 	const deleteButtonRef = useRef<HTMLButtonElement>(null);
@@ -122,20 +131,16 @@ export function FileTreePane() {
 				return;
 			}
 			renameDirectory(oldPath, newPath);
-			// Update active file path if it was inside the renamed directory
-			if (activeFilePath?.startsWith(oldPrefix)) {
-				const newActivePath = `${newPrefix}${activeFilePath.slice(oldPrefix.length)}`;
-				openFile(newActivePath);
-			}
+			// Update open tabs for files inside the renamed directory
+			renameOpenFilesInDirectory(oldPath, newPath);
 		} else {
 			if (filesByPath[newPath]) {
 				alert("A file with that path already exists");
 				return;
 			}
 			renameFile(oldPath, newPath);
-			if (activeFilePath === oldPath) {
-				openFile(newPath);
-			}
+			// Update the tab for the renamed file
+			renameOpenFile(oldPath, newPath);
 		}
 	};
 
@@ -152,13 +157,8 @@ export function FileTreePane() {
 		if (fileToDelete) {
 			if (isDeleteDir) {
 				deleteDirectory(fileToDelete);
-				// Close any open files inside the deleted directory
-				const prefix = fileToDelete.endsWith("/")
-					? fileToDelete
-					: `${fileToDelete}/`;
-				if (activeFilePath?.startsWith(prefix)) {
-					closeFile(activeFilePath);
-				}
+				// Close all open files inside the deleted directory
+				closeFilesInDirectory(fileToDelete);
 			} else {
 				deleteFile(fileToDelete);
 				if (activeFilePath === fileToDelete) {
@@ -292,7 +292,13 @@ export function FileTreePane() {
 									node={node}
 									depth={0}
 									activePath={activeFilePath}
-									onSelect={openFile}
+									selectedPath={selectedPath}
+									onSelect={(path, isDir) => {
+										setSelectedPath(path);
+										if (!isDir) {
+											openFile(path);
+										}
+									}}
 									filesByPath={filesByPath}
 									searchQuery={searchQuery}
 									onRename={handleRename}
