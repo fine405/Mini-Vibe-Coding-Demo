@@ -5,17 +5,34 @@ import { useFs } from "../fs/store";
 import type { VirtualFile } from "../fs/types";
 import { PreviewPane } from "./PreviewPane";
 
-// Mock Sandpack component
+// Mock Sandpack components
 vi.mock("@codesandbox/sandpack-react", () => ({
-	Sandpack: ({ files }: { files: Record<string, { code: string }> }) => (
-		<div data-testid="sandpack-preview">
+	SandpackProvider: ({
+		children,
+		files,
+	}: {
+		children: React.ReactNode;
+		files: Record<string, { code: string }>;
+	}) => (
+		<div data-testid="sandpack-provider">
 			{Object.entries(files).map(([path, file]) => (
 				<div key={path} data-testid={`file-${path}`}>
 					{file.code}
 				</div>
 			))}
+			{children}
 		</div>
 	),
+	SandpackPreview: () => <div data-testid="sandpack-preview" />,
+	useSandpack: () => ({
+		sandpack: {
+			runSandpack: vi.fn(),
+		},
+	}),
+	useSandpackConsole: () => ({
+		logs: [],
+		reset: vi.fn(),
+	}),
 }));
 
 // Mock FS store
