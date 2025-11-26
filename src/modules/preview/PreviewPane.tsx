@@ -5,6 +5,7 @@ import {
 } from "@codesandbox/sandpack-react";
 import { RefreshCw } from "lucide-react";
 import { useCallback, useState } from "react";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useFs } from "@/modules/fs/store";
 import { ConsolePanel } from "./ConsolePanel";
 
@@ -51,25 +52,34 @@ export function PreviewPane() {
 				files={files}
 				template="react"
 				theme="dark"
+				style={{
+					height: "100%",
+				}}
 				options={{
 					autorun: true,
 					autoReload: true,
 				}}
+				className="flex-1 flex flex-col overflow-hidden"
 			>
 				<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800/60 flex items-center justify-between">
 					<span>Preview</span>
 					<RefreshButton />
 				</div>
-				<div className="flex-1 overflow-hidden flex flex-col">
-					<div className="flex-1 overflow-hidden">
-						<SandpackPreview
-							showOpenInCodeSandbox={false}
-							showRefreshButton={false}
-							style={{ height: "100%" }}
-						/>
-					</div>
-					<ConsolePanel />
-				</div>
+				<PanelGroup direction="vertical" className="flex-1 overflow-hidden">
+					<Panel defaultSize={75} minSize={30}>
+						<div className="h-full overflow-hidden">
+							<SandpackPreview
+								showOpenInCodeSandbox={false}
+								showRefreshButton={false}
+								style={{ height: "100%" }}
+							/>
+						</div>
+					</Panel>
+					<PanelResizeHandle className="h-px bg-neutral-800/60 hover:bg-blue-500 transition-colors cursor-row-resize" />
+					<Panel defaultSize={25} minSize={10}>
+						<ConsolePanel />
+					</Panel>
+				</PanelGroup>
 			</SandpackProvider>
 		</div>
 	);

@@ -1,21 +1,8 @@
 import { useSandpackConsole } from "@codesandbox/sandpack-react";
-import {
-	AlertCircle,
-	AlertTriangle,
-	ChevronDown,
-	ChevronUp,
-	Info,
-	Trash2,
-} from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, AlertTriangle, Info, Trash2 } from "lucide-react";
 
-interface ConsolePanelProps {
-	maxHeight?: number;
-}
-
-export function ConsolePanel({ maxHeight = 200 }: ConsolePanelProps) {
+export function ConsolePanel() {
 	const { logs, reset } = useSandpackConsole({ resetOnPreviewRestart: true });
-	const [isCollapsed, setIsCollapsed] = useState(false);
 
 	const getLogIcon = (type: string) => {
 		switch (type) {
@@ -59,26 +46,17 @@ export function ConsolePanel({ maxHeight = 200 }: ConsolePanelProps) {
 	};
 
 	return (
-		<div className="border-t border-neutral-800/60 bg-neutral-900/80">
+		<div className="h-full flex flex-col bg-neutral-900/80">
 			{/* Header */}
-			<div className="flex items-center justify-between px-3 py-1.5 border-b border-neutral-800/40">
-				<button
-					type="button"
-					onClick={() => setIsCollapsed(!isCollapsed)}
-					className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400 hover:text-neutral-200 transition-colors"
-				>
-					{isCollapsed ? (
-						<ChevronUp className="h-3 w-3" />
-					) : (
-						<ChevronDown className="h-3 w-3" />
-					)}
+			<div className="flex items-center justify-between px-3 py-1.5 border-b border-neutral-800/40 shrink-0">
+				<div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400">
 					<span>Console</span>
 					{logs.length > 0 && (
 						<span className="px-1.5 py-0.5 text-[10px] font-medium bg-neutral-700 rounded">
 							{logs.length}
 						</span>
 					)}
-				</button>
+				</div>
 				<button
 					type="button"
 					onClick={reset}
@@ -90,32 +68,27 @@ export function ConsolePanel({ maxHeight = 200 }: ConsolePanelProps) {
 			</div>
 
 			{/* Console output */}
-			{!isCollapsed && (
-				<div
-					className="overflow-auto font-mono text-xs"
-					style={{ maxHeight: `${maxHeight}px` }}
-				>
-					{logs.length === 0 ? (
-						<div className="px-3 py-4 text-center text-neutral-500 text-xs">
-							No console output
-						</div>
-					) : (
-						<div className="divide-y divide-neutral-800/30">
-							{logs.map((log, index) => (
-								<div
-									key={`${log.id}-${index}`}
-									className={`flex items-start gap-2 px-3 py-1.5 ${getLogStyle(log.method)}`}
-								>
-									{getLogIcon(log.method)}
-									<pre className="flex-1 whitespace-pre-wrap break-all">
-										{formatLogData(log.data ?? [])}
-									</pre>
-								</div>
-							))}
-						</div>
-					)}
-				</div>
-			)}
+			<div className="flex-1 overflow-auto font-mono text-xs">
+				{logs.length === 0 ? (
+					<div className="px-3 py-4 text-center text-neutral-500 text-xs">
+						No console output
+					</div>
+				) : (
+					<div className="divide-y divide-neutral-800/30">
+						{logs.map((log, index) => (
+							<div
+								key={`${log.id}-${index}`}
+								className={`flex items-start gap-2 px-3 py-1.5 ${getLogStyle(log.method)}`}
+							>
+								{getLogIcon(log.method)}
+								<pre className="flex-1 whitespace-pre-wrap break-all">
+									{formatLogData(log.data ?? [])}
+								</pre>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
 		</div>
 	);
 }
