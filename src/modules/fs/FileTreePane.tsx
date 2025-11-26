@@ -5,15 +5,29 @@ import {
 	Download,
 	FileCode2,
 	Folder,
-	Pencil,
 	Plus,
 	Search,
-	Trash2,
 	Upload,
 	X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { useEditor } from "@/modules/editor";
 import {
 	exportProjectAsJSON,
@@ -169,6 +183,11 @@ interface TreeRowProps {
 	onSelect: (path: string) => void;
 	filesByPath: Record<string, VirtualFile>;
 	searchQuery?: string;
+	onRename: (path: string) => void;
+	onDelete: (path: string) => void;
+	renamingPath: string | null;
+	onRenameSubmit: (oldPath: string, newPath: string) => void;
+	onRenameCancel: () => void;
 }
 
 function TreeRow({
@@ -178,10 +197,18 @@ function TreeRow({
 	onSelect,
 	filesByPath,
 	searchQuery,
+	onRename,
+	onDelete,
+	renamingPath,
+	onRenameSubmit,
+	onRenameCancel,
 }: TreeRowProps) {
 	const [expanded, setExpanded] = useState(true);
 	const isActive = activePath === node.path;
 	const fileStatus = !node.isDir ? filesByPath[node.path]?.status : null;
+	const isRenaming = renamingPath === node.path;
+	const [renameValue, setRenameValue] = useState(node.path);
+	const inputRef = useRef<HTMLInputElement>(null);
 
 	// Check if folder has any modified or new files
 	const hasChanges = useMemo(() => {
@@ -198,6 +225,29 @@ function TreeRow({
 		return node.children?.some(checkNode) ?? false;
 	}, [node, filesByPath]);
 
+	// Update rename value when entering rename mode
+	if (isRenaming && renameValue !== node.path && renameValue === "") {
+		setRenameValue(node.path);
+	}
+
+	// Auto-focus and select filename (not extension) when entering rename mode
+	useEffect(() => {
+		if (isRenaming && inputRef.current) {
+			const input = inputRef.current;
+			input.focus();
+			setRenameValue(node.path);
+			// Select only the filename part (not extension)
+			const lastSlash = node.path.lastIndexOf("/");
+			const lastDot = node.path.lastIndexOf(".");
+			const filenameStart = lastSlash + 1;
+			const filenameEnd = lastDot > lastSlash ? lastDot : node.path.length;
+			// Use setTimeout to ensure value is set before selection
+			setTimeout(() => {
+				input.setSelectionRange(filenameStart, filenameEnd);
+			}, 0);
+		}
+	}, [isRenaming, node.path]);
+
 	const handleClick = () => {
 		if (node.isDir) {
 			setExpanded((v) => !v);
@@ -206,59 +256,157 @@ function TreeRow({
 		}
 	};
 
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		// Enter key triggers rename on selected file
+		if (e.key === "Enter" && isActive && !node.isDir && !isRenaming) {
+			e.preventDefault();
+			e.stopPropagation();
+			onRename(node.path);
+		}
+		// Cmd+Backspace triggers delete
+		if (e.key === "Backspace" && e.metaKey && isActive && !isRenaming) {
+			e.preventDefault();
+			e.stopPropagation();
+			onDelete(node.path);
+		}
+	};
+
+	const handleRenameBlur = () => {
+		// Auto-save on blur
+		onRenameSubmit(node.path, renameValue);
+	};
+
+	const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			e.stopPropagation();
+			onRenameSubmit(node.path, renameValue);
+		} else if (e.key === "Escape") {
+			e.preventDefault();
+			e.stopPropagation();
+			onRenameCancel();
+		}
+	};
+
 	return (
 		<div>
-			<button
-				type="button"
-				onClick={handleClick}
-				className={`flex w-full items-center gap-1 px-2 py-1.5 text-xs text-left hover:bg-neutral-800/60 ${
-					isActive ? "bg-neutral-800/80 text-neutral-50" : "text-neutral-300"
-				}`}
-				style={{ paddingLeft: 8 + depth * 12 }}
-			>
-				{node.isDir ? (
-					expanded ? (
-						<ChevronDown className="h-3 w-3 text-neutral-500" />
-					) : (
-						<ChevronRight className="h-3 w-3 text-neutral-500" />
-					)
-				) : (
-					<span className="inline-block w-3" />
-				)}
-				{node.isDir ? (
-					<Folder className="mr-1 h-3 w-3 text-neutral-500" />
-				) : (
-					<FileCode2 className="mr-1 h-3 w-3 text-neutral-500" />
-				)}
-				<span className="truncate flex-1">
-					{searchQuery && !node.isDir ? (
-						<HighlightedText text={node.path} query={searchQuery} />
-					) : (
-						node.name
-					)}
-				</span>
-				{/* Folder change indicator */}
-				{node.isDir && hasChanges && (
-					<span
-						className="ml-auto flex items-center justify-center px-1 py-0.5"
-						title="Contains modified files"
-					>
-						<span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-					</span>
-				)}
-				{/* File status badge */}
-				{!node.isDir && fileStatus && fileStatus !== "clean" && (
-					<span
-						className={`ml-auto text-[9px] font-semibold px-1 py-0.5 rounded ${
-							fileStatus === "new"
-								? "bg-green-500/20 text-green-400"
-								: "bg-blue-500/20 text-blue-400"
+			<ContextMenu>
+				<ContextMenuTrigger asChild>
+					<button
+						type="button"
+						onClick={handleClick}
+						onKeyDown={handleKeyDown}
+						onContextMenu={() => {
+							// If it's a file, select it on right click
+							if (!node.isDir) {
+								onSelect(node.path);
+							}
+						}}
+						className={`flex w-full items-center gap-1 px-2 py-1.5 text-xs text-left hover:bg-neutral-800/60 ${
+							isActive && !isRenaming
+								? "bg-neutral-800/80 text-neutral-50"
+								: "text-neutral-300"
 						}`}
+						style={{ paddingLeft: 8 + depth * 12 }}
 					>
-						{fileStatus === "new" ? "N" : "M"}
-					</span>
-				)}
-			</button>
+						{node.isDir ? (
+							expanded ? (
+								<ChevronDown className="h-3 w-3 text-neutral-500" />
+							) : (
+								<ChevronRight className="h-3 w-3 text-neutral-500" />
+							)
+						) : (
+							<span className="inline-block w-3" />
+						)}
+						{node.isDir ? (
+							<Folder className="mr-1 h-3 w-3 text-neutral-500" />
+						) : (
+							<FileCode2 className="mr-1 h-3 w-3 text-neutral-500" />
+						)}
+						{isRenaming ? (
+							<input
+								ref={inputRef}
+								type="text"
+								value={renameValue}
+								onChange={(e) => setRenameValue(e.target.value)}
+								onKeyDown={handleRenameKeyDown}
+								onBlur={handleRenameBlur}
+								onClick={(e) => e.stopPropagation()}
+								className="flex-1 min-w-0 bg-neutral-950 text-neutral-100 border border-blue-500/50 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-blue-500 selection:bg-blue-500/40"
+							/>
+						) : (
+							<span className="truncate flex-1">
+								{searchQuery && !node.isDir ? (
+									<HighlightedText text={node.path} query={searchQuery} />
+								) : (
+									node.name
+								)}
+							</span>
+						)}
+						{/* Folder change indicator */}
+						{!isRenaming && node.isDir && hasChanges && (
+							<span
+								className="ml-auto flex items-center justify-center px-1 py-0.5"
+								title="Contains modified files"
+							>
+								<span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+							</span>
+						)}
+						{/* File status badge */}
+						{!isRenaming &&
+							!node.isDir &&
+							fileStatus &&
+							fileStatus !== "clean" && (
+								<span
+									className={`ml-auto text-[9px] font-semibold px-1 py-0.5 rounded ${
+										fileStatus === "new"
+											? "bg-green-500/20 text-green-400"
+											: "bg-blue-500/20 text-blue-400"
+									}`}
+								>
+									{fileStatus === "new" ? "N" : "M"}
+								</span>
+							)}
+					</button>
+				</ContextMenuTrigger>
+				<ContextMenuContent className="w-64">
+					<ContextMenuItem disabled>Upload Files</ContextMenuItem>
+
+					<ContextMenuSeparator />
+
+					<ContextMenuItem disabled>
+						Cut <ContextMenuShortcut>⌘X</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuItem disabled>
+						Copy <ContextMenuShortcut>⌘C</ContextMenuShortcut>
+					</ContextMenuItem>
+
+					<ContextMenuSeparator />
+
+					<ContextMenuItem
+						onClick={() => navigator.clipboard.writeText(node.path)}
+					>
+						Copy Path <ContextMenuShortcut>⌥⌘C</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuItem
+						onClick={() => navigator.clipboard.writeText(node.name)}
+					>
+						Copy Relative Path <ContextMenuShortcut>⇧⌥⌘C</ContextMenuShortcut>
+					</ContextMenuItem>
+
+					<ContextMenuSeparator />
+
+					<ContextMenuItem onClick={() => onRename(node.path)}>
+						Rename... <ContextMenuShortcut>Enter</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuItem
+						onClick={() => onDelete(node.path)}
+						className="text-red-400 focus:text-red-400"
+					>
+						Delete <ContextMenuShortcut>⌫</ContextMenuShortcut>
+					</ContextMenuItem>
+				</ContextMenuContent>
+			</ContextMenu>
 			{node.isDir && expanded && node.children && node.children.length > 0 && (
 				<div>
 					{node.children.map((child) => (
@@ -270,6 +418,11 @@ function TreeRow({
 							onSelect={onSelect}
 							filesByPath={filesByPath}
 							searchQuery={searchQuery}
+							onRename={onRename}
+							onDelete={onDelete}
+							renamingPath={renamingPath}
+							onRenameSubmit={onRenameSubmit}
+							onRenameCancel={onRenameCancel}
 						/>
 					))}
 				</div>
@@ -285,11 +438,23 @@ export function FileTreePane() {
 	const { openFile, activeFilePath, closeAllFiles, closeFile } = useEditor();
 
 	const [searchQuery, setSearchQuery] = useState("");
+	const [renamingPath, setRenamingPath] = useState<string | null>(null);
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+	const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+	const deleteButtonRef = useRef<HTMLButtonElement>(null);
+
 	const tree = useMemo(() => buildTree(filesByPath), [filesByPath]);
 	const filteredTree = useMemo(
 		() => filterTree(tree, searchQuery),
 		[tree, searchQuery],
 	);
+
+	// Auto-focus delete button when dialog opens
+	useEffect(() => {
+		if (deleteDialogOpen && deleteButtonRef.current) {
+			deleteButtonRef.current.focus();
+		}
+	}, [deleteDialogOpen]);
 
 	const handleNewFile = () => {
 		const path = window.prompt("Enter new file path (e.g., /src/NewFile.tsx):");
@@ -306,13 +471,15 @@ export function FileTreePane() {
 		openFile(path);
 	};
 
-	const handleRename = () => {
-		if (!activeFilePath || !filesByPath[activeFilePath]) {
-			alert("Please select a file first");
-			return;
-		}
-		const newPath = window.prompt("Enter new path:", activeFilePath);
-		if (!newPath || newPath === activeFilePath) return;
+	const handleRename = (path: string) => {
+		if (!filesByPath[path]) return;
+		setRenamingPath(path);
+	};
+
+	const onRenameSubmit = (oldPath: string, newPath: string) => {
+		setRenamingPath(null);
+		if (oldPath === newPath) return;
+
 		if (!newPath.startsWith("/")) {
 			alert("Path must start with /");
 			return;
@@ -321,21 +488,27 @@ export function FileTreePane() {
 			alert("A file with that path already exists");
 			return;
 		}
-		renameFile(activeFilePath, newPath);
-		openFile(newPath);
+		renameFile(oldPath, newPath);
+		if (activeFilePath === oldPath) {
+			openFile(newPath);
+		}
 	};
 
-	const handleDelete = () => {
-		if (!activeFilePath || !filesByPath[activeFilePath]) {
-			alert("Please select a file first");
-			return;
+	const handleDelete = (path: string) => {
+		if (!filesByPath[path]) return;
+		setFileToDelete(path);
+		setDeleteDialogOpen(true);
+	};
+
+	const confirmDelete = () => {
+		if (fileToDelete) {
+			deleteFile(fileToDelete);
+			if (activeFilePath === fileToDelete) {
+				closeFile(fileToDelete);
+			}
 		}
-		const confirmed = window.confirm(
-			`Delete ${activeFilePath}?\nThis cannot be undone.`,
-		);
-		if (!confirmed) return;
-		deleteFile(activeFilePath);
-		closeFile(activeFilePath);
+		setDeleteDialogOpen(false);
+		setFileToDelete(null);
 	};
 
 	const handleNewProject = () => {
@@ -395,7 +568,7 @@ export function FileTreePane() {
 							className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-neutral-800/60 text-neutral-300 hover:bg-neutral-700 hover:text-neutral-100 transition-colors"
 							title="New Project"
 						>
-							1 New Project
+							New Project
 						</button>
 						<button
 							type="button"
@@ -423,24 +596,6 @@ export function FileTreePane() {
 						title="New file"
 					>
 						<Plus className="h-3.5 w-3.5" />
-					</button>
-					<button
-						type="button"
-						onClick={handleRename}
-						disabled={!activeFilePath}
-						className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-						title="Rename file"
-					>
-						<Pencil className="h-3.5 w-3.5" />
-					</button>
-					<button
-						type="button"
-						onClick={handleDelete}
-						disabled={!activeFilePath}
-						className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-red-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-						title="Delete file"
-					>
-						<Trash2 className="h-3.5 w-3.5" />
 					</button>
 				</div>
 			</div>
@@ -480,6 +635,11 @@ export function FileTreePane() {
 									onSelect={openFile}
 									filesByPath={filesByPath}
 									searchQuery={searchQuery}
+									onRename={handleRename}
+									onDelete={handleDelete}
+									renamingPath={renamingPath}
+									onRenameSubmit={onRenameSubmit}
+									onRenameCancel={() => setRenamingPath(null)}
 								/>
 							))
 						) : (
@@ -496,6 +656,43 @@ export function FileTreePane() {
 					<ScrollArea.Thumb className="relative flex-1 rounded-full bg-neutral-600" />
 				</ScrollArea.Scrollbar>
 			</ScrollArea.Root>
+
+			<Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+				<DialogContent
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							e.preventDefault();
+							confirmDelete();
+						}
+					}}
+				>
+					<DialogHeader>
+						<DialogTitle>Delete File</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to delete{" "}
+							<span className="font-mono text-neutral-300">{fileToDelete}</span>
+							? This action cannot be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<button
+							type="button"
+							className="px-3 py-1.5 text-sm rounded hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-neutral-200"
+							onClick={() => setDeleteDialogOpen(false)}
+						>
+							Cancel
+						</button>
+						<button
+							ref={deleteButtonRef}
+							type="button"
+							className="px-3 py-1.5 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded transition-colors font-medium"
+							onClick={confirmDelete}
+						>
+							Delete
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
