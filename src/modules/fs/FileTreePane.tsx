@@ -1,25 +1,7 @@
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import {
-	ChevronDown,
-	ChevronRight,
-	Download,
-	FileCode2,
-	Folder,
-	Plus,
-	Search,
-	Upload,
-	X,
-} from "lucide-react";
+import { Download, Plus, Search, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-	ContextMenu,
-	ContextMenuContent,
-	ContextMenuItem,
-	ContextMenuSeparator,
-	ContextMenuShortcut,
-	ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 import {
 	Dialog,
 	DialogContent,
@@ -34,402 +16,9 @@ import {
 	importProjectFromJSON,
 	selectProjectFile,
 } from "./export";
-import { fuzzyMatch } from "./fuzzyMatch";
+import { TreeRow } from "./FileTreeRow";
 import { useFs } from "./store";
-import type { VirtualFile } from "./types";
-
-interface TreeNode {
-	name: string;
-	path: string;
-	isDir: boolean;
-	children?: TreeNode[];
-}
-
-function buildTree(filesByPath: Record<string, VirtualFile>): TreeNode[] {
-	// Build a map of all nodes (files and directories)
-	const nodeMap = new Map<string, TreeNode>();
-
-	// First pass: create all nodes
-	Object.values(filesByPath).forEach((file) => {
-		const segments = file.path.split("/").filter(Boolean);
-		let currentPath = "";
-
-		segments.forEach((segment, index) => {
-			const isLast = index === segments.length - 1;
-			currentPath = currentPath ? `${currentPath}/${segment}` : `/${segment}`;
-
-			if (!nodeMap.has(currentPath)) {
-				nodeMap.set(currentPath, {
-					name: segment,
-					path: currentPath,
-					isDir: !isLast,
-					children: !isLast ? [] : undefined,
-				});
-			}
-		});
-	});
-
-	// Second pass: build parent-child relationships
-	const rootNodes: TreeNode[] = [];
-
-	nodeMap.forEach((node) => {
-		const parentPath = node.path.substring(0, node.path.lastIndexOf("/"));
-
-		if (!parentPath) {
-			// Root level node
-			rootNodes.push(node);
-		} else {
-			// Add to parent's children
-			const parent = nodeMap.get(parentPath);
-			if (parent?.children) {
-				parent.children.push(node);
-			}
-		}
-	});
-
-	// Sort nodes recursively
-	const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
-		const sorted = [...nodes].sort((a, b) => {
-			if (a.isDir && !b.isDir) return -1;
-			if (!a.isDir && b.isDir) return 1;
-			return a.name.localeCompare(b.name);
-		});
-		sorted.forEach((n) => {
-			if (n.children) n.children = sortNodes(n.children);
-		});
-		return sorted;
-	};
-
-	return sortNodes(rootNodes);
-}
-
-/**
- * Filter tree nodes based on fuzzy search query
- * Returns nodes that match or have children that match
- */
-function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
-	if (!query) return nodes;
-
-	const filtered: TreeNode[] = [];
-
-	for (const node of nodes) {
-		if (node.isDir && node.children) {
-			// For directories, recursively filter children
-			const filteredChildren = filterTree(node.children, query);
-			if (filteredChildren.length > 0) {
-				filtered.push({
-					...node,
-					children: filteredChildren,
-				});
-			}
-		} else {
-			// For files, check if path matches the query
-			const matchResult = fuzzyMatch(query, node.path);
-			if (matchResult.matched) {
-				filtered.push(node);
-			}
-		}
-	}
-
-	return filtered;
-}
-
-/**
- * Highlight matched characters in text
- */
-function HighlightedText({ text, query }: { text: string; query: string }) {
-	if (!query) {
-		return <>{text}</>;
-	}
-
-	const matchResult = fuzzyMatch(query, text);
-	if (!matchResult.matched) {
-		return <>{text}</>;
-	}
-
-	const parts: React.ReactNode[] = [];
-	let lastIndex = 0;
-
-	matchResult.matchedIndices.forEach((index) => {
-		// Add text before match
-		if (index > lastIndex) {
-			parts.push(
-				<span key={`text-${lastIndex}-${index}`}>
-					{text.substring(lastIndex, index)}
-				</span>,
-			);
-		}
-		// Add highlighted character
-		parts.push(
-			<span key={`match-${index}`} className="bg-yellow-500/30 text-yellow-200">
-				{text[index]}
-			</span>,
-		);
-		lastIndex = index + 1;
-	});
-
-	// Add remaining text
-	if (lastIndex < text.length) {
-		parts.push(<span key="text-end">{text.substring(lastIndex)}</span>);
-	}
-
-	return <>{parts}</>;
-}
-
-interface TreeRowProps {
-	node: TreeNode;
-	depth: number;
-	activePath: string | null;
-	onSelect: (path: string) => void;
-	filesByPath: Record<string, VirtualFile>;
-	searchQuery?: string;
-	onRename: (path: string) => void;
-	onDelete: (path: string) => void;
-	renamingPath: string | null;
-	onRenameSubmit: (oldPath: string, newPath: string) => void;
-	onRenameCancel: () => void;
-}
-
-function TreeRow({
-	node,
-	depth,
-	activePath,
-	onSelect,
-	filesByPath,
-	searchQuery,
-	onRename,
-	onDelete,
-	renamingPath,
-	onRenameSubmit,
-	onRenameCancel,
-}: TreeRowProps) {
-	const [expanded, setExpanded] = useState(true);
-	const isActive = activePath === node.path;
-	const fileStatus = !node.isDir ? filesByPath[node.path]?.status : null;
-	const isRenaming = renamingPath === node.path;
-	const [renameValue, setRenameValue] = useState(node.path);
-	const inputRef = useRef<HTMLInputElement>(null);
-
-	// Check if folder has any modified or new files
-	const hasChanges = useMemo(() => {
-		if (!node.isDir) return false;
-
-		const checkNode = (n: TreeNode): boolean => {
-			if (!n.isDir) {
-				const status = filesByPath[n.path]?.status;
-				return status === "new" || status === "modified";
-			}
-			return n.children?.some(checkNode) ?? false;
-		};
-
-		return node.children?.some(checkNode) ?? false;
-	}, [node, filesByPath]);
-
-	// Update rename value when entering rename mode
-	if (isRenaming && renameValue !== node.path && renameValue === "") {
-		setRenameValue(node.path);
-	}
-
-	// Auto-focus and select filename (not extension) when entering rename mode
-	useEffect(() => {
-		if (isRenaming && inputRef.current) {
-			const input = inputRef.current;
-			input.focus();
-			setRenameValue(node.path);
-			// Select only the filename part (not extension)
-			const lastSlash = node.path.lastIndexOf("/");
-			const lastDot = node.path.lastIndexOf(".");
-			const filenameStart = lastSlash + 1;
-			const filenameEnd = lastDot > lastSlash ? lastDot : node.path.length;
-			// Use setTimeout to ensure value is set before selection
-			setTimeout(() => {
-				input.setSelectionRange(filenameStart, filenameEnd);
-			}, 0);
-		}
-	}, [isRenaming, node.path]);
-
-	const handleClick = () => {
-		if (node.isDir) {
-			setExpanded((v) => !v);
-		} else {
-			onSelect(node.path);
-		}
-	};
-
-	const handleKeyDown = (e: React.KeyboardEvent) => {
-		// Enter key triggers rename on selected file
-		if (e.key === "Enter" && isActive && !node.isDir && !isRenaming) {
-			e.preventDefault();
-			e.stopPropagation();
-			onRename(node.path);
-		}
-		// Cmd+Backspace triggers delete
-		if (e.key === "Backspace" && e.metaKey && isActive && !isRenaming) {
-			e.preventDefault();
-			e.stopPropagation();
-			onDelete(node.path);
-		}
-	};
-
-	const handleRenameBlur = () => {
-		// Auto-save on blur
-		onRenameSubmit(node.path, renameValue);
-	};
-
-	const handleRenameKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter") {
-			e.preventDefault();
-			e.stopPropagation();
-			onRenameSubmit(node.path, renameValue);
-		} else if (e.key === "Escape") {
-			e.preventDefault();
-			e.stopPropagation();
-			onRenameCancel();
-		}
-	};
-
-	return (
-		<div>
-			<ContextMenu>
-				<ContextMenuTrigger asChild>
-					<button
-						type="button"
-						onClick={handleClick}
-						onKeyDown={handleKeyDown}
-						onContextMenu={() => {
-							// If it's a file, select it on right click
-							if (!node.isDir) {
-								onSelect(node.path);
-							}
-						}}
-						className={`flex w-full items-center gap-1 px-2 py-1.5 text-xs text-left hover:bg-neutral-800/60 ${
-							isActive && !isRenaming
-								? "bg-neutral-800/80 text-neutral-50"
-								: "text-neutral-300"
-						}`}
-						style={{ paddingLeft: 8 + depth * 12 }}
-					>
-						{node.isDir ? (
-							expanded ? (
-								<ChevronDown className="h-3 w-3 text-neutral-500" />
-							) : (
-								<ChevronRight className="h-3 w-3 text-neutral-500" />
-							)
-						) : (
-							<span className="inline-block w-3" />
-						)}
-						{node.isDir ? (
-							<Folder className="mr-1 h-3 w-3 text-neutral-500" />
-						) : (
-							<FileCode2 className="mr-1 h-3 w-3 text-neutral-500" />
-						)}
-						{isRenaming ? (
-							<input
-								ref={inputRef}
-								type="text"
-								value={renameValue}
-								onChange={(e) => setRenameValue(e.target.value)}
-								onKeyDown={handleRenameKeyDown}
-								onBlur={handleRenameBlur}
-								onClick={(e) => e.stopPropagation()}
-								className="flex-1 min-w-0 bg-neutral-950 text-neutral-100 border border-blue-500/50 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-blue-500 selection:bg-blue-500/40"
-							/>
-						) : (
-							<span className="truncate flex-1">
-								{searchQuery && !node.isDir ? (
-									<HighlightedText text={node.path} query={searchQuery} />
-								) : (
-									node.name
-								)}
-							</span>
-						)}
-						{/* Folder change indicator */}
-						{!isRenaming && node.isDir && hasChanges && (
-							<span
-								className="ml-auto flex items-center justify-center px-1 py-0.5"
-								title="Contains modified files"
-							>
-								<span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-							</span>
-						)}
-						{/* File status badge */}
-						{!isRenaming &&
-							!node.isDir &&
-							fileStatus &&
-							fileStatus !== "clean" && (
-								<span
-									className={`ml-auto text-[9px] font-semibold px-1 py-0.5 rounded ${
-										fileStatus === "new"
-											? "bg-green-500/20 text-green-400"
-											: "bg-blue-500/20 text-blue-400"
-									}`}
-								>
-									{fileStatus === "new" ? "N" : "M"}
-								</span>
-							)}
-					</button>
-				</ContextMenuTrigger>
-				<ContextMenuContent className="w-64">
-					<ContextMenuItem disabled>Upload Files</ContextMenuItem>
-
-					<ContextMenuSeparator />
-
-					<ContextMenuItem disabled>
-						Cut <ContextMenuShortcut>⌘X</ContextMenuShortcut>
-					</ContextMenuItem>
-					<ContextMenuItem disabled>
-						Copy <ContextMenuShortcut>⌘C</ContextMenuShortcut>
-					</ContextMenuItem>
-
-					<ContextMenuSeparator />
-
-					<ContextMenuItem
-						onClick={() => navigator.clipboard.writeText(node.path)}
-					>
-						Copy Path <ContextMenuShortcut>⌥⌘C</ContextMenuShortcut>
-					</ContextMenuItem>
-					<ContextMenuItem
-						onClick={() => navigator.clipboard.writeText(node.name)}
-					>
-						Copy Relative Path <ContextMenuShortcut>⇧⌥⌘C</ContextMenuShortcut>
-					</ContextMenuItem>
-
-					<ContextMenuSeparator />
-
-					<ContextMenuItem onClick={() => onRename(node.path)}>
-						Rename... <ContextMenuShortcut>Enter</ContextMenuShortcut>
-					</ContextMenuItem>
-					<ContextMenuItem
-						onClick={() => onDelete(node.path)}
-						className="text-red-400 focus:text-red-400"
-					>
-						Delete <ContextMenuShortcut>⌫</ContextMenuShortcut>
-					</ContextMenuItem>
-				</ContextMenuContent>
-			</ContextMenu>
-			{node.isDir && expanded && node.children && node.children.length > 0 && (
-				<div>
-					{node.children.map((child) => (
-						<TreeRow
-							key={child.path}
-							node={child}
-							depth={depth + 1}
-							activePath={activePath}
-							onSelect={onSelect}
-							filesByPath={filesByPath}
-							searchQuery={searchQuery}
-							onRename={onRename}
-							onDelete={onDelete}
-							renamingPath={renamingPath}
-							onRenameSubmit={onRenameSubmit}
-							onRenameCancel={onRenameCancel}
-						/>
-					))}
-				</div>
-			)}
-		</div>
-	);
-}
+import { buildTree, filterTree } from "./tree";
 
 export function FileTreePane() {
 	const { filesByPath, createFile, deleteFile, renameFile, setFiles, resetFs } =
@@ -442,6 +31,10 @@ export function FileTreePane() {
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 	const [fileToDelete, setFileToDelete] = useState<string | null>(null);
 	const deleteButtonRef = useRef<HTMLButtonElement>(null);
+	const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
+	const [newFilePath, setNewFilePath] = useState("/src/NewFile.tsx");
+	const [newFileError, setNewFileError] = useState("");
+	const newFileInputRef = useRef<HTMLInputElement>(null);
 
 	const tree = useMemo(() => buildTree(filesByPath), [filesByPath]);
 	const filteredTree = useMemo(
@@ -457,18 +50,42 @@ export function FileTreePane() {
 	}, [deleteDialogOpen]);
 
 	const handleNewFile = () => {
-		const path = window.prompt("Enter new file path (e.g., /src/NewFile.tsx):");
-		if (!path) return;
-		if (!path.startsWith("/")) {
-			alert("Path must start with /");
+		setNewFilePath("/src/NewFile.tsx");
+		setNewFileError("");
+		setNewFileDialogOpen(true);
+	};
+
+	const handleNewFileDialogChange = (open: boolean) => {
+		setNewFileDialogOpen(open);
+		if (!open) {
+			setNewFileError("");
+		}
+	};
+
+	useEffect(() => {
+		if (newFileDialogOpen && newFileInputRef.current) {
+			setTimeout(() => newFileInputRef.current?.focus(), 0);
+		}
+	}, [newFileDialogOpen]);
+
+	const submitNewFile = (e?: React.FormEvent) => {
+		e?.preventDefault();
+		const trimmedPath = newFilePath.trim();
+		if (!trimmedPath) {
+			setNewFileError("Path is required");
 			return;
 		}
-		if (filesByPath[path]) {
-			alert("File already exists");
+		if (!trimmedPath.startsWith("/")) {
+			setNewFileError("Path must start with /");
 			return;
 		}
-		createFile(path, "// New file\n");
-		openFile(path);
+		if (filesByPath[trimmedPath]) {
+			setNewFileError("File already exists");
+			return;
+		}
+		createFile(trimmedPath, "// New file\n");
+		openFile(trimmedPath);
+		handleNewFileDialogChange(false);
 	};
 
 	const handleRename = (path: string) => {
@@ -656,6 +273,52 @@ export function FileTreePane() {
 					<ScrollArea.Thumb className="relative flex-1 rounded-full bg-neutral-600" />
 				</ScrollArea.Scrollbar>
 			</ScrollArea.Root>
+
+			<Dialog open={newFileDialogOpen} onOpenChange={handleNewFileDialogChange}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Create New File</DialogTitle>
+						<DialogDescription>
+							Provide the full path starting from the workspace root (e.g.
+							/src/NewFile.tsx).
+						</DialogDescription>
+					</DialogHeader>
+					<form className="space-y-4" onSubmit={submitNewFile}>
+						<label className="flex flex-col gap-1 text-sm text-neutral-300">
+							<span>File path</span>
+							<input
+								type="text"
+								ref={newFileInputRef}
+								value={newFilePath}
+								onChange={(e) => {
+									setNewFilePath(e.target.value);
+									setNewFileError("");
+								}}
+								className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+								placeholder="/src/NewFile.tsx"
+							/>
+						</label>
+						{newFileError && (
+							<p className="text-xs text-red-400">{newFileError}</p>
+						)}
+						<DialogFooter>
+							<button
+								type="button"
+								onClick={() => handleNewFileDialogChange(false)}
+								className="px-3 py-1.5 text-sm rounded hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-neutral-200"
+							>
+								Cancel
+							</button>
+							<button
+								type="submit"
+								className="px-3 py-1.5 text-sm rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 font-medium transition-colors"
+							>
+								Create File
+							</button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
 
 			<Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
 				<DialogContent
