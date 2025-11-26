@@ -4,7 +4,7 @@ import {
 	useSandpack,
 } from "@codesandbox/sandpack-react";
 import { RefreshCw } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useFs } from "@/modules/fs/store";
 import { ConsolePanel } from "./ConsolePanel";
@@ -37,18 +37,30 @@ function RefreshButton() {
 export function PreviewPane() {
 	const { filesByPath } = useFs();
 
-	const files = Object.fromEntries(
-		Object.entries(filesByPath).map(([path, file]) => [
-			path,
-			{
-				code: file.content,
-			},
-		]),
+	const files = useMemo(
+		() =>
+			Object.fromEntries(
+				Object.entries(filesByPath).map(([path, file]) => [
+					path,
+					{ code: file.content },
+				]),
+			),
+		[filesByPath],
 	);
+
+	// Skip rendering if no files
+	if (Object.keys(files).length === 0) {
+		return (
+			<div className="h-full w-full flex items-center justify-center bg-neutral-950 text-neutral-400">
+				Loading files...
+			</div>
+		);
+	}
 
 	return (
 		<div className="h-full w-full flex flex-col bg-neutral-950 text-neutral-100">
 			<SandpackProvider
+				key="sandpack-provider"
 				files={files}
 				template="react"
 				theme="dark"
@@ -58,6 +70,7 @@ export function PreviewPane() {
 				options={{
 					autorun: true,
 					autoReload: true,
+					bundlerURL: "https://sandpack-bundler-4bw.pages.dev",
 				}}
 				className="flex-1 flex flex-col overflow-hidden"
 			>
