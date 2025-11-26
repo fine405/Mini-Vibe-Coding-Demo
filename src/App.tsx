@@ -1,7 +1,13 @@
 import "./App.css";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useState } from "react";
-import { Save, FolderOpen, CheckCheck } from "lucide-react";
+import {
+	Save,
+	FolderOpen,
+	CheckCheck,
+	MessageSquare,
+	TerminalSquare,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PersistenceLoader } from "./components/PersistenceLoader";
 import {
@@ -23,7 +29,7 @@ import { useLayoutStore } from "./modules/layout/store";
 export default function App() {
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const { saveToIndexedDB, acceptAllChanges } = useFs();
-	const { showChat } = useLayoutStore();
+	const { showChat, toggleChat, toggleConsole } = useLayoutStore();
 
 	// Define command actions
 	const commandActions: CommandAction[] = [
@@ -67,6 +73,24 @@ export default function App() {
 			shortcut: "⌘⇧A",
 			group: "Edit",
 		},
+		{
+			id: "toggle-chat",
+			label: "Toggle Chat Panel",
+			description: "Show or hide the chat panel",
+			icon: <MessageSquare className="h-4 w-4" />,
+			action: toggleChat,
+			shortcut: "⌘1",
+			group: "Layout",
+		},
+		{
+			id: "toggle-console",
+			label: "Toggle Console Panel",
+			description: "Show or hide the console panel",
+			icon: <TerminalSquare className="h-4 w-4" />,
+			action: toggleConsole,
+			shortcut: "⌘2",
+			group: "Layout",
+		},
 	];
 
 	// Register keyboard shortcuts
@@ -97,13 +121,25 @@ export default function App() {
 			},
 			description: "Save workspace",
 		},
+		{
+			key: "1",
+			metaKey: true,
+			action: toggleChat,
+			description: "Toggle chat panel",
+		},
+		{
+			key: "2",
+			metaKey: true,
+			action: toggleConsole,
+			description: "Toggle console panel",
+		},
 	]);
 
 	return (
 		<ErrorBoundary>
 			<PersistenceLoader>
 				<div className="w-screen h-screen bg-neutral-950 text-neutral-100 flex flex-col">
-					<Header />
+					<Header onOpenCommandPalette={() => setCommandPaletteOpen(true)} />
 					<div className="flex-1 overflow-hidden">
 						<PanelGroup direction="horizontal" className="h-full">
 							{showChat && (

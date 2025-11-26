@@ -10,6 +10,10 @@
 ## Edit Operations
 - **⌘⇧A** - Accept all changes (mark all files as clean)
 
+## Layout
+- **⌘1** - Toggle Chat Panel
+- **⌘2** - Toggle Console Panel
+
 ## Chat
 - **⌘Enter** or **Ctrl+Enter** - Send chat message (in chat input)
 
@@ -23,6 +27,10 @@ The command palette provides quick access to:
 
 ### Edit Group
 - **Accept All Changes** - Accept all pending file modifications
+
+### Layout Group
+- **Toggle Chat Panel** - Show or hide the chat panel
+- **Toggle Console Panel** - Show or hide the console panel
 
 ### File Search
 - Type to search files by name with fuzzy matching
