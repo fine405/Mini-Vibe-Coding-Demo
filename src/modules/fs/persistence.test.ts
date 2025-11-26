@@ -202,4 +202,22 @@ describe("Persistence", () => {
 		expect(loaded?.filesByPath).toEqual(original);
 		expect(loaded?.timestamp).toBeGreaterThan(0);
 	});
+
+	it("should preserve originalContent field when saving", async () => {
+		const filesByPath: Record<string, VirtualFile> = {
+			"/test.js": {
+				path: "/test.js",
+				content: "const modified = true;",
+				status: "modified",
+				originalContent: "const original = true;",
+			},
+		};
+
+		await saveWorkspace(filesByPath);
+		const loaded = await loadWorkspace();
+
+		expect(loaded?.filesByPath["/test.js"].originalContent).toBe(
+			"const original = true;",
+		);
+	});
 });

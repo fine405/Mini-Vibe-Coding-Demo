@@ -45,6 +45,7 @@ interface FsStore extends VirtualFileSystemState {
 	loadFromPersistence: () => Promise<boolean>;
 	saveToIndexedDB: () => Promise<void>;
 	acceptAllChanges: () => void;
+	revertFile: (path: string) => void;
 }
 
 const stateCreator = immer<FsStore>((set) => ({
@@ -62,6 +63,13 @@ const stateCreator = immer<FsStore>((set) => ({
 		set((state) => {
 			const existing = state.filesByPath[path];
 			if (!existing) return;
+			// Store original content on first modification
+			if (
+				existing.status === "clean" &&
+				existing.originalContent === undefined
+			) {
+				existing.originalContent = existing.content;
+			}
 			existing.content = content;
 			existing.status = "modified";
 		});
@@ -177,7 +185,23 @@ const stateCreator = immer<FsStore>((set) => ({
 			for (const path in state.filesByPath) {
 				if (state.filesByPath[path].status !== "clean") {
 					state.filesByPath[path].status = "clean";
+					// Clear original content since changes are accepted
+					delete state.filesByPath[path].originalContent;
 				}
+			}
+		});
+		// Auto-save to IndexedDB
+		const state = useFs.getState();
+		saveWorkspace(state.filesByPath).catch(console.error);
+	},
+	revertFile(path) {
+		set((state) => {
+			const existing = state.filesByPath[path];
+			if (!existing || existing.status !== "modified") return;
+			if (existing.originalContent !== undefined) {
+				existing.content = existing.originalContent;
+				existing.status = "clean";
+				delete existing.originalContent;
 			}
 		});
 		// Auto-save to IndexedDB

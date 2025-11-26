@@ -98,15 +98,21 @@ export function ChatPane() {
 							status: "new",
 						};
 						break;
-					case "update":
-						if (newFilesByPath[change.path]) {
+					case "update": {
+						const existing = newFilesByPath[change.path];
+						if (existing) {
 							newFilesByPath[change.path] = {
-								...newFilesByPath[change.path],
+								...existing,
 								content: change.content || "",
 								status: "modified",
+								// Store original content for revert/diff if not already stored
+								originalContent:
+									existing.originalContent ??
+									(existing.status === "clean" ? existing.content : undefined),
 							};
 						}
 						break;
+					}
 					case "delete":
 						delete newFilesByPath[change.path];
 						break;

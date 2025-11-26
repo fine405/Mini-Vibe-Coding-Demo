@@ -1,17 +1,25 @@
 import { FileCode2 } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { useFs } from "@/modules/fs/store";
 import { EditorDiffView } from "./EditorDiffView";
 import { EditorTabs } from "./EditorTabs";
 import { getLanguageFromPath, MonacoEditorWrapper } from "./MonacoEditor";
 import { useEditor } from "./store";
 
-// Store original content for diff view
-const originalContentCache = new Map<string, string>();
-
 export function EditorPane() {
-	const { filesByPath } = useFs();
+	const { filesByPath, revertFile } = useFs();
 	const updateFileContent = useFs((s) => s.updateFileContent);
+	const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+	const [fileToRevert, setFileToRevert] = useState<string | null>(null);
+	const revertButtonRef = useRef<HTMLButtonElement>(null);
 
 	const {
 		openFiles,
@@ -27,17 +35,10 @@ export function EditorPane() {
 	const handleContentChange = useCallback(
 		(newContent: string) => {
 			if (activeFilePath) {
-				// Cache original content before first edit
-				if (!originalContentCache.has(activeFilePath)) {
-					const file = filesByPath[activeFilePath];
-					if (file && file.status === "clean") {
-						originalContentCache.set(activeFilePath, file.content);
-					}
-				}
 				updateFileContent(activeFilePath, newContent);
 			}
 		},
-		[activeFilePath, filesByPath, updateFileContent],
+		[activeFilePath, updateFileContent],
 	);
 
 	const getFileStatus = useCallback(
@@ -49,8 +50,38 @@ export function EditorPane() {
 
 	const getOriginalContent = useCallback(
 		(path: string) => {
-			// Return cached original content, or current content if no cache
-			return originalContentCache.get(path) || filesByPath[path]?.content || "";
+			const file = filesByPath[path];
+			// Return stored original content, or current content if none
+			return file?.originalContent ?? file?.content ?? "";
+		},
+		[filesByPath],
+	);
+
+	const handleRevert = useCallback((path: string) => {
+		setFileToRevert(path);
+		setRevertDialogOpen(true);
+	}, []);
+
+	const confirmRevert = useCallback(() => {
+		if (fileToRevert) {
+			revertFile(fileToRevert);
+		}
+		setRevertDialogOpen(false);
+		setFileToRevert(null);
+	}, [fileToRevert, revertFile]);
+
+	useEffect(() => {
+		if (revertDialogOpen) {
+			setTimeout(() => {
+				revertButtonRef.current?.focus();
+			}, 0);
+		}
+	}, [revertDialogOpen]);
+
+	const canRevert = useCallback(
+		(path: string) => {
+			const file = filesByPath[path];
+			return file?.status === "modified" && file?.originalContent !== undefined;
 		},
 		[filesByPath],
 	);
@@ -91,6 +122,8 @@ export function EditorPane() {
 				onCloseTab={closeFile}
 				onToggleViewMode={toggleViewMode}
 				getFileStatus={getFileStatus}
+				onRevert={handleRevert}
+				canRevert={canRevert}
 			/>
 
 			{/* Editor content */}
@@ -115,6 +148,37 @@ export function EditorPane() {
 					</div>
 				)}
 			</div>
+
+			{/* Revert Confirmation Dialog */}
+			<Dialog open={revertDialogOpen} onOpenChange={setRevertDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Revert Changes</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to revert{" "}
+							<span className="font-mono text-neutral-300">{fileToRevert}</span>
+							? All changes will be discarded.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<button
+							type="button"
+							onClick={() => setRevertDialogOpen(false)}
+							className="px-3 py-1.5 text-sm rounded hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-neutral-200"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={confirmRevert}
+							ref={revertButtonRef}
+							className="px-3 py-1.5 text-sm rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 font-medium transition-colors"
+						>
+							Revert
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
