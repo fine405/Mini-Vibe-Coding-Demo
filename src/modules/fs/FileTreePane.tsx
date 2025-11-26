@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useEditor } from "@/modules/editor";
 import {
 	exportProjectAsJSON,
 	importProjectFromJSON,
@@ -278,16 +279,10 @@ function TreeRow({
 }
 
 export function FileTreePane() {
-	const {
-		filesByPath,
-		activeFilePath,
-		createFile,
-		deleteFile,
-		renameFile,
-		setActiveFile,
-		setFiles,
-		resetFs,
-	} = useFs();
+	const { filesByPath, createFile, deleteFile, renameFile, setFiles, resetFs } =
+		useFs();
+
+	const { openFile, activeFilePath, closeAllFiles, closeFile } = useEditor();
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const tree = useMemo(() => buildTree(filesByPath), [filesByPath]);
@@ -308,7 +303,7 @@ export function FileTreePane() {
 			return;
 		}
 		createFile(path, "// New file\n");
-		setActiveFile(path);
+		openFile(path);
 	};
 
 	const handleRename = () => {
@@ -327,7 +322,7 @@ export function FileTreePane() {
 			return;
 		}
 		renameFile(activeFilePath, newPath);
-		setActiveFile(newPath);
+		openFile(newPath);
 	};
 
 	const handleDelete = () => {
@@ -340,7 +335,7 @@ export function FileTreePane() {
 		);
 		if (!confirmed) return;
 		deleteFile(activeFilePath);
-		setActiveFile(null);
+		closeFile(activeFilePath);
 	};
 
 	const handleNewProject = () => {
@@ -349,7 +344,7 @@ export function FileTreePane() {
 		);
 		if (!confirmed) return;
 		resetFs();
-		setActiveFile(null);
+		closeAllFiles();
 		toast.success("New project created", {
 			description: "All files and storage cleared",
 		});
@@ -374,7 +369,7 @@ export function FileTreePane() {
 			const file = await selectProjectFile();
 			const importedFiles = await importProjectFromJSON(file);
 			setFiles(importedFiles);
-			setActiveFile(null);
+			closeAllFiles();
 			const fileCount = Object.keys(importedFiles).length;
 			toast.success("Project imported successfully", {
 				description: `${fileCount} files loaded and saved to storage`,
@@ -482,7 +477,7 @@ export function FileTreePane() {
 									node={node}
 									depth={0}
 									activePath={activeFilePath}
-									onSelect={setActiveFile}
+									onSelect={openFile}
 									filesByPath={filesByPath}
 									searchQuery={searchQuery}
 								/>

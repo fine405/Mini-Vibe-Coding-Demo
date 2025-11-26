@@ -11,6 +11,7 @@ import {
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Toaster } from "./components/ui/toaster";
 import { ChatPane } from "./modules/chat/ChatPane";
+import { EditorPane } from "./modules/editor";
 import { FileTreePane } from "./modules/fs/FileTreePane";
 import { PreviewPane } from "./modules/preview/PreviewPane";
 import { useFs } from "./modules/fs/store";
@@ -99,15 +100,19 @@ export default function App() {
 			<PersistenceLoader>
 				<div className="w-screen h-screen bg-neutral-950 text-neutral-100">
 					<PanelGroup direction="horizontal" className="h-full">
-						<Panel defaultSize={18} minSize={10}>
+						<Panel defaultSize={16} minSize={10}>
 							<ChatPane />
 						</Panel>
 						<PanelResizeHandle className="w-px bg-neutral-800/80" />
-						<Panel defaultSize={24} minSize={15}>
+						<Panel defaultSize={14} minSize={10}>
 							<FileTreePane />
 						</Panel>
 						<PanelResizeHandle className="w-px bg-neutral-800/80" />
-						<Panel defaultSize={58} minSize={25}>
+						<Panel defaultSize={35} minSize={20}>
+							<EditorPane />
+						</Panel>
+						<PanelResizeHandle className="w-px bg-neutral-800/80" />
+						<Panel defaultSize={35} minSize={20}>
 							<PreviewPane />
 						</Panel>
 					</PanelGroup>
