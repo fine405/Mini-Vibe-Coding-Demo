@@ -26,6 +26,7 @@ import {
 	DialogTitle,
 } from "./components/ui/dialog";
 import { ChatPane } from "./modules/chat/ChatPane";
+import { useChatStore } from "./modules/chat/store";
 import { EditorPane } from "./modules/editor";
 import { FileTreePane } from "./modules/fs/FileTreePane";
 import { PreviewPane } from "./modules/preview/PreviewPane";
@@ -55,6 +56,7 @@ export default function App() {
 		getModifiedFiles,
 	} = useFs();
 	const { closeAllFiles } = useEditor();
+	const { clearMessages } = useChatStore();
 	const { showChat, toggleChat, toggleConsole } = useLayoutStore();
 
 	// Dialog states
@@ -151,6 +153,7 @@ export default function App() {
 	const confirmNewProject = () => {
 		resetFs();
 		closeAllFiles();
+		clearMessages();
 		setNewProjectDialogOpen(false);
 		toast.success("New project created", {
 			description: "All files and storage cleared",
