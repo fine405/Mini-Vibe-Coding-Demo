@@ -172,9 +172,9 @@ export function ChatPane() {
 	};
 
 	return (
-		<div className="h-full w-full flex flex-col border-r border-neutral-800/60 bg-neutral-950/80 text-neutral-100">
+		<div className="h-full w-full flex flex-col border-r border-border-primary bg-bg-primary text-fg-primary">
 			{/* Header */}
-			<div className="shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800/60">
+			<div className="shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-muted border-b border-border-primary">
 				Chat
 			</div>
 
@@ -186,7 +186,7 @@ export function ChatPane() {
 				>
 					<div className="p-3 space-y-3">
 						{messages.length === 0 && (
-							<div className="text-xs text-neutral-500 text-center py-8">
+							<div className="text-xs text-fg-muted text-center py-8">
 								<p className="mb-2">👋 Welcome to mini-lovable!</p>
 								<p>Try asking: "create a react todo app"</p>
 							</div>
@@ -195,12 +195,12 @@ export function ChatPane() {
 							<div
 								key={msg.id}
 								className={`text-xs ${
-									msg.role === "user" ? "text-neutral-100" : "text-neutral-300"
+									msg.role === "user" ? "text-fg-primary" : "text-fg-secondary"
 								}`}
 							>
 								<div
 									className={`font-medium text-[10px] uppercase tracking-wide mb-1 ${
-										msg.role === "user" ? "text-blue-400" : "text-green-400"
+										msg.role === "user" ? "text-accent" : "text-success"
 									}`}
 								>
 									{msg.role === "user" ? "You" : "Assistant"}
@@ -208,8 +208,8 @@ export function ChatPane() {
 								<div
 									className={`rounded px-2.5 py-2 ${
 										msg.role === "user"
-											? "bg-blue-500/10 border border-blue-500/20"
-											: "bg-neutral-800/60 border border-neutral-700/60"
+											? "bg-accent/10 border border-accent/20"
+											: "bg-bg-tertiary border border-border-primary"
 									}`}
 								>
 									{msg.content}
@@ -217,7 +217,7 @@ export function ChatPane() {
 							</div>
 						))}
 						{isLoading && (
-							<div className="flex items-center gap-2 text-xs text-neutral-400">
+							<div className="flex items-center gap-2 text-xs text-fg-muted">
 								<Loader2 className="h-3 w-3 animate-spin" />
 								<span>Thinking...</span>
 							</div>
@@ -226,9 +226,9 @@ export function ChatPane() {
 				</ScrollArea.Viewport>
 				<ScrollArea.Scrollbar
 					orientation="vertical"
-					className="flex w-1.5 touch-none select-none bg-neutral-900/80"
+					className="flex w-1.5 touch-none select-none bg-bg-tertiary"
 				>
-					<ScrollArea.Thumb className="relative flex-1 rounded-full bg-neutral-600" />
+					<ScrollArea.Thumb className="relative flex-1 rounded-full bg-fg-muted/20" />
 				</ScrollArea.Scrollbar>
 			</ScrollArea.Root>
 
@@ -240,34 +240,34 @@ export function ChatPane() {
 						{/* Header with close button */}
 						<div className="flex items-center justify-between px-4 mb-3">
 							<div className="flex items-center gap-2">
-								<Sparkles className="h-4 w-4 text-neutral-400" />
-								<span className="text-sm font-normal text-neutral-300">
+								<Sparkles className="h-4 w-4 text-fg-muted" />
+								<span className="text-sm font-normal text-fg-secondary">
 									Suggestions
 								</span>
 							</div>
 							<button
 								type="button"
 								onClick={() => setShowSuggestions(false)}
-								className="p-1 hover:bg-neutral-700/50 rounded transition-colors"
+								className="p-1 hover:bg-bg-tertiary rounded transition-colors"
 								title="Close suggestions"
 							>
-								<X className="h-4 w-4 text-neutral-400 hover:text-neutral-200" />
+								<X className="h-4 w-4 text-fg-muted hover:text-fg-primary" />
 							</button>
 						</div>
 
 						{/* Scrollable suggestions */}
 						<div className="relative">
 							{/* Left gradient mask */}
-							<div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-[black] via-[black]/80 to-transparent z-[5] pointer-events-none" />
+							<div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-[var(--color-bg-primary)] via-[var(--color-bg-primary)]/80 to-transparent z-[5] pointer-events-none" />
 
 							{/* Left arrow */}
 							<button
 								type="button"
 								onClick={() => scrollSuggestions("left")}
-								className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-1 hover:bg-neutral-700/90 rounded-full transition-colors"
+								className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-1 hover:bg-bg-tertiary rounded-full transition-colors"
 								title="Scroll left"
 							>
-								<ChevronLeft className="h-3 w-3 text-neutral-300" />
+								<ChevronLeft className="h-3 w-3 text-fg-muted" />
 							</button>
 
 							{/* Suggestions container */}
@@ -282,7 +282,7 @@ export function ChatPane() {
 											type="button"
 											onClick={() => setInput(patch.trigger)}
 											disabled={isLoading}
-											className="shrink-0 text-[10px] px-2 py-1 bg-neutral-700/40 hover:bg-neutral-600/50 rounded-full text-neutral-200 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap font-normal"
+											className="shrink-0 text-[10px] px-2 py-1 bg-bg-tertiary hover:bg-bg-secondary rounded-full text-fg-secondary hover:text-fg-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap font-normal"
 											title={patch.summary}
 										>
 											{patch.trigger}
@@ -292,16 +292,16 @@ export function ChatPane() {
 							</div>
 
 							{/* Right gradient mask */}
-							<div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[black] via-[black]/80 to-transparent z-[5] pointer-events-none" />
+							<div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[var(--color-bg-primary)] via-[var(--color-bg-primary)]/80 to-transparent z-[5] pointer-events-none" />
 
 							{/* Right arrow */}
 							<button
 								type="button"
 								onClick={() => scrollSuggestions("right")}
-								className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-1 hover:bg-neutral-700/90 rounded-full transition-colors"
+								className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-1 hover:bg-bg-tertiary rounded-full transition-colors"
 								title="Scroll right"
 							>
-								<ChevronRight className="h-3 w-3 text-neutral-300" />
+								<ChevronRight className="h-3 w-3 text-fg-muted" />
 							</button>
 						</div>
 					</div>
@@ -316,16 +316,16 @@ export function ChatPane() {
 							onKeyDown={handleKeyPress}
 							placeholder="Ask me to create something..."
 							disabled={isLoading}
-							className="flex-1 px-2.5 py-1.5 text-xs bg-neutral-900 border border-neutral-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-neutral-100 placeholder:text-neutral-500 disabled:opacity-50"
+							className="flex-1 px-2.5 py-1.5 text-xs bg-bg-secondary border border-border-primary rounded focus:outline-none focus:ring-1 focus:ring-accent text-fg-primary placeholder:text-fg-muted disabled:opacity-50"
 						/>
 						<button
 							type="button"
 							onClick={handleSend}
 							disabled={sendDisabled}
 							className={cn(
-								"py-1.5 px-4  bg-blue-500 rounded text-white transition-colors`",
+								"py-1.5 px-4  bg-accent rounded text-white transition-colors`",
 								{
-									"hover:bg-blue-600": !sendDisabled,
+									"hover:bg-accent-hover": !sendDisabled,
 									"opacity-50 cursor-not-allowed": sendDisabled,
 								},
 							)}
@@ -334,7 +334,7 @@ export function ChatPane() {
 							<Send className="h-3.5 w-3.5" />
 						</button>
 					</div>
-					<p className="text-[10px] text-neutral-500 mt-1.5">
+					<p className="text-[10px] text-fg-muted mt-1.5">
 						Press ⌘+Enter to send
 					</p>
 				</div>

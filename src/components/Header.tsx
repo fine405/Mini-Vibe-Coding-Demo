@@ -8,6 +8,7 @@ import {
 	Upload,
 } from "lucide-react";
 import { useLayoutStore } from "@/modules/layout/store";
+import { ThemeToggle } from "./ThemeToggle";
 import {
 	Tooltip,
 	TooltipContent,
@@ -31,13 +32,13 @@ export function Header({
 	const { showChat, showConsole, toggleChat, toggleConsole } = useLayoutStore();
 
 	return (
-		<div className="h-10 w-full bg-neutral-950 border-b border-neutral-800 flex items-center justify-between px-4 shrink-0">
+		<div className="h-10 w-full bg-bg-primary border-b border-border-primary flex items-center justify-between px-4 shrink-0 text-fg-primary">
 			<div className="flex items-center gap-3">
-				<span className="text-sm font-semibold text-neutral-300">
+				<span className="text-sm font-semibold text-fg-muted">
 					Mini Lovable
 				</span>
 
-				<div className="w-px h-4 bg-neutral-800" />
+				<div className="w-px h-4 bg-border-primary" />
 
 				<TooltipProvider delayDuration={300}>
 					<div className="flex items-center gap-1">
@@ -46,7 +47,7 @@ export function Header({
 								<button
 									type="button"
 									onClick={onNewProject}
-									className="flex items-center gap-1.5 px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors"
+									className="flex items-center gap-1.5 px-2 py-1 rounded bg-accent hover:bg-accent-hover text-white text-xs font-medium transition-colors"
 								>
 									<FilePlus2 className="h-3.5 w-3.5" />
 									<span>New Project</span>
@@ -60,7 +61,7 @@ export function Header({
 								<button
 									type="button"
 									onClick={onImportProject}
-									className="p-1.5 rounded hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
+									className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
 								>
 									<Upload className="h-4 w-4" />
 								</button>
@@ -73,7 +74,7 @@ export function Header({
 								<button
 									type="button"
 									onClick={onExportProject}
-									className="p-1.5 rounded hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
+									className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
 								>
 									<Download className="h-4 w-4" />
 								</button>
@@ -92,9 +93,9 @@ export function Header({
 							<button
 								type="button"
 								onClick={onOpenCommandPalette}
-								className="flex items-center gap-2 px-2.5 py-1 rounded border border-neutral-800 bg-neutral-900/70 hover:bg-neutral-800 transition-colors text-neutral-200"
+								className="flex items-center gap-2 px-2.5 py-1 rounded border border-border-primary bg-bg-secondary hover:bg-bg-tertiary transition-colors text-fg-secondary hover:text-fg-primary"
 							>
-								<Command className="h-3.5 w-3.5 text-neutral-300" />
+								<Command className="h-3.5 w-3.5 text-fg-muted" />
 								<span className="text-xs font-medium tracking-wide">
 									Command Palette
 								</span>
@@ -103,7 +104,7 @@ export function Header({
 						<TooltipContent>Open Command Palette (⌘K)</TooltipContent>
 					</Tooltip>
 
-					<div className="w-px h-4 bg-neutral-800 mx-1" />
+					<div className="w-px h-4 bg-border-primary mx-1" />
 
 					<Tooltip>
 						<TooltipTrigger asChild>
@@ -111,8 +112,8 @@ export function Header({
 								type="button"
 								onClick={toggleChat}
 								className={clsx(
-									"p-1.5 rounded hover:bg-neutral-800 transition-colors",
-									showChat ? "text-neutral-200" : "text-neutral-500",
+									"p-1.5 rounded hover:bg-bg-tertiary transition-colors",
+									showChat ? "text-fg-primary" : "text-fg-muted",
 								)}
 							>
 								<MessageSquare className="h-4 w-4" />
@@ -121,7 +122,7 @@ export function Header({
 						<TooltipContent>Toggle Chat Panel (⌘1)</TooltipContent>
 					</Tooltip>
 
-					<div className="w-px h-4 bg-neutral-800 mx-1" />
+					<div className="w-px h-4 bg-border-primary mx-1" />
 
 					<Tooltip>
 						<TooltipTrigger asChild>
@@ -129,8 +130,8 @@ export function Header({
 								type="button"
 								onClick={toggleConsole}
 								className={clsx(
-									"p-1.5 rounded hover:bg-neutral-800 transition-colors",
-									showConsole ? "text-neutral-200" : "text-neutral-500",
+									"p-1.5 rounded hover:bg-bg-tertiary transition-colors",
+									showConsole ? "text-fg-primary" : "text-fg-muted",
 								)}
 							>
 								<TerminalSquare className="h-4 w-4" />
@@ -139,6 +140,9 @@ export function Header({
 						<TooltipContent>Toggle Console Panel (⌘2)</TooltipContent>
 					</Tooltip>
 				</TooltipProvider>
+
+				<div className="w-px h-4 bg-border-primary mx-2" />
+				<ThemeToggle />
 			</div>
 		</div>
 	);

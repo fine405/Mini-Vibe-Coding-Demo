@@ -34,7 +34,7 @@ export function EditorTabs({
 
 	return (
 		<TooltipProvider delayDuration={300}>
-			<div className="flex items-center border-b border-neutral-800/60 bg-neutral-900/50 overflow-x-auto">
+			<div className="flex items-center border-b border-border-primary bg-bg-secondary overflow-x-auto">
 				{openFiles.map((file) => {
 					const isActive = file.path === activeFilePath;
 					const fileName = file.path.split("/").pop() || file.path;
@@ -45,22 +45,22 @@ export function EditorTabs({
 						<button
 							type="button"
 							key={file.path}
-							className={`group flex items-center gap-1 px-3 py-1.5 text-xs border-r border-neutral-800/40 cursor-pointer transition-colors ${
+							className={`group flex items-center gap-1 px-3 py-1.5 text-xs border-r border-border-secondary cursor-pointer transition-colors ${
 								isActive
-									? "bg-neutral-800/80 text-neutral-100"
-									: "text-neutral-400 hover:bg-neutral-800/40 hover:text-neutral-200"
+									? "bg-bg-primary text-fg-primary"
+									: "text-fg-secondary hover:bg-bg-tertiary hover:text-fg-primary"
 							}`}
 							onClick={() => onSelectTab(file.path)}
 							title={file.path}
 						>
-							<FileCode2 className="h-3 w-3 text-neutral-500 shrink-0" />
+							<FileCode2 className="h-3 w-3 text-fg-muted shrink-0" />
 							<span className="truncate max-w-32">{fileName}</span>
 
 							{/* Status indicator */}
 							{isModified && (
 								<span
 									className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-										status === "new" ? "bg-green-400" : "bg-blue-400"
+										status === "new" ? "bg-success" : "bg-accent"
 									}`}
 								/>
 							)}
@@ -77,8 +77,8 @@ export function EditorTabs({
 											}}
 											className={`p-0.5 rounded transition-colors shrink-0 ${
 												file.viewMode === "diff"
-													? "text-blue-400 bg-blue-500/20"
-													: "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700/50"
+													? "text-accent bg-accent/20"
+													: "text-fg-muted hover:text-fg-primary hover:bg-bg-tertiary"
 											}`}
 										>
 											<GitCompare className="h-3 w-3" />
@@ -102,7 +102,7 @@ export function EditorTabs({
 												e.stopPropagation();
 												onRevert(file.path);
 											}}
-											className="p-0.5 rounded transition-colors shrink-0 text-neutral-500 hover:text-orange-300 hover:bg-orange-500/20"
+											className="p-0.5 rounded transition-colors shrink-0 text-fg-muted hover:text-warning hover:bg-warning/20"
 										>
 											<RotateCcw className="h-3 w-3" />
 										</button>
@@ -118,7 +118,7 @@ export function EditorTabs({
 									e.stopPropagation();
 									onCloseTab(file.path);
 								}}
-								className="p-0.5 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-700/50 opacity-0 group-hover:opacity-100 transition-opacity"
+								className="p-0.5 rounded text-fg-muted hover:text-fg-primary hover:bg-bg-tertiary opacity-0 group-hover:opacity-100 transition-opacity"
 								title="Close"
 							>
 								<X className="h-3 w-3" />

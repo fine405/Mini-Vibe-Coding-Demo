@@ -1,9 +1,25 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { useFs } from "../fs/store";
 import type { VirtualFile } from "../fs/types";
 import { PreviewPane } from "./PreviewPane";
+
+beforeAll(() => {
+	Object.defineProperty(window, "matchMedia", {
+		writable: true,
+		value: vi.fn().mockImplementation((query: string) => ({
+			matches: false,
+			media: query,
+			onchange: null,
+			addListener: vi.fn(),
+			removeListener: vi.fn(),
+			addEventListener: vi.fn(),
+			removeEventListener: vi.fn(),
+			dispatchEvent: vi.fn(),
+		})),
+	});
+});
 
 // Mock Sandpack components
 vi.mock("@codesandbox/sandpack-react", () => ({

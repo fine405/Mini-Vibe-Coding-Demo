@@ -163,14 +163,14 @@ export function FileTreePane() {
 	};
 
 	return (
-		<div className="flex h-full w-full flex-col bg-neutral-950/80 text-neutral-100">
-			<div className="flex items-center justify-between border-b border-neutral-800/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+		<div className="flex h-full w-full flex-col bg-bg-secondary text-fg-primary">
+			<div className="flex items-center justify-between border-b border-border-primary px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
 				<span>Files</span>
 				<div className="flex items-center gap-1">
 					<button
 						type="button"
 						onClick={handleNewFile}
-						className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 transition-colors"
+						className="rounded p-1 hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
 						title="New file"
 					>
 						<Plus className="h-3.5 w-3.5" />
@@ -178,21 +178,21 @@ export function FileTreePane() {
 				</div>
 			</div>
 			{/* Search Input */}
-			<div className="px-2 py-2 border-b border-neutral-800/60">
+			<div className="px-2 py-2 border-b border-border-primary">
 				<div className="relative">
-					<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-neutral-500" />
+					<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-fg-muted" />
 					<input
 						type="text"
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						placeholder="Search files..."
-						className="w-full pl-7 pr-7 py-1.5 text-xs bg-neutral-900 border border-neutral-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-neutral-100 placeholder:text-neutral-500"
+						className="w-full pl-7 pr-7 py-1.5 text-xs bg-bg-tertiary border border-border-secondary rounded focus:outline-none focus:ring-1 focus:ring-accent text-fg-primary placeholder:text-fg-muted"
 					/>
 					{searchQuery && (
 						<button
 							type="button"
 							onClick={() => setSearchQuery("")}
-							className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-neutral-700 text-neutral-500 hover:text-neutral-300 transition-colors"
+							className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
 							title="Clear search"
 						>
 							<X className="h-3 w-3" />
@@ -227,7 +227,7 @@ export function FileTreePane() {
 								/>
 							))
 						) : (
-							<div className="px-3 py-8 text-center text-neutral-500 text-xs">
+							<div className="px-3 py-8 text-center text-fg-muted text-xs">
 								{searchQuery ? "No files match your search" : "No files"}
 							</div>
 						)}
@@ -235,9 +235,9 @@ export function FileTreePane() {
 				</ScrollArea.Viewport>
 				<ScrollArea.Scrollbar
 					orientation="vertical"
-					className="flex w-1.5 touch-none select-none bg-neutral-900/80"
+					className="flex w-1.5 touch-none select-none bg-bg-tertiary"
 				>
-					<ScrollArea.Thumb className="relative flex-1 rounded-full bg-neutral-600" />
+					<ScrollArea.Thumb className="relative flex-1 rounded-full bg-fg-muted/20" />
 				</ScrollArea.Scrollbar>
 			</ScrollArea.Root>
 
@@ -251,7 +251,7 @@ export function FileTreePane() {
 						</DialogDescription>
 					</DialogHeader>
 					<form className="space-y-4" onSubmit={submitNewFile}>
-						<label className="flex flex-col gap-1 text-sm text-neutral-300">
+						<label className="flex flex-col gap-1 text-sm text-fg-secondary">
 							<span>File path</span>
 							<input
 								type="text"
@@ -261,24 +261,24 @@ export function FileTreePane() {
 									setNewFilePath(e.target.value);
 									setNewFileError("");
 								}}
-								className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+								className="w-full rounded border border-border-primary bg-bg-tertiary px-3 py-2 text-sm text-fg-primary outline-none focus:border-accent focus:ring-1 focus:ring-accent"
 								placeholder="/src/NewFile.tsx"
 							/>
 						</label>
 						{newFileError && (
-							<p className="text-xs text-red-400">{newFileError}</p>
+							<p className="text-xs text-error">{newFileError}</p>
 						)}
 						<DialogFooter>
 							<button
 								type="button"
 								onClick={() => handleNewFileDialogChange(false)}
-								className="px-3 py-1.5 text-sm rounded hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-neutral-200"
+								className="px-3 py-1.5 text-sm rounded hover:bg-bg-tertiary transition-colors text-fg-muted hover:text-fg-primary"
 							>
 								Cancel
 							</button>
 							<button
 								type="submit"
-								className="px-3 py-1.5 text-sm rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 font-medium transition-colors"
+								className="px-3 py-1.5 text-sm rounded bg-accent/10 text-accent hover:bg-accent/20 font-medium transition-colors"
 							>
 								Create File
 							</button>
@@ -302,7 +302,7 @@ export function FileTreePane() {
 						</DialogTitle>
 						<DialogDescription>
 							Are you sure you want to delete{" "}
-							<span className="font-mono text-neutral-300">{fileToDelete}</span>
+							<span className="font-mono text-fg-primary">{fileToDelete}</span>
 							{isDeleteDir && " and all its contents"}? This action cannot be
 							undone.
 						</DialogDescription>
@@ -310,7 +310,7 @@ export function FileTreePane() {
 					<DialogFooter>
 						<button
 							type="button"
-							className="px-3 py-1.5 text-sm rounded hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-neutral-200"
+							className="px-3 py-1.5 text-sm rounded hover:bg-bg-tertiary transition-colors text-fg-muted hover:text-fg-primary"
 							onClick={() => setDeleteDialogOpen(false)}
 						>
 							Cancel
@@ -318,7 +318,7 @@ export function FileTreePane() {
 						<button
 							ref={deleteButtonRef}
 							type="button"
-							className="px-3 py-1.5 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded transition-colors font-medium"
+							className="px-3 py-1.5 text-sm bg-error/10 text-error hover:bg-error/20 rounded transition-colors font-medium"
 							onClick={confirmDelete}
 						>
 							Delete

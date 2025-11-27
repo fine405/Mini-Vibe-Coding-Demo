@@ -215,7 +215,7 @@ export default function App() {
 	return (
 		<ErrorBoundary>
 			<PersistenceLoader>
-				<div className="w-screen h-screen bg-neutral-950 text-neutral-100 flex flex-col">
+				<div className="w-screen h-screen bg-bg-primary text-fg-primary flex flex-col">
 					<Header
 						onOpenCommandPalette={() => setCommandPaletteOpen(true)}
 						onNewProject={handleNewProject}
@@ -229,17 +229,17 @@ export default function App() {
 									<Panel defaultSize={20} minSize={15} order={1}>
 										<ChatPane />
 									</Panel>
-									<PanelResizeHandle className="w-px bg-neutral-800/80" />
+									<PanelResizeHandle className="w-px bg-border-primary" />
 								</>
 							)}
 							<Panel defaultSize={15} minSize={10} order={2}>
 								<FileTreePane />
 							</Panel>
-							<PanelResizeHandle className="w-px bg-neutral-800/80" />
+							<PanelResizeHandle className="w-px bg-border-primary" />
 							<Panel defaultSize={35} minSize={20} order={3}>
 								<EditorPane />
 							</Panel>
-							<PanelResizeHandle className="w-px bg-neutral-800/80" />
+							<PanelResizeHandle className="w-px bg-border-primary" />
 							<Panel defaultSize={30} minSize={20} order={4}>
 								<PreviewPane />
 							</Panel>
@@ -270,14 +270,14 @@ export default function App() {
 								<button
 									type="button"
 									onClick={() => setNewProjectDialogOpen(false)}
-									className="px-4 py-2 text-sm rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors"
+									className="px-4 py-2 text-sm rounded bg-bg-tertiary hover:bg-bg-secondary text-fg-secondary transition-colors"
 								>
 									Cancel
 								</button>
 								<button
 									type="button"
 									onClick={confirmNewProject}
-									className="px-4 py-2 text-sm rounded bg-red-600 hover:bg-red-500 text-white font-medium transition-colors"
+									className="px-4 py-2 text-sm rounded bg-error hover:bg-error/90 text-white font-medium transition-colors"
 								>
 									Start New Project
 								</button>
@@ -306,7 +306,7 @@ export default function App() {
 										}
 									}}
 									placeholder="my-project"
-									className="w-full px-3 py-2 text-sm bg-neutral-900 border border-neutral-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-neutral-100 placeholder:text-neutral-500"
+									className="w-full px-3 py-2 text-sm bg-bg-tertiary border border-border-primary rounded focus:outline-none focus:ring-2 focus:ring-accent text-fg-primary placeholder:text-fg-muted"
 									autoFocus
 								/>
 							</div>
@@ -314,7 +314,7 @@ export default function App() {
 								<button
 									type="button"
 									onClick={() => setExportDialogOpen(false)}
-									className="px-4 py-2 text-sm rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors"
+									className="px-4 py-2 text-sm rounded bg-bg-tertiary hover:bg-bg-secondary text-fg-secondary transition-colors"
 								>
 									Cancel
 								</button>
@@ -322,7 +322,7 @@ export default function App() {
 									type="button"
 									onClick={confirmExportProject}
 									disabled={!exportProjectName.trim()}
-									className="px-4 py-2 text-sm rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+									className="px-4 py-2 text-sm rounded bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
 								>
 									Export
 								</button>
@@ -344,14 +344,14 @@ export default function App() {
 								<button
 									type="button"
 									onClick={() => setImportDialogOpen(false)}
-									className="px-4 py-2 text-sm rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors"
+									className="px-4 py-2 text-sm rounded bg-bg-tertiary hover:bg-bg-secondary text-fg-secondary transition-colors"
 								>
 									Cancel
 								</button>
 								<button
 									type="button"
 									onClick={confirmImportProject}
-									className="px-4 py-2 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+									className="px-4 py-2 text-sm rounded bg-accent hover:bg-accent-hover text-white font-medium transition-colors"
 								>
 									Choose File & Import
 								</button>

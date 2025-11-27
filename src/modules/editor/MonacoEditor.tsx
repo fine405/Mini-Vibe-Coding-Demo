@@ -1,5 +1,6 @@
 import Editor from "@monaco-editor/react";
 import { useCallback } from "react";
+import { useThemeStore } from "@/modules/theme/store";
 
 interface MonacoEditorProps {
 	value: string;
@@ -52,6 +53,7 @@ export function MonacoEditorWrapper({
 	onChange,
 	readOnly = false,
 }: MonacoEditorProps) {
+	const { mode } = useThemeStore();
 	const handleChange = useCallback(
 		(newValue: string | undefined) => {
 			if (onChange && newValue !== undefined) {
@@ -67,7 +69,7 @@ export function MonacoEditorWrapper({
 			language={language}
 			value={value}
 			onChange={handleChange}
-			theme="vs-dark"
+			theme={mode === "dark" ? "vs-dark" : "vs-light"}
 			options={{
 				readOnly,
 				minimap: { enabled: false },

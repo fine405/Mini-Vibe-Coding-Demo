@@ -8,6 +8,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useFs } from "@/modules/fs/store";
 import { useLayoutStore } from "@/modules/layout/store";
+import { useThemeStore } from "@/modules/theme/store";
 import { ConsolePanel } from "./ConsolePanel";
 import { useSandpackConsoleBridge } from "./consoleBridge";
 
@@ -31,7 +32,7 @@ function RefreshButton() {
 		<button
 			type="button"
 			onClick={handleRefresh}
-			className="p-1 rounded hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 transition-colors"
+			className="p-1 rounded hover:bg-bg-tertiary text-fg-secondary hover:text-fg-primary transition-colors"
 			title="Refresh Preview"
 		>
 			<RefreshCw
@@ -44,6 +45,7 @@ function RefreshButton() {
 export function PreviewPane() {
 	const { filesByPath } = useFs();
 	const { showConsole } = useLayoutStore();
+	const { resolvedTheme } = useThemeStore();
 
 	const files = useMemo(
 		() =>
@@ -59,19 +61,19 @@ export function PreviewPane() {
 	// Skip rendering if no files
 	if (Object.keys(files).length === 0) {
 		return (
-			<div className="h-full w-full flex items-center justify-center bg-neutral-950 text-neutral-400">
+			<div className="h-full w-full flex items-center justify-center bg-bg-primary text-fg-secondary">
 				Loading files...
 			</div>
 		);
 	}
 
 	return (
-		<div className="h-full w-full flex flex-col bg-neutral-950 text-neutral-100">
+		<div className="h-full w-full flex flex-col bg-bg-primary text-fg-primary">
 			<SandpackProvider
 				key="sandpack-provider"
 				files={files}
 				template="react"
-				theme="dark"
+				theme={resolvedTheme}
 				style={{
 					height: "100%",
 				}}
@@ -83,7 +85,7 @@ export function PreviewPane() {
 				className="flex-1 flex flex-col overflow-hidden"
 			>
 				<SandpackConsoleBridgeListener />
-				<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800/60 flex items-center justify-between">
+				<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-secondary border-b border-border-primary flex items-center justify-between">
 					<span>Preview</span>
 					<RefreshButton />
 				</div>
@@ -99,7 +101,7 @@ export function PreviewPane() {
 					</Panel>
 					{showConsole && (
 						<>
-							<PanelResizeHandle className="h-px bg-neutral-800/60 hover:bg-blue-500 transition-colors cursor-row-resize" />
+							<PanelResizeHandle className="h-px bg-border-primary hover:bg-accent transition-colors cursor-row-resize" />
 							<Panel defaultSize={25} minSize={10}>
 								<ConsolePanel />
 							</Panel>

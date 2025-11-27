@@ -86,15 +86,18 @@ export function CommandPalette({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className="overflow-hidden p-0 shadow-lg">
-				<Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-neutral-400 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+			<DialogContent className="overflow-hidden p-0 shadow-lg bg-bg-secondary text-fg-primary border-border-primary">
+				<Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-fg-muted [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
 					<CommandInput
 						placeholder="Type a command or search..."
 						value={search}
 						onValueChange={setSearch}
+						className="text-fg-primary placeholder:text-fg-muted border-b border-border-primary"
 					/>
 					<CommandList>
-						<CommandEmpty>No results found.</CommandEmpty>
+						<CommandEmpty className="py-6 text-center text-sm text-fg-muted">
+							No results found.
+						</CommandEmpty>
 
 						{/* Custom Action Groups */}
 						{Object.entries(groupedActions).map(([groupName, actions]) => (
@@ -103,18 +106,21 @@ export function CommandPalette({
 									<CommandItem
 										key={action.id}
 										onSelect={() => handleSelect(action.action)}
+										className="data-[selected=true]:bg-bg-tertiary data-[selected=true]:text-fg-primary"
 									>
 										{action.icon && <span className="mr-2">{action.icon}</span>}
 										<div className="flex flex-col flex-1">
 											<span>{action.label}</span>
 											{action.description && (
-												<span className="text-xs text-neutral-500">
+												<span className="text-xs text-fg-muted">
 													{action.description}
 												</span>
 											)}
 										</div>
 										{action.shortcut && (
-											<CommandShortcut>{action.shortcut}</CommandShortcut>
+											<CommandShortcut className="text-fg-muted">
+												{action.shortcut}
+											</CommandShortcut>
 										)}
 									</CommandItem>
 								))}
@@ -124,12 +130,15 @@ export function CommandPalette({
 						{/* Files */}
 						{sortedFiles.length > 0 && (
 							<>
-								{customActions.length > 0 && <CommandSeparator />}
+								{customActions.length > 0 && (
+									<CommandSeparator className="bg-border-primary" />
+								)}
 								<CommandGroup heading="Files">
 									{sortedFiles.slice(0, 10).map((file) => (
 										<CommandItem
 											key={file.path}
 											onSelect={() => handleSelect(() => openFile(file.path))}
+											className="data-[selected=true]:bg-bg-tertiary data-[selected=true]:text-fg-primary"
 										>
 											<FileCode2 className="mr-2 h-4 w-4" />
 											<span className="flex-1 truncate">{file.path}</span>
@@ -137,8 +146,8 @@ export function CommandPalette({
 												<span
 													className={`text-xs ${
 														file.status === "new"
-															? "text-green-400"
-															: "text-blue-400"
+															? "text-success"
+															: "text-accent"
 													}`}
 												>
 													{file.status === "new" ? "New" : "Modified"}
@@ -147,7 +156,7 @@ export function CommandPalette({
 										</CommandItem>
 									))}
 									{sortedFiles.length > 10 && (
-										<div className="px-2 py-1.5 text-xs text-neutral-500">
+										<div className="px-2 py-1.5 text-xs text-fg-muted">
 											+{sortedFiles.length - 10} more files
 										</div>
 									)}

@@ -39,7 +39,7 @@ function HighlightedText({ text, query }: HighlightedTextProps) {
 			);
 		}
 		parts.push(
-			<span key={`match-${index}`} className="bg-yellow-500/30 text-yellow-200">
+			<span key={`match-${index}`} className="bg-warning/30 text-warning">
 				{text[index]}
 			</span>,
 		);
@@ -170,26 +170,26 @@ export function TreeRow({
 						onContextMenu={() => {
 							onSelect(node.path, node.isDir);
 						}}
-						className={`flex w-full items-center gap-1 px-2 py-1.5 text-xs text-left hover:bg-neutral-800/60 ${
+						className={`flex w-full items-center gap-1 px-2 py-1.5 text-xs text-left hover:bg-bg-tertiary ${
 							(isSelected || isActive) && !isRenaming
-								? "bg-neutral-800/80 text-neutral-50"
-								: "text-neutral-300"
+								? "bg-bg-tertiary text-fg-primary"
+								: "text-fg-secondary"
 						}`}
 						style={{ paddingLeft: 8 + depth * 12 }}
 					>
 						{node.isDir ? (
 							expanded ? (
-								<ChevronDown className="h-3 w-3 text-neutral-500" />
+								<ChevronDown className="h-3 w-3 text-fg-muted" />
 							) : (
-								<ChevronRight className="h-3 w-3 text-neutral-500" />
+								<ChevronRight className="h-3 w-3 text-fg-muted" />
 							)
 						) : (
 							<span className="inline-block w-3" />
 						)}
 						{node.isDir ? (
-							<Folder className="mr-1 h-3 w-3 text-neutral-500" />
+							<Folder className="mr-1 h-3 w-3 text-fg-muted" />
 						) : (
-							<FileCode2 className="mr-1 h-3 w-3 text-neutral-500" />
+							<FileCode2 className="mr-1 h-3 w-3 text-fg-muted" />
 						)}
 						{isRenaming ? (
 							<input
@@ -200,7 +200,7 @@ export function TreeRow({
 								onKeyDown={handleRenameKeyDown}
 								onBlur={handleRenameBlur}
 								onClick={(e) => e.stopPropagation()}
-								className="flex-1 min-w-0 bg-neutral-950 text-neutral-100 border border-blue-500/50 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-blue-500 selection:bg-blue-500/40"
+								className="flex-1 min-w-0 bg-bg-secondary text-fg-primary border border-accent/50 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-accent selection:bg-accent/40"
 							/>
 						) : (
 							<span className="truncate flex-1">
@@ -216,7 +216,7 @@ export function TreeRow({
 								className="ml-auto flex items-center justify-center px-1 py-0.5"
 								title="Contains modified files"
 							>
-								<span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+								<span className="h-1.5 w-1.5 rounded-full bg-accent" />
 							</span>
 						)}
 						{!isRenaming &&
@@ -226,8 +226,8 @@ export function TreeRow({
 								<span
 									className={`ml-auto text-[9px] font-semibold px-1 py-0.5 rounded ${
 										fileStatus === "new"
-											? "bg-green-500/20 text-green-400"
-											: "bg-blue-500/20 text-blue-400"
+											? "bg-success/20 text-success"
+											: "bg-accent/20 text-accent"
 									}`}
 								>
 									{fileStatus === "new" ? "N" : "M"}
@@ -261,7 +261,7 @@ export function TreeRow({
 					</ContextMenuItem>
 					<ContextMenuItem
 						onClick={() => onDelete(node.path, node.isDir)}
-						className="text-red-400 focus:text-red-400"
+						className="text-error focus:text-error"
 					>
 						Delete <ContextMenuShortcut>⌫</ContextMenuShortcut>
 					</ContextMenuItem>

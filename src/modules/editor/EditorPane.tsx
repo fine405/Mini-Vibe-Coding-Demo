@@ -89,12 +89,12 @@ export function EditorPane() {
 	// Render empty state
 	if (openFiles.length === 0) {
 		return (
-			<div className="h-full w-full flex flex-col bg-neutral-950 text-neutral-100">
-				<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800/60">
+			<div className="h-full w-full flex flex-col bg-bg-primary text-fg-primary">
+				<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-secondary border-b border-border-primary">
 					Editor
 				</div>
 				<div className="flex-1 flex items-center justify-center">
-					<div className="text-center text-neutral-500">
+					<div className="text-center text-fg-muted">
 						<FileCode2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
 						<p className="text-sm">No file open</p>
 						<p className="text-xs mt-1">Select a file from the tree to edit</p>
@@ -113,7 +113,7 @@ export function EditorPane() {
 		activeFile.status !== "clean";
 
 	return (
-		<div className="h-full w-full flex flex-col bg-neutral-950 text-neutral-100">
+		<div className="h-full w-full flex flex-col bg-bg-primary text-fg-primary">
 			{/* Tabs */}
 			<EditorTabs
 				openFiles={openFiles}
@@ -143,7 +143,7 @@ export function EditorPane() {
 						/>
 					)
 				) : (
-					<div className="h-full flex items-center justify-center text-neutral-500 text-sm">
+					<div className="h-full flex items-center justify-center text-fg-muted text-sm">
 						File not found
 					</div>
 				)}
@@ -156,15 +156,15 @@ export function EditorPane() {
 						<DialogTitle>Revert Changes</DialogTitle>
 						<DialogDescription>
 							Are you sure you want to revert{" "}
-							<span className="font-mono text-neutral-300">{fileToRevert}</span>
-							? All changes will be discarded.
+							<span className="font-mono text-fg-primary">{fileToRevert}</span>?
+							All changes will be discarded.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
 						<button
 							type="button"
 							onClick={() => setRevertDialogOpen(false)}
-							className="px-3 py-1.5 text-sm rounded hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-neutral-200"
+							className="px-3 py-1.5 text-sm rounded hover:bg-bg-tertiary transition-colors text-fg-muted hover:text-fg-primary"
 						>
 							Cancel
 						</button>
@@ -172,7 +172,7 @@ export function EditorPane() {
 							type="button"
 							onClick={confirmRevert}
 							ref={revertButtonRef}
-							className="px-3 py-1.5 text-sm rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 font-medium transition-colors"
+							className="px-3 py-1.5 text-sm rounded bg-error/10 text-error hover:bg-error/20 font-medium transition-colors"
 						>
 							Revert
 						</button>

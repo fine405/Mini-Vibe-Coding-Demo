@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+@theme {
+	--color-bg-primary: var(--color-bg-primary);
+	--color-bg-secondary: var(--color-bg-secondary);
+	--color-bg-tertiary: var(--color-bg-tertiary);
+	
+	--color-fg-primary: var(--color-fg-primary);
+	--color-fg-secondary: var(--color-fg-secondary);
+	--color-fg-muted: var(--color-fg-muted);
+	
+	--color-border-primary: var(--color-border-primary);
+	--color-border-secondary: var(--color-border-secondary);
+	
+	--color-accent: var(--color-accent);
+	--color-accent-hover: var(--color-accent-hover);
+	
+	--color-success: var(--color-success);
+	--color-warning: var(--color-warning);
+	--color-error: var(--color-error);
+}
+
 #root {
 	width: 100vw;
 	height: 100vh;
