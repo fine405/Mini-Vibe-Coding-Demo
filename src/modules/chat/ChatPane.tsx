@@ -1,11 +1,13 @@
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import {
+	Bot,
 	ChevronLeft,
 	ChevronRight,
 	Loader2,
 	RotateCcw,
 	Send,
 	Sparkles,
+	User,
 	X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -196,46 +198,67 @@ export function ChatPane() {
 						{messages.map((msg) => (
 							<div
 								key={msg.id}
-								className={`text-xs ${
-									msg.role === "user" ? "text-fg-primary" : "text-fg-secondary"
+								className={`flex gap-2.5 ${
+									msg.role === "user" ? "flex-row-reverse" : ""
 								}`}
 							>
+								{/* Avatar */}
 								<div
-									className={`font-medium text-[10px] uppercase tracking-wide mb-1 ${
-										msg.role === "user" ? "text-accent" : "text-success"
-									}`}
-								>
-									{msg.role === "user" ? "You" : "Assistant"}
-								</div>
-								<div
-									className={`rounded px-2.5 py-2 ${
+									className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
 										msg.role === "user"
-											? "bg-accent/10 border border-accent/20"
-											: "bg-bg-tertiary border border-border-primary"
+											? "bg-accent/20 text-accent"
+											: "bg-success/20 text-success"
 									}`}
 								>
-									{msg.content}
-									{msg.appliedPatch && getModifiedFiles().length > 0 && (
-										<button
-											type="button"
-											onClick={() => {
-												const count = getModifiedFiles().length;
-												revertAllChanges();
-												toast.success(`Reverted ${count} file(s)`);
-											}}
-											className="mt-2 flex items-center gap-1 text-[10px] px-2 py-1 bg-warning/10 hover:bg-warning/20 border border-warning/30 rounded text-warning transition-colors"
-										>
-											<RotateCcw className="h-3 w-3" />
-											Revert Changes
-										</button>
+									{msg.role === "user" ? (
+										<User className="h-3.5 w-3.5" />
+									) : (
+										<Bot className="h-3.5 w-3.5" />
 									)}
+								</div>
+								{/* Message */}
+								<div
+									className={`flex-1 min-w-0 ${
+										msg.role === "user" ? "text-right" : ""
+									}`}
+								>
+									<div
+										className={`inline-block text-xs rounded-lg px-3 py-2 max-w-full ${
+											msg.role === "user"
+												? "bg-accent text-white rounded-br-sm"
+												: "bg-bg-tertiary border border-border-primary text-fg-secondary rounded-bl-sm"
+										}`}
+									>
+										<span className="whitespace-pre-wrap break-words">
+											{msg.content}
+										</span>
+										{msg.appliedPatch && getModifiedFiles().length > 0 && (
+											<button
+												type="button"
+												onClick={() => {
+													const count = getModifiedFiles().length;
+													revertAllChanges();
+													toast.success(`Reverted ${count} file(s)`);
+												}}
+												className="mt-2 flex items-center gap-1 text-[10px] px-2 py-1 bg-warning/10 hover:bg-warning/20 border border-warning/30 rounded text-warning transition-colors"
+											>
+												<RotateCcw className="h-3 w-3" />
+												Revert Changes
+											</button>
+										)}
+									</div>
 								</div>
 							</div>
 						))}
 						{isLoading && (
-							<div className="flex items-center gap-2 text-xs text-fg-muted">
-								<Loader2 className="h-3 w-3 animate-spin" />
-								<span>Thinking...</span>
+							<div className="flex gap-2.5">
+								<div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center bg-success/20 text-success">
+									<Bot className="h-3.5 w-3.5" />
+								</div>
+								<div className="flex items-center gap-1.5 text-xs text-fg-muted">
+									<Loader2 className="h-3 w-3 animate-spin" />
+									<span>Thinking...</span>
+								</div>
 							</div>
 						)}
 					</div>
