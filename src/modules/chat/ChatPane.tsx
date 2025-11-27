@@ -176,7 +176,7 @@ export function ChatPane() {
 	};
 
 	return (
-		<div className="h-full w-full flex flex-col border-r border-border-primary bg-bg-primary text-fg-primary">
+		<div className="h-full w-full flex flex-col border-r border-border-primary bg-bg-primary text-fg-primary animate-fade-in">
 			{/* Header */}
 			<div className="shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-muted border-b border-border-primary">
 				Chat
@@ -190,16 +190,37 @@ export function ChatPane() {
 				>
 					<div className="p-3 space-y-3">
 						{messages.length === 0 && (
-							<div className="text-xs text-fg-muted text-center py-8">
-								<p className="mb-2">👋 Welcome to mini-lovable!</p>
-								<p>Try asking: "create a react todo app"</p>
+							<div className="flex flex-col items-center justify-center py-12 px-4">
+								<div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-500/20 flex items-center justify-center mb-4">
+									<Bot className="h-6 w-6 text-pink-500" />
+								</div>
+								<h3 className="text-sm font-medium text-fg-primary mb-1">
+									Welcome to Mini Lovable
+								</h3>
+								<p className="text-xs text-fg-muted text-center mb-4">
+									Describe what you want to build and I'll help you create it.
+								</p>
+								<div className="flex flex-wrap gap-1.5 justify-center">
+									{patches.slice(0, 3).map((patch) => (
+										<button
+											key={patch.id}
+											type="button"
+											onClick={() => setInput(patch.trigger)}
+											className="text-[10px] px-2 py-1 bg-bg-tertiary hover:bg-bg-secondary rounded-full text-fg-secondary hover:text-fg-primary transition-all"
+										>
+											{patch.trigger}
+										</button>
+									))}
+								</div>
 							</div>
 						)}
 						{messages.map((msg) => (
 							<div
 								key={msg.id}
 								className={`flex gap-2.5 ${
-									msg.role === "user" ? "flex-row-reverse" : ""
+									msg.role === "user"
+										? "flex-row-reverse animate-slide-in-right"
+										: "animate-slide-in-left"
 								}`}
 							>
 								{/* Avatar */}
@@ -362,7 +383,7 @@ export function ChatPane() {
 							onClick={handleSend}
 							disabled={sendDisabled}
 							className={cn(
-								"py-1.5 px-4  bg-accent rounded text-white transition-colors`",
+								"py-1.5 px-4 bg-accent rounded text-white transition-all btn-press",
 								{
 									"hover:bg-accent-hover": !sendDisabled,
 									"opacity-50 cursor-not-allowed": sendDisabled,

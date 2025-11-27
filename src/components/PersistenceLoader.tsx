@@ -29,10 +29,26 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 
 	if (isLoading) {
 		return (
-			<div className="w-screen h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center">
-				<div className="text-center">
-					<div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent mb-4" />
-					<p className="text-sm text-neutral-400">Loading workspace...</p>
+			<div className="w-screen h-screen bg-bg-primary flex items-center justify-center">
+				<div className="flex flex-col items-center gap-4">
+					{/* Logo */}
+					<div className="flex items-center gap-2 animate-pulse">
+						<img
+							src="https://lovable.dev/icon.svg?9e0c9b5bb1bae062"
+							alt="Lovable"
+							className="h-8 w-8"
+						/>
+						<span className="text-xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">
+							Mini Lovable
+						</span>
+					</div>
+					{/* Loading indicator */}
+					<div className="flex items-center gap-1">
+						<div className="w-2 h-2 rounded-full bg-pink-500 animate-bounce [animation-delay:-0.3s]" />
+						<div className="w-2 h-2 rounded-full bg-purple-500 animate-bounce [animation-delay:-0.15s]" />
+						<div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" />
+					</div>
+					<p className="text-xs text-fg-muted">Loading workspace...</p>
 				</div>
 			</div>
 		);
