@@ -236,7 +236,7 @@ export function TreeRow({
 					</button>
 				</ContextMenuTrigger>
 				<ContextMenuContent className="w-64">
-					<ContextMenuItem disabled>Upload Files</ContextMenuItem>
+					{/* <ContextMenuItem disabled>Upload Files</ContextMenuItem>
 					<ContextMenuSeparator />
 					<ContextMenuItem disabled>
 						Cut <ContextMenuShortcut>⌘X</ContextMenuShortcut>
@@ -244,7 +244,7 @@ export function TreeRow({
 					<ContextMenuItem disabled>
 						Copy <ContextMenuShortcut>⌘C</ContextMenuShortcut>
 					</ContextMenuItem>
-					<ContextMenuSeparator />
+					<ContextMenuSeparator /> */}
 					<ContextMenuItem
 						onClick={() => navigator.clipboard.writeText(node.path)}
 					>

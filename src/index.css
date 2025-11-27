@@ -29,14 +29,47 @@ body {
 	min-height: 100vh;
 }
 
+/* Custom cursors */
+:root {
+	--cursor-default: url("./assets/cursors/pointer.svg") 4 4, auto;
+	--cursor-pointer: url("./assets/cursors/hand.svg") 10 2, pointer;
+}
+
+html {
+	cursor: var(--cursor-default);
+}
+
+a,
+a:hover,
+button,
+button:hover,
+[role="button"],
+[role="button"]:hover,
+input[type="button"],
+input[type="button"]:hover,
+input[type="submit"],
+input[type="submit"]:hover,
+input[type="reset"],
+input[type="reset"]:hover,
+label,
+label:hover,
+select,
+select:hover,
+summary,
+summary:hover {
+	cursor: var(--cursor-pointer) !important;
+}
+
+input,
+textarea {
+	cursor: text !important;
+}
+
 h1 {
 	font-size: 3.2em;
 	line-height: 1.1;
 }
 
-button {
-	cursor: pointer;
-}
 
 /* Hide scrollbar */
 .hide-scrollbar {

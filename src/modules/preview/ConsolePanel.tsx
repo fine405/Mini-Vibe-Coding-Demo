@@ -79,7 +79,10 @@ export function ConsolePanel() {
 	};
 
 	return (
-		<div className="h-full flex flex-col bg-neutral-900/80">
+		<div
+			className="h-full flex flex-col bg-neutral-900/80"
+			style={{ cursor: "var(--cursor-default)" }}
+		>
 			{/* Header */}
 			<div className="flex items-center justify-between px-3 py-1.5 border-b border-neutral-800/40 shrink-0">
 				<div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400">
