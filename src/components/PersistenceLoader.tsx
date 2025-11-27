@@ -205,14 +205,8 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 				)}
 			</AnimatePresence>
 
-			{/* Main content - render immediately but hidden behind loading screen */}
-			<div
-				className={
-					phase === "done" ? "opacity-100" : "opacity-0 pointer-events-none"
-				}
-			>
-				{children}
-			</div>
+			{/* Main content - only render after loading is complete */}
+			{phase === "done" && children}
 		</>
 	);
 }

@@ -58,6 +58,13 @@ export function PreviewPane() {
 		[filesByPath],
 	);
 
+	// Generate a stable key based on file paths to force Sandpack remount when files change significantly
+	// This ensures preview updates after loading from persistence
+	const sandpackKey = useMemo(() => {
+		const paths = Object.keys(filesByPath).sort().join(",");
+		return `sandpack-${paths.length}-${paths.slice(0, 100)}`;
+	}, [filesByPath]);
+
 	// Skip rendering if no files
 	if (Object.keys(files).length === 0) {
 		return (
@@ -70,7 +77,7 @@ export function PreviewPane() {
 	return (
 		<div className="h-full w-full flex flex-col bg-bg-primary text-fg-primary">
 			<SandpackProvider
-				key="sandpack-provider"
+				key={sandpackKey}
 				files={files}
 				template="react"
 				theme={resolvedTheme}
