@@ -63,6 +63,9 @@ const stateCreator = immer<FsStore>((set) => ({
 		set((state) => {
 			const existing = state.filesByPath[path];
 			if (!existing) return;
+			if (existing.content === content) {
+				return;
+			}
 			// Store original content on first modification
 			if (
 				existing.status === "clean" &&
@@ -71,7 +74,15 @@ const stateCreator = immer<FsStore>((set) => ({
 				existing.originalContent = existing.content;
 			}
 			existing.content = content;
-			existing.status = "modified";
+			if (
+				existing.originalContent !== undefined &&
+				existing.content === existing.originalContent
+			) {
+				existing.status = "clean";
+				delete existing.originalContent;
+			} else {
+				existing.status = "modified";
+			}
 		});
 		// Auto-save to IndexedDB
 		const state = useFs.getState();
