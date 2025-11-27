@@ -1,7 +1,6 @@
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import { Download, Plus, Search, Upload, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import {
 	Dialog,
 	DialogContent,
@@ -11,11 +10,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { useEditor } from "@/modules/editor";
-import {
-	exportProjectAsJSON,
-	importProjectFromJSON,
-	selectProjectFile,
-} from "./export";
 import { TreeRow } from "./FileTreeRow";
 import { useFs } from "./store";
 import { buildTree, filterTree } from "./tree";
@@ -28,14 +22,11 @@ export function FileTreePane() {
 		renameFile,
 		deleteDirectory,
 		renameDirectory,
-		setFiles,
-		resetFs,
 	} = useFs();
 
 	const {
 		openFile,
 		activeFilePath,
-		closeAllFiles,
 		closeFile,
 		closeFilesInDirectory,
 		renameOpenFile,
@@ -171,83 +162,10 @@ export function FileTreePane() {
 		setIsDeleteDir(false);
 	};
 
-	const handleNewProject = () => {
-		const confirmed = window.confirm(
-			"Start a new project?\nThis will clear all current files and storage.",
-		);
-		if (!confirmed) return;
-		resetFs();
-		closeAllFiles();
-		toast.success("New project created", {
-			description: "All files and storage cleared",
-		});
-	};
-
-	const handleExport = () => {
-		const projectName = window.prompt("Enter project name:", "my-project");
-		if (!projectName) return;
-		exportProjectAsJSON(filesByPath, projectName);
-		toast.success("Project exported", {
-			description: `${projectName}.json downloaded`,
-		});
-	};
-
-	const handleImport = async () => {
-		const confirmed = window.confirm(
-			"Import a project?\nThis will replace all current files.",
-		);
-		if (!confirmed) return;
-
-		try {
-			const file = await selectProjectFile();
-			const importedFiles = await importProjectFromJSON(file);
-			setFiles(importedFiles);
-			closeAllFiles();
-			const fileCount = Object.keys(importedFiles).length;
-			toast.success("Project imported successfully", {
-				description: `${fileCount} files loaded and saved to storage`,
-			});
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Failed to import project";
-			toast.error("Import failed", {
-				description: message,
-			});
-		}
-	};
-
 	return (
 		<div className="flex h-full w-full flex-col bg-neutral-950/80 text-neutral-100">
 			<div className="flex items-center justify-between border-b border-neutral-800/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-				<div className="flex items-center gap-2">
-					<span>Files</span>
-					<div className="flex items-center gap-1">
-						<button
-							type="button"
-							onClick={handleNewProject}
-							className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-neutral-800/60 text-neutral-300 hover:bg-neutral-700 hover:text-neutral-100 transition-colors"
-							title="New Project"
-						>
-							New Project
-						</button>
-						<button
-							type="button"
-							onClick={handleExport}
-							className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 transition-colors"
-							title="Export Project"
-						>
-							<Download className="h-3 w-3" />
-						</button>
-						<button
-							type="button"
-							onClick={handleImport}
-							className="rounded p-1 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 transition-colors"
-							title="Import Project"
-						>
-							<Upload className="h-3 w-3" />
-						</button>
-					</div>
-				</div>
+				<span>Files</span>
 				<div className="flex items-center gap-1">
 					<button
 						type="button"
