@@ -9,6 +9,7 @@
 
 ## Edit Operations
 - **⌘⇧A** - Accept all changes (mark all files as clean)
+- **⌘⇧R** - Revert all changes (discard all pending modifications)
 
 ## Layout
 - **⌘1** - Toggle Chat Panel
@@ -27,6 +28,7 @@ The command palette provides quick access to:
 
 ### Edit Group
 - **Accept All Changes** - Accept all pending file modifications
+- **Revert All Changes** - Discard all pending file modifications
 
 ### Layout Group
 - **Toggle Chat Panel** - Show or hide the chat panel

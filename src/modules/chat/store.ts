@@ -8,6 +8,7 @@ export interface ChatMessage {
 	role: "user" | "assistant";
 	content: string;
 	patch?: Patch; // If assistant message includes a patch
+	appliedPatch?: boolean; // If this message confirms a patch was applied
 	timestamp: number;
 }
 

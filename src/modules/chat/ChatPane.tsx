@@ -3,6 +3,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Loader2,
+	RotateCcw,
 	Send,
 	Sparkles,
 	X,
@@ -19,7 +20,7 @@ import { useChatStore } from "./store";
 
 export function ChatPane() {
 	const { messages, isLoading, addMessage, setLoading } = useChatStore();
-	const { filesByPath, setFiles } = useFs();
+	const { filesByPath, setFiles, revertAllChanges, getModifiedFiles } = useFs();
 	const [input, setInput] = useState("");
 	const [patches, setPatches] = useState<Patch[]>([]);
 	const [reviewingPatch, setReviewingPatch] = useState<Patch | null>(null);
@@ -136,6 +137,7 @@ export function ChatPane() {
 			addMessage({
 				role: "assistant",
 				content: `✅ Applied ${appliedCount} of ${reviewingPatch.changes.length} changes successfully! Check the preview on the right.`,
+				appliedPatch: true,
 			});
 		} else {
 			// Handle error
@@ -213,6 +215,20 @@ export function ChatPane() {
 									}`}
 								>
 									{msg.content}
+									{msg.appliedPatch && getModifiedFiles().length > 0 && (
+										<button
+											type="button"
+											onClick={() => {
+												const count = getModifiedFiles().length;
+												revertAllChanges();
+												toast.success(`Reverted ${count} file(s)`);
+											}}
+											className="mt-2 flex items-center gap-1 text-[10px] px-2 py-1 bg-warning/10 hover:bg-warning/20 border border-warning/30 rounded text-warning transition-colors"
+										>
+											<RotateCcw className="h-3 w-3" />
+											Revert Changes
+										</button>
+									)}
 								</div>
 							</div>
 						))}

@@ -7,6 +7,7 @@ import {
 	CheckCheck,
 	MessageSquare,
 	TerminalSquare,
+	RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PersistenceLoader } from "./components/PersistenceLoader";
@@ -44,13 +45,21 @@ import { useLayoutStore } from "./modules/layout/store";
 
 export default function App() {
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-	const { filesByPath, saveToIndexedDB, acceptAllChanges, resetFs, setFiles } =
-		useFs();
+	const {
+		filesByPath,
+		saveToIndexedDB,
+		acceptAllChanges,
+		resetFs,
+		setFiles,
+		revertAllChanges,
+		getModifiedFiles,
+	} = useFs();
 	const { closeAllFiles } = useEditor();
 	const { showChat, toggleChat, toggleConsole } = useLayoutStore();
 
 	// Dialog states
 	const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
+	const [revertAllDialogOpen, setRevertAllDialogOpen] = useState(false);
 	const [exportDialogOpen, setExportDialogOpen] = useState(false);
 	const [exportFormat, setExportFormat] = useState<"json" | "zip">("json");
 	const [exportProjectName, setExportProjectName] = useState("my-project");
@@ -115,6 +124,22 @@ export default function App() {
 			action: toggleConsole,
 			shortcut: "⌘2",
 			group: "Layout",
+		},
+		{
+			id: "revert-all",
+			label: "Revert All Changes",
+			description: "Discard all pending file changes",
+			icon: <RotateCcw className="h-4 w-4" />,
+			action: () => {
+				const modifiedFiles = getModifiedFiles();
+				if (modifiedFiles.length === 0) {
+					toast.info("No modified files to revert");
+					return;
+				}
+				setRevertAllDialogOpen(true);
+			},
+			shortcut: "⌘⇧R",
+			group: "Edit",
 		},
 	];
 
@@ -254,6 +279,20 @@ export default function App() {
 			},
 			description: "Accept all changes",
 		},
+		{
+			key: "r",
+			metaKey: true,
+			shiftKey: true,
+			action: () => {
+				const modifiedFiles = getModifiedFiles();
+				if (modifiedFiles.length === 0) {
+					toast.info("No modified files to revert");
+					return;
+				}
+				setRevertAllDialogOpen(true);
+			},
+			description: "Revert all changes",
+		},
 	]);
 
 	return (
@@ -371,6 +410,46 @@ export default function App() {
 									className="px-4 py-2 text-sm rounded bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
 								>
 									Export
+								</button>
+							</DialogFooter>
+						</DialogContent>
+					</Dialog>
+
+					{/* Revert All Changes Dialog */}
+					<Dialog
+						open={revertAllDialogOpen}
+						onOpenChange={setRevertAllDialogOpen}
+					>
+						<DialogContent>
+							<DialogHeader>
+								<DialogTitle>Revert All Changes</DialogTitle>
+								<DialogDescription>
+									This will discard changes in{" "}
+									<span className="font-semibold text-fg-primary">
+										{getModifiedFiles().length} file(s)
+									</span>
+									. This action cannot be undone.
+								</DialogDescription>
+							</DialogHeader>
+							<DialogFooter>
+								<button
+									type="button"
+									onClick={() => setRevertAllDialogOpen(false)}
+									className="px-4 py-2 text-sm rounded bg-bg-tertiary hover:bg-bg-secondary text-fg-secondary transition-colors"
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									onClick={() => {
+										const count = getModifiedFiles().length;
+										revertAllChanges();
+										setRevertAllDialogOpen(false);
+										toast.success(`Reverted ${count} file(s)`);
+									}}
+									className="px-4 py-2 text-sm rounded bg-warning hover:bg-warning/90 text-white font-medium transition-colors"
+								>
+									Revert All
 								</button>
 							</DialogFooter>
 						</DialogContent>
