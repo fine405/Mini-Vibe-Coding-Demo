@@ -13,11 +13,11 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useFs } from "@/modules/fs/store";
-import { applyPatchToFs } from "@/modules/patches/apply";
+import { applySelectedHunks, parseHunks } from "@/modules/patches/hunk";
 import { loadPatches, matchPatchByTrigger } from "@/modules/patches/loader";
 import type { Patch } from "@/modules/patches/types";
 import { cn } from "@/utils/cn";
-import { DiffReviewModal } from "./DiffReviewModal";
+import { DiffReviewModal, type HunkSelection } from "./DiffReviewModal";
 import { useChatStore } from "./store";
 
 export function ChatPane() {
@@ -79,36 +79,70 @@ export function ChatPane() {
 		setLoading(false);
 	};
 
-	const handleAcceptPatch = (selectedIndices?: Set<number>) => {
+	const handleAcceptPatch = (
+		_selectedIndices?: Set<number>,
+		hunkSelection?: HunkSelection,
+	) => {
 		if (!reviewingPatch) return;
 
-		// Apply patch to FS using the applyPatchToFs function
-		const result = applyPatchToFs(filesByPath, reviewingPatch, selectedIndices);
-
-		if (result.success) {
-			// Get the updated filesByPath by reapplying changes
+		try {
 			const newFilesByPath = { ...filesByPath };
-			const changesToApply = selectedIndices
-				? reviewingPatch.changes.filter((_, i) => selectedIndices.has(i))
-				: reviewingPatch.changes;
+			let appliedHunksCount = 0;
+			let totalHunksCount = 0;
 
-			for (const change of changesToApply) {
+			// Process each file change
+			for (let i = 0; i < reviewingPatch.changes.length; i++) {
+				const change = reviewingPatch.changes[i];
+				const fileHunkSelection = hunkSelection?.get(i);
+
+				// Skip if file is not selected (no hunks selected)
+				if (fileHunkSelection && fileHunkSelection.size === 0) {
+					continue;
+				}
+
+				const oldContent = filesByPath[change.path]?.content || "";
+				const newContent = change.content || "";
+
+				// Parse hunks for this file
+				const parsed = parseHunks(
+					oldContent,
+					newContent,
+					change.path,
+					change.op,
+				);
+				totalHunksCount += parsed.hunks.length;
+
+				// Determine which hunks to apply
+				const hunksToApply =
+					fileHunkSelection || new Set(parsed.hunks.map((h) => h.index));
+				appliedHunksCount += hunksToApply.size;
+
+				// Check if all hunks are selected (full file apply)
+				const allHunksSelected = hunksToApply.size === parsed.hunks.length;
+
 				switch (change.op) {
 					case "create":
-						newFilesByPath[change.path] = {
-							path: change.path,
-							content: change.content || "",
-							status: "new",
-						};
+						if (hunksToApply.has(0)) {
+							newFilesByPath[change.path] = {
+								path: change.path,
+								content: newContent,
+								status: "new",
+							};
+						}
 						break;
+
 					case "update": {
 						const existing = newFilesByPath[change.path];
 						if (existing) {
+							// Apply selected hunks to get final content
+							const finalContent = allHunksSelected
+								? newContent
+								: applySelectedHunks(oldContent, parsed, hunksToApply);
+
 							newFilesByPath[change.path] = {
 								...existing,
-								content: change.content || "",
+								content: finalContent,
 								status: "modified",
-								// Store original content for revert/diff if not already stored
 								originalContent:
 									existing.originalContent ??
 									(existing.status === "clean" ? existing.content : undefined),
@@ -116,8 +150,11 @@ export function ChatPane() {
 						}
 						break;
 					}
+
 					case "delete":
-						delete newFilesByPath[change.path];
+						if (hunksToApply.has(0)) {
+							delete newFilesByPath[change.path];
+						}
 						break;
 				}
 			}
@@ -125,31 +162,31 @@ export function ChatPane() {
 			setFiles(newFilesByPath);
 			setReviewingPatch(null);
 
-			// Add confirmation message
-			const appliedCount =
-				selectedIndices?.size ?? reviewingPatch.changes.length;
+			// Build confirmation message
+			const message =
+				appliedHunksCount === totalHunksCount
+					? `Applied all ${appliedHunksCount} hunks`
+					: `Applied ${appliedHunksCount} of ${totalHunksCount} hunks`;
 
-			toast.success(
-				`Applied ${appliedCount} of ${reviewingPatch.changes.length} changes`,
-				{
-					description: "Check the preview on the right",
-				},
-			);
+			toast.success(message, {
+				description: "Check the preview on the right",
+			});
 
 			addMessage({
 				role: "assistant",
-				content: `✅ Applied ${appliedCount} of ${reviewingPatch.changes.length} changes successfully! Check the preview on the right.`,
+				content: `✅ ${message} successfully! Check the preview on the right.`,
 				appliedPatch: true,
 			});
-		} else {
-			// Handle error
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 			toast.error("Failed to apply changes", {
-				description: result.error,
+				description: errorMessage,
 			});
 
 			addMessage({
 				role: "assistant",
-				content: `❌ Failed to apply changes: ${result.error}`,
+				content: `❌ Failed to apply changes: ${errorMessage}`,
 			});
 		}
 	};

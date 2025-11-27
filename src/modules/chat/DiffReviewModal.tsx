@@ -7,14 +7,26 @@ import {
 	FileX,
 	X,
 } from "lucide-react";
-import { useState } from "react";
-import { DiffViewer } from "@/components/DiffViewer";
+import { useMemo, useState } from "react";
 import { useFs } from "@/modules/fs/store";
+import {
+	areAllHunksSelected,
+	areSomeHunksSelected,
+	type Hunk,
+	type ParsedHunks,
+	parseHunks,
+} from "@/modules/patches/hunk";
 import type { Patch } from "@/modules/patches/types";
 
-interface DiffReviewModalProps {
+/** Selection state for hunks: Map<fileIndex, Set<hunkIndex>> */
+export type HunkSelection = Map<number, Set<number>>;
+
+export interface DiffReviewModalProps {
 	patch: Patch;
-	onAccept: (selectedIndices?: Set<number>) => void;
+	onAccept: (
+		selectedIndices?: Set<number>,
+		hunkSelection?: HunkSelection,
+	) => void;
 	onCancel: () => void;
 }
 
@@ -25,52 +37,144 @@ export function DiffReviewModal({
 }: DiffReviewModalProps) {
 	const { filesByPath } = useFs();
 	const [isApplying, setIsApplying] = useState(false);
-	const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
-		new Set(patch.changes.map((_, i) => i)),
-	);
 	const [expandedIndices, setExpandedIndices] = useState<Set<number>>(
 		new Set(),
 	);
 
-	const toggleChange = (index: number) => {
-		const newSelected = new Set(selectedIndices);
-		if (newSelected.has(index)) {
-			newSelected.delete(index);
-		} else {
-			newSelected.add(index);
+	// Parse hunks for each file change
+	const parsedHunksMap = useMemo(() => {
+		const map = new Map<number, ParsedHunks>();
+		for (let i = 0; i < patch.changes.length; i++) {
+			const change = patch.changes[i];
+			const oldContent = filesByPath[change.path]?.content || "";
+			const newContent = change.content || "";
+			map.set(i, parseHunks(oldContent, newContent, change.path, change.op));
 		}
-		setSelectedIndices(newSelected);
+		return map;
+	}, [patch.changes, filesByPath]);
+
+	// Initialize hunk selection: all hunks selected by default
+	const [hunkSelection, setHunkSelection] = useState<HunkSelection>(() => {
+		const selection = new Map<number, Set<number>>();
+		for (let i = 0; i < patch.changes.length; i++) {
+			const parsed = parsedHunksMap.get(i);
+			if (parsed) {
+				selection.set(i, new Set(parsed.hunks.map((h) => h.index)));
+			}
+		}
+		return selection;
+	});
+
+	// Derive file-level selection from hunk selection
+	const selectedFileIndices = useMemo(() => {
+		const selected = new Set<number>();
+		for (const [fileIndex, hunkIndices] of hunkSelection) {
+			if (hunkIndices.size > 0) {
+				selected.add(fileIndex);
+			}
+		}
+		return selected;
+	}, [hunkSelection]);
+
+	// Toggle a single hunk
+	const toggleHunk = (fileIndex: number, hunkIndex: number) => {
+		setHunkSelection((prev) => {
+			const newSelection = new Map(prev);
+			const fileHunks = new Set(prev.get(fileIndex) || []);
+			if (fileHunks.has(hunkIndex)) {
+				fileHunks.delete(hunkIndex);
+			} else {
+				fileHunks.add(hunkIndex);
+			}
+			newSelection.set(fileIndex, fileHunks);
+			return newSelection;
+		});
 	};
 
+	// Toggle all hunks in a file
+	const toggleFile = (fileIndex: number) => {
+		const parsed = parsedHunksMap.get(fileIndex);
+		if (!parsed) return;
+
+		setHunkSelection((prev) => {
+			const newSelection = new Map(prev);
+			const currentHunks = prev.get(fileIndex) || new Set();
+			const allSelected = areAllHunksSelected(parsed.hunks, currentHunks);
+
+			if (allSelected) {
+				// Deselect all hunks
+				newSelection.set(fileIndex, new Set());
+			} else {
+				// Select all hunks
+				newSelection.set(fileIndex, new Set(parsed.hunks.map((h) => h.index)));
+			}
+			return newSelection;
+		});
+	};
+
+	// Toggle all files
 	const toggleAll = () => {
-		if (selectedIndices.size === patch.changes.length) {
-			setSelectedIndices(new Set());
+		const allFilesFullySelected = patch.changes.every((_, i) => {
+			const parsed = parsedHunksMap.get(i);
+			const selected = hunkSelection.get(i) || new Set();
+			return parsed && areAllHunksSelected(parsed.hunks, selected);
+		});
+
+		if (allFilesFullySelected) {
+			// Deselect all
+			setHunkSelection(new Map(patch.changes.map((_, i) => [i, new Set()])));
 		} else {
-			setSelectedIndices(new Set(patch.changes.map((_, i) => i)));
+			// Select all
+			const newSelection = new Map<number, Set<number>>();
+			for (let i = 0; i < patch.changes.length; i++) {
+				const parsed = parsedHunksMap.get(i);
+				if (parsed) {
+					newSelection.set(i, new Set(parsed.hunks.map((h) => h.index)));
+				}
+			}
+			setHunkSelection(newSelection);
 		}
 	};
 
 	const toggleExpand = (index: number) => {
-		const newExpanded = new Set(expandedIndices);
-		if (newExpanded.has(index)) {
-			newExpanded.delete(index);
-		} else {
-			newExpanded.add(index);
-		}
-		setExpandedIndices(newExpanded);
+		setExpandedIndices((prev) => {
+			const newExpanded = new Set(prev);
+			if (newExpanded.has(index)) {
+				newExpanded.delete(index);
+			} else {
+				newExpanded.add(index);
+			}
+			return newExpanded;
+		});
 	};
+
+	// Count total selected hunks
+	const totalHunks = useMemo(() => {
+		let count = 0;
+		for (const parsed of parsedHunksMap.values()) {
+			count += parsed.hunks.length;
+		}
+		return count;
+	}, [parsedHunksMap]);
+
+	const selectedHunksCount = useMemo(() => {
+		let count = 0;
+		for (const hunkIndices of hunkSelection.values()) {
+			count += hunkIndices.size;
+		}
+		return count;
+	}, [hunkSelection]);
 
 	const handleAccept = async () => {
 		setIsApplying(true);
-		// Small delay for UX
 		await new Promise((resolve) => setTimeout(resolve, 300));
-		onAccept(selectedIndices);
+		onAccept(selectedFileIndices, hunkSelection);
 		setIsApplying(false);
 	};
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-			<div className="w-full max-w-2xl max-h-[80vh] bg-neutral-900 border border-neutral-700 rounded-lg shadow-2xl flex flex-col">
+			<div className="w-full max-w-3xl max-h-[85vh] bg-neutral-900 border border-neutral-700 rounded-lg shadow-2xl flex flex-col">
 				{/* Header */}
 				<div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
 					<div>
@@ -95,24 +199,33 @@ export function DiffReviewModal({
 						{/* Select All Toggle */}
 						<div className="flex items-center justify-between pb-2 border-b border-neutral-700/50">
 							<span className="text-xs text-neutral-400">
-								{selectedIndices.size} of {patch.changes.length} changes
-								selected
+								{selectedHunksCount} of {totalHunks} hunks selected
 							</span>
 							<button
 								type="button"
 								onClick={toggleAll}
 								className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
 							>
-								{selectedIndices.size === patch.changes.length
+								{selectedHunksCount === totalHunks
 									? "Deselect All"
 									: "Select All"}
 							</button>
 						</div>
 
 						{/* Individual Changes */}
-						{patch.changes.map((change, index) => {
-							const isSelected = selectedIndices.has(index);
-							const isExpanded = expandedIndices.has(index);
+						{patch.changes.map((change, fileIndex) => {
+							const parsed = parsedHunksMap.get(fileIndex);
+							const fileHunkSelection =
+								hunkSelection.get(fileIndex) || new Set();
+							const isExpanded = expandedIndices.has(fileIndex);
+							const allHunksSelected = parsed
+								? areAllHunksSelected(parsed.hunks, fileHunkSelection)
+								: false;
+							const someHunksSelected = parsed
+								? areSomeHunksSelected(parsed.hunks, fileHunkSelection)
+								: false;
+							const hasAnySelection = fileHunkSelection.size > 0;
+
 							let Icon = FileCode2;
 							let colorClass = "text-neutral-400";
 							let bgClass = "bg-neutral-500/10";
@@ -135,43 +248,50 @@ export function DiffReviewModal({
 								borderClass = "border-red-500/20";
 							}
 
-							const oldContent = filesByPath[change.path]?.content || "";
-							const newContent = change.content || "";
-
 							return (
 								<div
-									key={`${change.path}-${index}`}
+									key={`${change.path}-${fileIndex}`}
 									className={`border ${borderClass} rounded overflow-hidden ${
-										!isSelected ? "opacity-40" : ""
+										!hasAnySelection ? "opacity-40" : ""
 									}`}
 								>
-									<button
-										type="button"
-										className={`flex w-full items-center gap-2 text-left text-xs ${bgClass} px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity`}
-										onClick={() => toggleChange(index)}
+									{/* File Header */}
+									<div
+										className={`flex items-center gap-2 text-xs ${bgClass} px-2 py-1.5`}
 									>
-										<input
-											type="checkbox"
-											checked={isSelected}
-											onChange={() => toggleChange(index)}
-											className="h-3.5 w-3.5 rounded border-neutral-600 bg-neutral-800 text-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
-											onClick={(e) => e.stopPropagation()}
-										/>
-										<Icon className={`h-3 w-3 ${colorClass}`} />
-										<span className="font-mono text-neutral-300 flex-1">
-											{change.path}
-										</span>
+										<button
+											type="button"
+											onClick={() => toggleFile(fileIndex)}
+											className="flex items-center gap-2 flex-1 text-left hover:opacity-80 transition-opacity"
+										>
+											<input
+												type="checkbox"
+												checked={allHunksSelected}
+												ref={(el) => {
+													if (el) el.indeterminate = someHunksSelected;
+												}}
+												onChange={() => toggleFile(fileIndex)}
+												className="h-3.5 w-3.5 rounded border-neutral-600 bg-neutral-800 text-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+												onClick={(e) => e.stopPropagation()}
+											/>
+											<Icon className={`h-3 w-3 ${colorClass}`} />
+											<span className="font-mono text-neutral-300 flex-1">
+												{change.path}
+											</span>
+										</button>
 										<span
 											className={`text-[10px] uppercase font-medium ${colorClass}`}
 										>
 											{change.op}
 										</span>
+										{parsed && parsed.hunks.length > 1 && (
+											<span className="text-[10px] text-neutral-500">
+												{fileHunkSelection.size}/{parsed.hunks.length} hunks
+											</span>
+										)}
 										<button
 											type="button"
-											onClick={(e) => {
-												e.stopPropagation();
-												toggleExpand(index);
-											}}
+											onClick={() => toggleExpand(fileIndex)}
 											className="p-0.5 hover:bg-neutral-700/50 rounded transition-colors"
 											title={isExpanded ? "Collapse" : "Expand"}
 										>
@@ -181,16 +301,46 @@ export function DiffReviewModal({
 												<ChevronRight className="h-3 w-3 text-neutral-400" />
 											)}
 										</button>
-									</button>
+									</div>
 
-									{/* Diff View */}
-									{isExpanded && change.op !== "delete" && (
-										<div className="border-t border-neutral-700/50 max-h-64 overflow-auto">
-											<DiffViewer
-												oldContent={change.op === "create" ? "" : oldContent}
-												newContent={newContent}
-												fileName={change.path}
-											/>
+									{/* Hunks */}
+									{isExpanded && parsed && (
+										<div className="border-t border-neutral-700/50">
+											{parsed.hunks.map((hunk) => {
+												const isHunkSelected = fileHunkSelection.has(
+													hunk.index,
+												);
+												return (
+													<div
+														key={`hunk-${fileIndex}-${hunk.index}`}
+														className={`${!isHunkSelected ? "opacity-40" : ""}`}
+													>
+														{/* Hunk Header */}
+														<button
+															type="button"
+															onClick={() => toggleHunk(fileIndex, hunk.index)}
+															className="flex w-full items-center gap-2 px-3 py-1 bg-neutral-800/50 hover:bg-neutral-800 transition-colors text-left"
+														>
+															<input
+																type="checkbox"
+																checked={isHunkSelected}
+																onChange={() =>
+																	toggleHunk(fileIndex, hunk.index)
+																}
+																className="h-3 w-3 rounded border-neutral-600 bg-neutral-800 text-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+																onClick={(e) => e.stopPropagation()}
+															/>
+															<span className="font-mono text-[10px] text-neutral-500">
+																{hunk.header}
+															</span>
+														</button>
+														{/* Hunk Diff Lines */}
+														<div className="max-h-48 overflow-auto">
+															<HunkDiffView hunk={hunk} />
+														</div>
+													</div>
+												);
+											})}
 										</div>
 									)}
 
@@ -219,13 +369,75 @@ export function DiffReviewModal({
 					<button
 						type="button"
 						onClick={handleAccept}
-						disabled={isApplying}
+						disabled={isApplying || selectedHunksCount === 0}
 						className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 					>
-						{isApplying ? "Applying..." : "Accept All"}
+						{isApplying
+							? "Applying..."
+							: selectedHunksCount === totalHunks
+								? "Accept All"
+								: `Accept ${selectedHunksCount} Hunks`}
 					</button>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+/** Render diff lines for a single hunk */
+function HunkDiffView({ hunk }: { hunk: Hunk }) {
+	return (
+		<div className="font-mono text-xs">
+			{hunk.lines.map((line, i) => {
+				const prefix = line[0];
+				const content = line.substring(1);
+				// Use line content hash for more stable keys
+				const lineKey = `${i}-${prefix}-${content.substring(0, 20)}`;
+
+				if (prefix === "+") {
+					return (
+						<div
+							key={lineKey}
+							className="flex bg-green-500/10 border-l-2 border-green-500"
+						>
+							<span className="inline-block w-8 px-1 text-right text-green-400 select-none shrink-0">
+								+
+							</span>
+							<pre className="flex-1 px-2 py-0.5 whitespace-pre-wrap break-all">
+								{content || " "}
+							</pre>
+						</div>
+					);
+				}
+
+				if (prefix === "-") {
+					return (
+						<div
+							key={lineKey}
+							className="flex bg-red-500/10 border-l-2 border-red-500"
+						>
+							<span className="inline-block w-8 px-1 text-right text-red-400 select-none shrink-0">
+								-
+							</span>
+							<pre className="flex-1 px-2 py-0.5 whitespace-pre-wrap break-all">
+								{content || " "}
+							</pre>
+						</div>
+					);
+				}
+
+				// Context line (starts with space or no prefix)
+				return (
+					<div key={lineKey} className="flex bg-neutral-900/30">
+						<span className="inline-block w-8 px-1 text-right text-neutral-600 select-none shrink-0">
+							{" "}
+						</span>
+						<pre className="flex-1 px-2 py-0.5 whitespace-pre-wrap break-all text-neutral-400">
+							{prefix === " " ? content : line}
+						</pre>
+					</div>
+				);
+			})}
 		</div>
 	);
 }
