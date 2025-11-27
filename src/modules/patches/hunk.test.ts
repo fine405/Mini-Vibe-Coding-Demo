@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
 	applySelectedHunks,
+	applySelectedHunksAsync,
 	areAllHunksSelected,
 	areSomeHunksSelected,
 	type Hunk,
 	parseHunks,
+	parseHunksAsync,
 } from "./hunk";
 
 describe("parseHunks", () => {
@@ -312,5 +314,59 @@ describe("areSomeHunksSelected", () => {
 		const selected = new Set<number>();
 
 		expect(areSomeHunksSelected(hunks, selected)).toBe(false);
+	});
+});
+
+describe("Performance", () => {
+	it("should parse and apply 100KB file in less than 500ms", async () => {
+		// Generate ~100KB of content (about 2000 lines of 50 chars each)
+		const lineCount = 2000;
+		const oldLines: string[] = [];
+		const newLines: string[] = [];
+
+		for (let i = 0; i < lineCount; i++) {
+			const line = `line ${i}: ${"x".repeat(40)}`;
+			oldLines.push(line);
+			// Modify every 100th line to create hunks
+			if (i % 100 === 50) {
+				newLines.push(`MODIFIED ${i}: ${"y".repeat(40)}`);
+			} else {
+				newLines.push(line);
+			}
+		}
+
+		const oldContent = oldLines.join("\n");
+		const newContent = newLines.join("\n");
+
+		// Verify size is approximately 100KB
+		const size = new Blob([oldContent]).size;
+		expect(size).toBeGreaterThan(90 * 1024); // At least 90KB
+		expect(size).toBeLessThan(150 * 1024); // Less than 150KB
+
+		const startTime = performance.now();
+
+		// Parse hunks
+		const parsed = await parseHunksAsync(
+			oldContent,
+			newContent,
+			"large-file.ts",
+			"update",
+		);
+
+		// Apply all hunks
+		const allHunks = new Set(parsed.hunks.map((h) => h.index));
+		const result = await applySelectedHunksAsync(oldContent, parsed, allHunks);
+
+		const endTime = performance.now();
+		const duration = endTime - startTime;
+
+		// Verify result is correct
+		expect(result).toBe(newContent);
+
+		// Verify performance target: <500ms
+		expect(duration).toBeLessThan(500);
+
+		// Log actual duration for debugging
+		console.log(`100KB file parse+apply took ${duration.toFixed(2)}ms`);
 	});
 });

@@ -13,7 +13,10 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useFs } from "@/modules/fs/store";
-import { applySelectedHunks, parseHunks } from "@/modules/patches/hunk";
+import {
+	applySelectedHunksAsync,
+	parseHunksAsync,
+} from "@/modules/patches/hunk";
 import { loadPatches, matchPatchByTrigger } from "@/modules/patches/loader";
 import type { Patch } from "@/modules/patches/types";
 import { cn } from "@/utils/cn";
@@ -79,7 +82,7 @@ export function ChatPane() {
 		setLoading(false);
 	};
 
-	const handleAcceptPatch = (
+	const handleAcceptPatch = async (
 		_selectedIndices?: Set<number>,
 		hunkSelection?: HunkSelection,
 	) => {
@@ -103,8 +106,8 @@ export function ChatPane() {
 				const oldContent = filesByPath[change.path]?.content || "";
 				const newContent = change.content || "";
 
-				// Parse hunks for this file
-				const parsed = parseHunks(
+				// Parse hunks for this file (async for large files)
+				const parsed = await parseHunksAsync(
 					oldContent,
 					newContent,
 					change.path,
@@ -134,10 +137,14 @@ export function ChatPane() {
 					case "update": {
 						const existing = newFilesByPath[change.path];
 						if (existing) {
-							// Apply selected hunks to get final content
+							// Apply selected hunks to get final content (async for large files)
 							const finalContent = allHunksSelected
 								? newContent
-								: applySelectedHunks(oldContent, parsed, hunksToApply);
+								: await applySelectedHunksAsync(
+										oldContent,
+										parsed,
+										hunksToApply,
+									);
 
 							newFilesByPath[change.path] = {
 								...existing,

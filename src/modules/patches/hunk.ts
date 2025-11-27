@@ -1,4 +1,9 @@
 import { structuredPatch } from "diff";
+import {
+	applySelectedHunksInWorker,
+	parseHunksInWorker,
+	shouldUseWorker,
+} from "./diffWorkerManager";
 
 /**
  * Represents a single hunk (chunk) of changes within a file diff
@@ -216,4 +221,72 @@ export function areSomeHunksSelected(
 		selectedIndices.has(hunk.index),
 	).length;
 	return selectedCount > 0 && selectedCount < hunks.length;
+}
+
+/**
+ * Async version of parseHunks that auto-selects sync/worker based on file size
+ * Uses Web Worker for large files (>50KB or >1000 lines) to avoid UI jank
+ */
+export async function parseHunksAsync(
+	oldContent: string,
+	newContent: string,
+	path: string,
+	op: "create" | "update" | "delete",
+): Promise<ParsedHunks> {
+	// Check if we should use worker based on content size
+	const contentToCheck = op === "delete" ? oldContent : newContent;
+
+	if (import.meta.env.DEV) {
+		console.time(`[parseHunksAsync] ${path}`);
+	}
+
+	let result: ParsedHunks;
+
+	if (shouldUseWorker(contentToCheck)) {
+		// Use worker for large files
+		result = await parseHunksInWorker(oldContent, newContent, path, op);
+	} else {
+		// Use sync version for small files
+		result = parseHunks(oldContent, newContent, path, op);
+	}
+
+	if (import.meta.env.DEV) {
+		console.timeEnd(`[parseHunksAsync] ${path}`);
+	}
+
+	return result;
+}
+
+/**
+ * Async version of applySelectedHunks that auto-selects sync/worker based on file size
+ * Uses Web Worker for large files to avoid UI jank
+ */
+export async function applySelectedHunksAsync(
+	oldContent: string,
+	parsedHunks: ParsedHunks,
+	selectedHunkIndices: Set<number>,
+): Promise<string> {
+	if (import.meta.env.DEV) {
+		console.time(`[applySelectedHunksAsync] ${parsedHunks.path}`);
+	}
+
+	let result: string;
+
+	if (shouldUseWorker(oldContent)) {
+		// Use worker for large files
+		result = await applySelectedHunksInWorker(
+			oldContent,
+			parsedHunks,
+			selectedHunkIndices,
+		);
+	} else {
+		// Use sync version for small files
+		result = applySelectedHunks(oldContent, parsedHunks, selectedHunkIndices);
+	}
+
+	if (import.meta.env.DEV) {
+		console.timeEnd(`[applySelectedHunksAsync] ${parsedHunks.path}`);
+	}
+
+	return result;
 }
