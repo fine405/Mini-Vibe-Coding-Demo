@@ -244,6 +244,16 @@ export default function App() {
 			action: toggleConsole,
 			description: "Toggle console panel",
 		},
+		{
+			key: "a",
+			metaKey: true,
+			shiftKey: true,
+			action: () => {
+				acceptAllChanges();
+				toast.success("All changes accepted");
+			},
+			description: "Accept all changes",
+		},
 	]);
 
 	return (
