@@ -2,7 +2,9 @@
 
 A minimal "Lovable-style" AI coding surface with chat, file tree, code editor, live preview, and console — all running in the browser with mocked AI responses.
 
-![Mini Lovable Demo](./docs/demo.gif)
+[![Mini Lovable Demo](./docs/demo.gif)](https://www.youtube.com/watch?v=WKtRpzEyE0U)
+
+> Click the gif above to watch the full demo
 
 ## Quick Start
 
