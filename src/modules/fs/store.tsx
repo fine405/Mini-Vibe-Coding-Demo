@@ -225,12 +225,16 @@ const stateCreator = immer<FsStore>((set) => ({
 		set((state) => {
 			for (const path in state.filesByPath) {
 				const file = state.filesByPath[path];
-				if (file.status === "modified" && file.originalContent !== undefined) {
+				if (file.originalContent !== undefined) {
+					// Revert to original content (works for both "modified" and "new" with changes)
 					file.content = file.originalContent;
-					file.status = "clean";
+					// Keep status as "new" if it was new, otherwise set to "clean"
+					if (file.status !== "new") {
+						file.status = "clean";
+					}
 					delete file.originalContent;
 				} else if (file.status === "new") {
-					// Delete new files
+					// Delete new files that have no original content (first-time creation)
 					delete state.filesByPath[path];
 				}
 			}

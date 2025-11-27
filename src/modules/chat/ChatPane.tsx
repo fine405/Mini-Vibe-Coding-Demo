@@ -25,7 +25,8 @@ import { useChatStore } from "./store";
 
 export function ChatPane() {
 	const { messages, isLoading, addMessage, setLoading } = useChatStore();
-	const { filesByPath, setFiles, revertAllChanges, getModifiedFiles } = useFs();
+	const { setFiles, revertAllChanges, getModifiedFiles, acceptAllChanges } =
+		useFs();
 	const [input, setInput] = useState("");
 	const [patches, setPatches] = useState<Patch[]>([]);
 	const [reviewingPatch, setReviewingPatch] = useState<Patch | null>(null);
@@ -89,7 +90,13 @@ export function ChatPane() {
 		if (!reviewingPatch) return;
 
 		try {
-			const newFilesByPath = { ...filesByPath };
+			// Accept any pending changes first, so this patch becomes a new checkpoint
+			// This ensures revert only undoes THIS patch, not previous ones
+			acceptAllChanges();
+
+			// Get fresh filesByPath after accepting changes
+			const currentFiles = useFs.getState().filesByPath;
+			const newFilesByPath = { ...currentFiles };
 			let appliedHunksCount = 0;
 			let totalHunksCount = 0;
 
@@ -103,7 +110,7 @@ export function ChatPane() {
 					continue;
 				}
 
-				const oldContent = filesByPath[change.path]?.content || "";
+				const oldContent = currentFiles[change.path]?.content || "";
 				const newContent = change.content || "";
 
 				// Parse hunks for this file (async for large files)
@@ -146,13 +153,13 @@ export function ChatPane() {
 										hunksToApply,
 									);
 
+							// Always save current content as originalContent before applying new patch
+							// This ensures revert goes back to the state before THIS patch
 							newFilesByPath[change.path] = {
 								...existing,
 								content: finalContent,
 								status: "modified",
-								originalContent:
-									existing.originalContent ??
-									(existing.status === "clean" ? existing.content : undefined),
+								originalContent: existing.content,
 							};
 						}
 						break;
@@ -258,63 +265,70 @@ export function ChatPane() {
 								</div>
 							</div>
 						)}
-						{messages.map((msg) => (
-							<div
-								key={msg.id}
-								className={`flex gap-2.5 ${
-									msg.role === "user"
-										? "flex-row-reverse animate-slide-in-right"
-										: "animate-slide-in-left"
-								}`}
-							>
-								{/* Avatar */}
+						{messages.map((msg, msgIndex) => {
+							// Only show revert button on the last applied patch message
+							const isLastAppliedPatch =
+								msg.appliedPatch &&
+								!messages.slice(msgIndex + 1).some((m) => m.appliedPatch);
+
+							return (
 								<div
-									className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+									key={msg.id}
+									className={`flex gap-2.5 ${
 										msg.role === "user"
-											? "bg-accent/20 text-accent"
-											: "bg-success/20 text-success"
+											? "flex-row-reverse animate-slide-in-right"
+											: "animate-slide-in-left"
 									}`}
 								>
-									{msg.role === "user" ? (
-										<User className="h-3.5 w-3.5" />
-									) : (
-										<Bot className="h-3.5 w-3.5" />
-									)}
-								</div>
-								{/* Message */}
-								<div
-									className={`flex-1 min-w-0 ${
-										msg.role === "user" ? "text-right" : ""
-									}`}
-								>
+									{/* Avatar */}
 									<div
-										className={`inline-block text-xs rounded-lg px-3 py-2 max-w-full ${
+										className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
 											msg.role === "user"
-												? "bg-accent text-white rounded-br-sm"
-												: "bg-bg-tertiary border border-border-primary text-fg-secondary rounded-bl-sm"
+												? "bg-accent/20 text-accent"
+												: "bg-success/20 text-success"
 										}`}
 									>
-										<span className="whitespace-pre-wrap break-words">
-											{msg.content}
-										</span>
-										{msg.appliedPatch && getModifiedFiles().length > 0 && (
-											<button
-												type="button"
-												onClick={() => {
-													const count = getModifiedFiles().length;
-													revertAllChanges();
-													toast.success(`Reverted ${count} file(s)`);
-												}}
-												className="mt-2 flex items-center gap-1 text-[10px] px-2 py-1 bg-warning/10 hover:bg-warning/20 border border-warning/30 rounded text-warning transition-colors"
-											>
-												<RotateCcw className="h-3 w-3" />
-												Revert Changes
-											</button>
+										{msg.role === "user" ? (
+											<User className="h-3.5 w-3.5" />
+										) : (
+											<Bot className="h-3.5 w-3.5" />
 										)}
 									</div>
+									{/* Message */}
+									<div
+										className={`flex-1 min-w-0 ${
+											msg.role === "user" ? "text-right" : ""
+										}`}
+									>
+										<div
+											className={`inline-block text-xs rounded-lg px-3 py-2 max-w-full ${
+												msg.role === "user"
+													? "bg-accent text-white rounded-br-sm"
+													: "bg-bg-tertiary border border-border-primary text-fg-secondary rounded-bl-sm"
+											}`}
+										>
+											<span className="whitespace-pre-wrap break-words">
+												{msg.content}
+											</span>
+											{isLastAppliedPatch && getModifiedFiles().length > 0 && (
+												<button
+													type="button"
+													onClick={() => {
+														const count = getModifiedFiles().length;
+														revertAllChanges();
+														toast.success(`Reverted ${count} file(s)`);
+													}}
+													className="mt-2 flex items-center gap-1 text-[10px] px-2 py-1 bg-warning/10 hover:bg-warning/20 border border-warning/30 rounded text-warning transition-colors"
+												>
+													<RotateCcw className="h-3 w-3" />
+													Revert Changes
+												</button>
+											)}
+										</div>
+									</div>
 								</div>
-							</div>
-						))}
+							);
+						})}
 						{isLoading && (
 							<div className="flex gap-2.5">
 								<div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center bg-success/20 text-success">
