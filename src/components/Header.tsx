@@ -47,9 +47,16 @@ export function Header({
 	return (
 		<div className="h-10 w-full bg-bg-primary border-b border-border-primary flex items-center justify-between px-4 shrink-0 text-fg-primary">
 			<div className="flex items-center gap-3">
-				<span className="text-sm font-semibold text-fg-muted">
-					Mini Lovable
-				</span>
+				<div className="flex items-center gap-1.5">
+					<img
+						src="https://lovable.dev/icon.svg?9e0c9b5bb1bae062"
+						alt="Lovable"
+						className="h-5 w-5"
+					/>
+					<span className="text-sm font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">
+						Mini Lovable
+					</span>
+				</div>
 
 				<div className="w-px h-4 bg-border-primary" />
 
@@ -60,10 +67,9 @@ export function Header({
 								<button
 									type="button"
 									onClick={onNewProject}
-									className="flex items-center gap-1.5 px-2 py-1 rounded bg-accent hover:bg-accent-hover text-white text-xs font-medium transition-colors"
+									className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
 								>
-									<FilePlus2 className="h-3.5 w-3.5" />
-									<span>New Project</span>
+									<FilePlus2 className="h-4 w-4" />
 								</button>
 							</TooltipTrigger>
 							<TooltipContent>Start a new project</TooltipContent>
