@@ -1,5 +1,6 @@
 import { FileCode2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useEditor } from "@/modules/editor";
 import { fuzzyMatch } from "@/modules/fs/fuzzyMatch";
 import { useFs } from "@/modules/fs/store";
 import {
@@ -36,7 +37,8 @@ export function CommandPalette({
 	onClose,
 	customActions = [],
 }: CommandPaletteProps) {
-	const { filesByPath, setActiveFile } = useFs();
+	const { filesByPath } = useFs();
+	const { openFile } = useEditor();
 	const [search, setSearch] = useState("");
 
 	// Reset search when dialog closes
@@ -127,9 +129,7 @@ export function CommandPalette({
 									{sortedFiles.slice(0, 10).map((file) => (
 										<CommandItem
 											key={file.path}
-											onSelect={() =>
-												handleSelect(() => setActiveFile(file.path))
-											}
+											onSelect={() => handleSelect(() => openFile(file.path))}
 										>
 											<FileCode2 className="mr-2 h-4 w-4" />
 											<span className="flex-1 truncate">{file.path}</span>
