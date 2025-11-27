@@ -32,7 +32,9 @@ import { useFs } from "./modules/fs/store";
 import { useEditor } from "./modules/editor";
 import {
 	exportProjectAsJSON,
+	exportProjectAsZip,
 	importProjectFromJSON,
+	importProjectFromZip,
 	selectProjectFile,
 } from "./modules/fs/export";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -50,7 +52,7 @@ export default function App() {
 	// Dialog states
 	const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
 	const [exportDialogOpen, setExportDialogOpen] = useState(false);
-	const [importDialogOpen, setImportDialogOpen] = useState(false);
+	const [exportFormat, setExportFormat] = useState<"json" | "zip">("json");
 	const [exportProjectName, setExportProjectName] = useState("my-project");
 	const exportInputRef = useRef<HTMLInputElement>(null);
 
@@ -130,34 +132,66 @@ export default function App() {
 		});
 	};
 
-	const handleExportProject = () => {
+	const handleExportJSON = () => {
+		setExportFormat("json");
 		setExportProjectName("my-project");
 		setExportDialogOpen(true);
 	};
 
-	const confirmExportProject = () => {
+	const handleExportZip = () => {
+		setExportFormat("zip");
+		setExportProjectName("my-project");
+		setExportDialogOpen(true);
+	};
+
+	const confirmExportProject = async () => {
 		if (!exportProjectName.trim()) return;
-		exportProjectAsJSON(filesByPath, exportProjectName.trim());
+		const name = exportProjectName.trim();
 		setExportDialogOpen(false);
-		toast.success("Project exported", {
-			description: `${exportProjectName.trim()}.json downloaded`,
-		});
+
+		if (exportFormat === "zip") {
+			await exportProjectAsZip(filesByPath, name);
+			toast.success("Project exported", {
+				description: `${name}.zip downloaded`,
+			});
+		} else {
+			exportProjectAsJSON(filesByPath, name);
+			toast.success("Project exported", {
+				description: `${name}.json downloaded`,
+			});
+		}
 	};
 
-	const handleImportProject = () => {
-		setImportDialogOpen(true);
-	};
-
-	const confirmImportProject = async () => {
-		setImportDialogOpen(false);
+	const handleImportJSON = async () => {
 		try {
-			const file = await selectProjectFile();
+			const file = await selectProjectFile(".json");
 			const importedFiles = await importProjectFromJSON(file);
 			setFiles(importedFiles);
 			closeAllFiles();
 			const fileCount = Object.keys(importedFiles).length;
 			toast.success("Project imported successfully", {
-				description: `${fileCount} files loaded and saved to storage`,
+				description: `${fileCount} files loaded from JSON`,
+			});
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Failed to import project";
+			if (message !== "File selection cancelled") {
+				toast.error("Import failed", {
+					description: message,
+				});
+			}
+		}
+	};
+
+	const handleImportZip = async () => {
+		try {
+			const file = await selectProjectFile(".zip");
+			const importedFiles = await importProjectFromZip(file);
+			setFiles(importedFiles);
+			closeAllFiles();
+			const fileCount = Object.keys(importedFiles).length;
+			toast.success("Project imported successfully", {
+				description: `${fileCount} files loaded from ZIP`,
 			});
 		} catch (error) {
 			const message =
@@ -219,8 +253,10 @@ export default function App() {
 					<Header
 						onOpenCommandPalette={() => setCommandPaletteOpen(true)}
 						onNewProject={handleNewProject}
-						onExportProject={handleExportProject}
-						onImportProject={handleImportProject}
+						onExportJSON={handleExportJSON}
+						onExportZip={handleExportZip}
+						onImportJSON={handleImportJSON}
+						onImportZip={handleImportZip}
 					/>
 					<div className="flex-1 overflow-hidden">
 						<PanelGroup direction="horizontal" className="h-full">
@@ -325,35 +361,6 @@ export default function App() {
 									className="px-4 py-2 text-sm rounded bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
 								>
 									Export
-								</button>
-							</DialogFooter>
-						</DialogContent>
-					</Dialog>
-
-					{/* Import Project Dialog */}
-					<Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-						<DialogContent>
-							<DialogHeader>
-								<DialogTitle>Import Project</DialogTitle>
-								<DialogDescription>
-									This will replace all current files with the imported project.
-									This action cannot be undone.
-								</DialogDescription>
-							</DialogHeader>
-							<DialogFooter>
-								<button
-									type="button"
-									onClick={() => setImportDialogOpen(false)}
-									className="px-4 py-2 text-sm rounded bg-bg-tertiary hover:bg-bg-secondary text-fg-secondary transition-colors"
-								>
-									Cancel
-								</button>
-								<button
-									type="button"
-									onClick={confirmImportProject}
-									className="px-4 py-2 text-sm rounded bg-accent hover:bg-accent-hover text-white font-medium transition-colors"
-								>
-									Choose File & Import
 								</button>
 							</DialogFooter>
 						</DialogContent>

@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import type { VirtualFile } from "./types";
 
 /**
@@ -84,11 +85,13 @@ export function importProjectFromJSON(
 /**
  * Trigger file input to select a project file
  */
-export function selectProjectFile(): Promise<File> {
+export function selectProjectFile(
+	accept: ".json" | ".zip" = ".json",
+): Promise<File> {
 	return new Promise((resolve, reject) => {
 		const input = document.createElement("input");
 		input.type = "file";
-		input.accept = ".json";
+		input.accept = accept;
 
 		input.onchange = (event) => {
 			const file = (event.target as HTMLInputElement).files?.[0];
@@ -105,4 +108,71 @@ export function selectProjectFile(): Promise<File> {
 
 		input.click();
 	});
+}
+
+/**
+ * Export project as ZIP
+ */
+export async function exportProjectAsZip(
+	filesByPath: Record<string, VirtualFile>,
+	projectName = "mini-lovable-project",
+): Promise<void> {
+	const zip = new JSZip();
+
+	// Add each file to the ZIP, preserving directory structure
+	for (const [path, file] of Object.entries(filesByPath)) {
+		// Remove leading slash for ZIP path
+		const zipPath = path.startsWith("/") ? path.slice(1) : path;
+		zip.file(zipPath, file.content);
+	}
+
+	// Generate the ZIP blob
+	const blob = await zip.generateAsync({ type: "blob" });
+	const url = URL.createObjectURL(blob);
+
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = `${projectName}-${Date.now()}.zip`;
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+	URL.revokeObjectURL(url);
+}
+
+/**
+ * Import project from ZIP file
+ */
+export async function importProjectFromZip(
+	file: File,
+): Promise<Record<string, VirtualFile>> {
+	const zip = await JSZip.loadAsync(file);
+	const files: Record<string, VirtualFile> = {};
+
+	const filePromises: Promise<void>[] = [];
+
+	zip.forEach((relativePath, zipEntry) => {
+		// Skip directories
+		if (zipEntry.dir) return;
+
+		const promise = zipEntry.async("string").then((content) => {
+			// Ensure path starts with /
+			const path = relativePath.startsWith("/")
+				? relativePath
+				: `/${relativePath}`;
+			files[path] = {
+				path,
+				content,
+				status: "clean",
+			};
+		});
+		filePromises.push(promise);
+	});
+
+	await Promise.all(filePromises);
+
+	if (Object.keys(files).length === 0) {
+		throw new Error("ZIP file contains no valid files");
+	}
+
+	return files;
 }

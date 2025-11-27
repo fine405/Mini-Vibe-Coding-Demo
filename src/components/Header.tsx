@@ -1,7 +1,10 @@
 import { clsx } from "clsx";
 import {
+	ChevronDown,
 	Command,
 	Download,
+	FileArchive,
+	FileJson,
 	FilePlus2,
 	MessageSquare,
 	TerminalSquare,
@@ -9,6 +12,12 @@ import {
 } from "lucide-react";
 import { useLayoutStore } from "@/modules/layout/store";
 import { ThemeToggle } from "./ThemeToggle";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import {
 	Tooltip,
 	TooltipContent,
@@ -19,15 +28,19 @@ import {
 interface HeaderProps {
 	onOpenCommandPalette?: () => void;
 	onNewProject?: () => void;
-	onExportProject?: () => void;
-	onImportProject?: () => void;
+	onExportJSON?: () => void;
+	onExportZip?: () => void;
+	onImportJSON?: () => void;
+	onImportZip?: () => void;
 }
 
 export function Header({
 	onOpenCommandPalette,
 	onNewProject,
-	onExportProject,
-	onImportProject,
+	onExportJSON,
+	onExportZip,
+	onImportJSON,
+	onImportZip,
 }: HeaderProps) {
 	const { showChat, showConsole, toggleChat, toggleConsole } = useLayoutStore();
 
@@ -56,31 +69,61 @@ export function Header({
 							<TooltipContent>Start a new project</TooltipContent>
 						</Tooltip>
 
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<button
-									type="button"
-									onClick={onImportProject}
-									className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
-								>
-									<Upload className="h-4 w-4" />
-								</button>
-							</TooltipTrigger>
-							<TooltipContent>Import Project</TooltipContent>
-						</Tooltip>
+						{/* Import Dropdown */}
+						<DropdownMenu>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<DropdownMenuTrigger asChild>
+										<button
+											type="button"
+											className="flex items-center gap-0.5 p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+										>
+											<Upload className="h-4 w-4" />
+											<ChevronDown className="h-3 w-3" />
+										</button>
+									</DropdownMenuTrigger>
+								</TooltipTrigger>
+								<TooltipContent>Import Project</TooltipContent>
+							</Tooltip>
+							<DropdownMenuContent align="start">
+								<DropdownMenuItem onClick={onImportJSON}>
+									<FileJson className="h-4 w-4" />
+									<span>Import JSON</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={onImportZip}>
+									<FileArchive className="h-4 w-4" />
+									<span>Import ZIP</span>
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<button
-									type="button"
-									onClick={onExportProject}
-									className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
-								>
-									<Download className="h-4 w-4" />
-								</button>
-							</TooltipTrigger>
-							<TooltipContent>Export Project</TooltipContent>
-						</Tooltip>
+						{/* Export Dropdown */}
+						<DropdownMenu>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<DropdownMenuTrigger asChild>
+										<button
+											type="button"
+											className="flex items-center gap-0.5 p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+										>
+											<Download className="h-4 w-4" />
+											<ChevronDown className="h-3 w-3" />
+										</button>
+									</DropdownMenuTrigger>
+								</TooltipTrigger>
+								<TooltipContent>Export Project</TooltipContent>
+							</Tooltip>
+							<DropdownMenuContent align="start">
+								<DropdownMenuItem onClick={onExportJSON}>
+									<FileJson className="h-4 w-4" />
+									<span>Export as JSON</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={onExportZip}>
+									<FileArchive className="h-4 w-4" />
+									<span>Export as ZIP</span>
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 				</TooltipProvider>
 			</div>
