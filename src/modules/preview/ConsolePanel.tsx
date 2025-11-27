@@ -1,8 +1,41 @@
 import { useSandpackConsole } from "@codesandbox/sandpack-react";
 import { AlertCircle, AlertTriangle, Info, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+	CONSOLE_BRIDGE_EVENT,
+	type ConsoleBridgePayload,
+} from "./consoleBridge";
 
 export function ConsolePanel() {
-	const { logs, reset } = useSandpackConsole({ resetOnPreviewRestart: true });
+	const { reset: sandpackReset } = useSandpackConsole({
+		resetOnPreviewRestart: true,
+	});
+	const [logs, setLogs] = useState<ConsoleBridgePayload[]>([]);
+
+	useEffect(() => {
+		if (typeof window === "undefined") {
+			return;
+		}
+
+		const handleMessage = (event: MessageEvent) => {
+			const data = event.data;
+			if (data?.type !== CONSOLE_BRIDGE_EVENT || !data.payload) {
+				return;
+			}
+
+			setLogs((prev) => [...prev, data.payload as ConsoleBridgePayload]);
+		};
+
+		window.addEventListener("message", handleMessage);
+		return () => {
+			window.removeEventListener("message", handleMessage);
+		};
+	}, []);
+
+	const handleClear = () => {
+		sandpackReset();
+		setLogs([]);
+	};
 
 	const getLogIcon = (type: string) => {
 		switch (type) {
@@ -59,7 +92,7 @@ export function ConsolePanel() {
 				</div>
 				<button
 					type="button"
-					onClick={reset}
+					onClick={handleClear}
 					className="p-1 rounded hover:bg-neutral-800/60 text-neutral-500 hover:text-neutral-300 transition-colors"
 					title="Clear Console"
 				>

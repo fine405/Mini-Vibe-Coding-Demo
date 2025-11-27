@@ -9,6 +9,12 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useFs } from "@/modules/fs/store";
 import { useLayoutStore } from "@/modules/layout/store";
 import { ConsolePanel } from "./ConsolePanel";
+import { useSandpackConsoleBridge } from "./consoleBridge";
+
+function SandpackConsoleBridgeListener() {
+	useSandpackConsoleBridge();
+	return null;
+}
 
 function RefreshButton() {
 	const { sandpack } = useSandpack();
@@ -76,6 +82,7 @@ export function PreviewPane() {
 				}}
 				className="flex-1 flex flex-col overflow-hidden"
 			>
+				<SandpackConsoleBridgeListener />
 				<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800/60 flex items-center justify-between">
 					<span>Preview</span>
 					<RefreshButton />

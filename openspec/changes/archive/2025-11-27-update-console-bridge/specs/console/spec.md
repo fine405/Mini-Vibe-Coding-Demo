@@ -1,8 +1,5 @@
-# console Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-console-panel. Update Purpose after archive.
-## Requirements
 ### Requirement: Console Output Display
 The system SHALL display console output from the preview iframe in a dedicated panel using a deterministic bridge that forwards Sandpack console events via `sandpack.listen` and `postMessage`.
 
@@ -18,17 +15,6 @@ The system SHALL display console output from the preview iframe in a dedicated p
 - **WHEN** the preview app calls console.warn with a message
 - **THEN** the message is forwarded through the bridge and appears in the console panel with "warn" styling (yellow)
 
-### Requirement: Collapsible Console Panel
-The system SHALL provide a collapsible console panel in the preview area.
-
-#### Scenario: Collapse console
-- **WHEN** user clicks the collapse toggle on the console panel
-- **THEN** the console panel collapses to show only the header
-
-#### Scenario: Expand console
-- **WHEN** user clicks the expand toggle on a collapsed console panel
-- **THEN** the console panel expands to show all console output
-
 ### Requirement: Console Controls
 The system SHALL provide controls for managing console output, including clearing bridged log history and resubscribing when the Sandpack preview restarts.
 
@@ -39,4 +25,3 @@ The system SHALL provide controls for managing console output, including clearin
 #### Scenario: Handle preview restart
 - **WHEN** the Sandpack preview restarts or re-handshakes
 - **THEN** the console bridge re-subscribes so new log events continue streaming
-
