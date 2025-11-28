@@ -42,7 +42,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 - **Resizable 3-Pane Layout**: Drag to resize Chat, Editor, and Preview panels
 - **Dark/Light Theme**: Toggle via header button
 - **Command Palette (⌘K)**: Quick actions and fuzzy file search
-- **Keyboard Shortcuts**: See [KEYBOARD_SHORTCUTS.md](./KEYBOARD_SHORTCUTS.md)
+- **Keyboard Shortcuts**: See [KEYBOARD_SHORTCUTS.md](./docs/KEYBOARD_SHORTCUTS.md)
 
 ## Architecture Decisions
 
