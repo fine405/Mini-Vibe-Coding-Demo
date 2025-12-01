@@ -242,6 +242,11 @@ export function ChatPane() {
 			setFiles(newFilesByPath);
 			setPendingChange(null);
 
+			// Reset view mode to editor for all affected files
+			for (const change of patchToApply.changes) {
+				setViewMode(change.path, "editor");
+			}
+
 			// Save original contents to message for revert
 			updateMessagePatchStatus(messageId, "applied", originalContents);
 
