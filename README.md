@@ -1,6 +1,6 @@
 # Mini Lovable
 
-A minimal "Lovable-style" AI coding surface with chat, file tree, code editor, live preview, and console — all running in the browser with mocked AI responses.
+A minimal "Lovable-style" AI coding surface with chat, file tree, code editor, live preview, and console — all running in the browser with mocked AI responses. Perfect for demonstrating AI-assisted coding workflows without requiring API keys.
 
 [![Mini Lovable Demo](./docs/demo.gif)](https://www.youtube.com/watch?v=WKtRpzEyE0U)
 
@@ -28,20 +28,21 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### Core Functionality
 - **Chat-to-Code (Mocked AI)**: Send prompts like "create a react todo app" or "add filter buttons" to trigger predefined patches
-- **Diff Review Modal**: Review changes before applying with Accept All / Revert options
-- **Monaco Editor**: Full-featured code editor with syntax highlighting and tabs
-- **Live Preview**: Real-time app preview powered by Sandpack in-browser bundler
-- **Console Panel**: Streams `console.log/error` from the preview iframe
-- **File Tree**: Visual file explorer with status badges (New/Modified)
+- **Inline Diff Review**: Review AI-suggested changes with hunk-level selection before applying
+- **Monaco Editor**: Full-featured code editor with syntax highlighting, multi-tab support, and built-in diff viewer
+- **Live Preview**: Real-time app preview powered by Sandpack in-browser bundler with hot reload
+- **Console Panel**: Streams `console.log/warn/error` from the preview iframe with color-coded output
+- **File Tree**: Visual file explorer with right-click context menu, inline rename, and status badges (New/Modified)
 
 ### Persistence & Import/Export
 - **IndexedDB Persistence**: Workspace auto-persists to browser storage
 - **Export/Import**: Download/upload projects as JSON or ZIP bundles
 
 ### UX Polish
-- **Resizable 3-Pane Layout**: Drag to resize Chat, Editor, and Preview panels
-- **Dark/Light Theme**: Toggle via header button
+- **Resizable 4-Pane Layout**: Drag to resize Chat, File Tree, Editor, and Preview panels
+- **Dark/Light Theme**: Toggle via header button with system preference detection
 - **Command Palette (⌘K)**: Quick actions and fuzzy file search
+- **Interactive Tour**: First-visit welcome dialog with guided tour of key features (use ← → keys to navigate)
 - **Keyboard Shortcuts**: See [KEYBOARD_SHORTCUTS.md](./docs/KEYBOARD_SHORTCUTS.md)
 
 ## Architecture Decisions
@@ -61,27 +62,30 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ```
 src/
 ├── modules/
-│   ├── fs/           # Virtual file system + IndexedDB adapter
-│   ├── patches/      # Patch loader + apply engine
+│   ├── chat/         # Chat UI, inline diff preview, trigger → patch mapping
 │   ├── editor/       # Monaco editor, tabs, diff viewer
-│   ├── preview/      # Sandpack wrapper + console bridge
-│   ├── chat/         # Chat UI + trigger → patch mapping
+│   ├── fs/           # Virtual file system + IndexedDB adapter
 │   ├── layout/       # Panel visibility state
-│   └── theme/        # Dark/light theme management
-├── components/       # Shared UI components
+│   ├── patches/      # Patch loader + hunk-based apply engine
+│   ├── preview/      # Sandpack wrapper + console bridge
+│   ├── theme/        # Dark/light theme management
+│   └── tour/         # Interactive feature tour
+├── components/       # Shared UI components (dialogs, tooltips, etc.)
 ├── hooks/            # Custom React hooks
 └── lib/              # Utilities
 ```
 
 ### Key Design Choices
 
-1. **Pure Patch Engine**: The patch application logic is pure and testable, decoupled from UI. Supports `create`, `update`, and `delete` operations.
+1. **Pure Patch Engine**: The patch application logic is pure and testable, decoupled from UI. Supports `create`, `update`, and `delete` operations with hunk-level granularity.
 
 2. **Console Bridge via postMessage**: Sandpack's preview iframe communicates console logs back to the host via a custom bridge script injected into the preview.
 
 3. **Optimistic UI**: File changes are applied immediately with visual feedback; persistence happens asynchronously.
 
-4. **Inline Rename with Context Menu**: File tree uses right-click context menu for rename/delete, with inline editing for rename operations.
+4. **Inline Rename with Context Menu**: File tree uses right-click context menu for rename/delete, with inline editing for rename operations. Supports keyboard shortcuts (double-click to rename, ⌘+Backspace to delete).
+
+5. **Interactive Tour System**: First-visit onboarding with step-by-step highlights of key UI areas. Uses localStorage persistence for "don't show again" preference.
 
 ## Tradeoffs
 
@@ -119,23 +123,27 @@ Test coverage includes:
 - **Persistence** (`persistence.test.ts`, `export.test.ts`)
 - **File system store** (`store.test.ts`)
 - **Editor store** (`store.test.ts`)
+- **Chat store** (`store.test.ts`)
+- **Layout store** (`store.test.ts`)
 - **Preview refresh** (`PreviewPane.test.tsx`)
 - **File tree interactions** (`FileTreePane.test.tsx`)
+- **Diff review toolbar** (`DiffReviewToolbar.test.tsx`)
+- **Inline diff preview** (`InlineDiffPreview.test.tsx`)
 - **Fuzzy matching** (`fuzzyMatch.test.ts`)
 
-## Time Spent
+## Keyboard Shortcuts
 
-| Phase | Hours | Notes |
-|-------|-------|-------|
-| Initial setup & architecture | 1.5 | Vite, Tailwind, module structure |
-| File system & persistence | 2.0 | IndexedDB, import/export |
-| Patch engine | 1.5 | Loader, apply logic, diff generation |
-| Editor integration | 1.5 | Monaco, tabs, diff viewer |
-| Preview & console | 1.0 | Sandpack, console bridge |
-| Chat UI | 0.5 | Message list, trigger matching |
-| UX polish | 1.5 | Command palette, shortcuts, dialogs, theme |
-| Testing | 1.0 | Unit tests, integration tests |
-| **Total** | **~10.5** | Slightly over 8hr target |
+| Shortcut | Action |
+|----------|--------|
+| `⌘K` / `⌘P` | Open command palette |
+| `⌘S` | Save workspace |
+| `⌘1` | Toggle chat panel |
+| `⌘2` | Toggle console panel |
+| `⌘⇧A` | Accept all changes |
+| `⌘⇧R` | Revert all changes |
+| `⌘Enter` | Send chat message |
+| `← →` | Navigate tour steps |
+| `Esc` | Skip tour / Close dialogs |
 
 ## Scripts
 
