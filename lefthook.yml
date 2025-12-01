@@ -7,10 +7,7 @@ pre-commit:
 
 pre-push:
   commands:
-    check:
-      glob: "src/**/*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}"
-      run: npx @biomejs/biome check --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {push_files}
-    test:
-      run: pnpm test run
     build:
       run: pnpm build
+    test:
+      run: pnpm test run
