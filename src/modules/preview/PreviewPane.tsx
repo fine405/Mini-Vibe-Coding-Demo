@@ -3,7 +3,7 @@ import {
 	SandpackProvider,
 	useSandpack,
 } from "@codesandbox/sandpack-react";
-import { RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useFs } from "@/modules/fs/store";
@@ -65,11 +65,19 @@ export function PreviewPane() {
 		return `sandpack-${paths.length}-${paths.slice(0, 100)}`;
 	}, [filesByPath]);
 
-	// Skip rendering if no files
+	// Show loading state if no files
 	if (Object.keys(files).length === 0) {
 		return (
-			<div className="h-full w-full flex items-center justify-center bg-bg-primary text-fg-secondary">
-				Loading files...
+			<div className="h-full w-full flex flex-col bg-bg-primary text-fg-primary">
+				<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-secondary border-b border-border-primary">
+					Preview
+				</div>
+				<div className="flex-1 flex items-center justify-center">
+					<div className="text-center">
+						<Loader2 className="h-8 w-8 mx-auto mb-3 text-accent/60 animate-spin" />
+						<p className="text-sm text-fg-muted">Loading project...</p>
+					</div>
+				</div>
 			</div>
 		);
 	}
