@@ -19,6 +19,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useEditor } from "@/modules/editor";
 import { useFs } from "@/modules/fs/store";
 import {
 	applySelectedHunksAsync,
@@ -27,8 +28,8 @@ import {
 import { loadPatches, matchPatchByTrigger } from "@/modules/patches/loader";
 import type { Patch } from "@/modules/patches/types";
 import { cn } from "@/utils/cn";
-import { DiffReviewModal, type HunkSelection } from "./DiffReviewModal";
-import { useChatStore } from "./store";
+import { InlineDiffPreview } from "./InlineDiffPreview";
+import { type HunkSelection, useChatStore } from "./store";
 
 // Format timestamp to relative or absolute time
 function formatTime(timestamp: number): string {
@@ -48,13 +49,22 @@ function formatTime(timestamp: number): string {
 }
 
 export function ChatPane() {
-	const { messages, isLoading, addMessage, setLoading, clearMessages } =
-		useChatStore();
-	const { setFiles, revertAllChanges, getModifiedFiles, acceptAllChanges } =
-		useFs();
+	const {
+		messages,
+		isLoading,
+		addMessage,
+		setLoading,
+		clearMessages,
+		pendingChange,
+		setPendingChange,
+		startReview,
+		updateMessagePatchStatus,
+		clearMessageOriginalContents,
+	} = useChatStore();
+	const { setFiles, acceptAllChanges } = useFs();
+	const { openFile, setViewMode } = useEditor();
 	const [input, setInput] = useState("");
 	const [patches, setPatches] = useState<Patch[]>([]);
-	const [reviewingPatch, setReviewingPatch] = useState<Patch | null>(null);
 	const [showSuggestions, setShowSuggestions] = useState(true);
 	const [streamingText, setStreamingText] = useState("");
 	const [isStreaming, setIsStreaming] = useState(false);
@@ -78,7 +88,7 @@ export function ChatPane() {
 					setStreamingText("");
 					resolve();
 				}
-			}, 20);
+			}, 30);
 		});
 	}, []);
 
@@ -114,14 +124,12 @@ export function ChatPane() {
 			const responseText = `I can help you with that! ${matchedPatch.summary}`;
 			// Stream the response
 			await streamText(responseText);
-			// Add assistant message with patch
+			// Add assistant message with patch (inline preview will be shown)
 			addMessage({
 				role: "assistant",
 				content: responseText,
 				patch: matchedPatch,
 			});
-			// Open diff review modal
-			setReviewingPatch(matchedPatch);
 		} else {
 			const responseText =
 				"I don't have a pre-built solution for that yet. Try asking for 'create a react todo app' or similar requests.";
@@ -138,10 +146,11 @@ export function ChatPane() {
 	};
 
 	const handleAcceptPatch = async (
-		_selectedIndices?: Set<number>,
-		hunkSelection?: HunkSelection,
+		hunkSelection: HunkSelection,
+		messageId: string,
 	) => {
-		if (!reviewingPatch) return;
+		const patchToApply = pendingChange?.patch;
+		if (!patchToApply) return;
 
 		try {
 			// Accept any pending changes first, so this patch becomes a new checkpoint
@@ -151,12 +160,13 @@ export function ChatPane() {
 			// Get fresh filesByPath after accepting changes
 			const currentFiles = useFs.getState().filesByPath;
 			const newFilesByPath = { ...currentFiles };
+			const originalContents: Record<string, string> = {};
 			let appliedHunksCount = 0;
 			let totalHunksCount = 0;
 
 			// Process each file change
-			for (let i = 0; i < reviewingPatch.changes.length; i++) {
-				const change = reviewingPatch.changes[i];
+			for (let i = 0; i < patchToApply.changes.length; i++) {
+				const change = patchToApply.changes[i];
 				const fileHunkSelection = hunkSelection?.get(i);
 
 				// Skip if file is not selected (no hunks selected)
@@ -166,6 +176,9 @@ export function ChatPane() {
 
 				const oldContent = currentFiles[change.path]?.content || "";
 				const newContent = change.content || "";
+
+				// Save original content for revert
+				originalContents[change.path] = oldContent;
 
 				// Parse hunks for this file (async for large files)
 				const parsed = await parseHunksAsync(
@@ -187,10 +200,11 @@ export function ChatPane() {
 				switch (change.op) {
 					case "create":
 						if (hunksToApply.has(0)) {
+							// Set as "clean" with no originalContent so it can't be reverted from editor
 							newFilesByPath[change.path] = {
 								path: change.path,
 								content: newContent,
-								status: "new",
+								status: "clean",
 							};
 						}
 						break;
@@ -207,13 +221,11 @@ export function ChatPane() {
 										hunksToApply,
 									);
 
-							// Always save current content as originalContent before applying new patch
-							// This ensures revert goes back to the state before THIS patch
+							// Set as "clean" with no originalContent so it can't be reverted from editor
 							newFilesByPath[change.path] = {
-								...existing,
+								path: change.path,
 								content: finalContent,
-								status: "modified",
-								originalContent: existing.content,
+								status: "clean",
 							};
 						}
 						break;
@@ -228,7 +240,10 @@ export function ChatPane() {
 			}
 
 			setFiles(newFilesByPath);
-			setReviewingPatch(null);
+			setPendingChange(null);
+
+			// Save original contents to message for revert
+			updateMessagePatchStatus(messageId, "applied", originalContents);
 
 			// Build confirmation message
 			const message =
@@ -238,12 +253,6 @@ export function ChatPane() {
 
 			toast.success(message, {
 				description: "Check the preview on the right",
-			});
-
-			addMessage({
-				role: "assistant",
-				content: `✅ ${message} successfully! Check the preview on the right.`,
-				appliedPatch: true,
 			});
 		} catch (error) {
 			const errorMessage =
@@ -341,10 +350,22 @@ export function ChatPane() {
 							</div>
 						)}
 						{messages.map((msg, msgIndex) => {
-							// Only show revert button on the last applied patch message
-							const isLastAppliedPatch =
-								msg.appliedPatch &&
-								!messages.slice(msgIndex + 1).some((m) => m.appliedPatch);
+							// Only show revert button on the last applied patch message that has original contents
+							const isLastRevertablePatch =
+								msg.patchStatus === "applied" &&
+								msg.appliedOriginalContents &&
+								Object.keys(msg.appliedOriginalContents).length > 0 &&
+								!messages
+									.slice(msgIndex + 1)
+									.some(
+										(m) =>
+											m.patchStatus === "applied" && m.appliedOriginalContents,
+									);
+
+							// Check if this message has a pending patch to review
+							// Only show if patchStatus is "pending" (not applied or rejected)
+							const hasPendingPatch =
+								msg.patch && msg.patchStatus === "pending";
 
 							return (
 								<div
@@ -371,7 +392,7 @@ export function ChatPane() {
 									</div>
 									{/* Message */}
 									<div
-										className={`flex-1 min-w-0 ${
+										className={`flex-1 min-w-0 overflow-hidden ${
 											msg.role === "user" ? "text-right" : ""
 										}`}
 									>
@@ -395,21 +416,102 @@ export function ChatPane() {
 											>
 												{formatTime(msg.timestamp)}
 											</div>
-											{isLastAppliedPatch && getModifiedFiles().length > 0 && (
-												<button
-													type="button"
-													onClick={() => {
-														const count = getModifiedFiles().length;
-														revertAllChanges();
-														toast.success(`Reverted ${count} file(s)`);
-													}}
-													className="mt-2 flex items-center gap-1 text-[10px] px-2 py-1 bg-warning/10 hover:bg-warning/20 border border-warning/30 rounded text-warning transition-colors"
-												>
-													<RotateCcw className="h-3 w-3" />
-													Revert Changes
-												</button>
-											)}
 										</div>
+
+										{/* Inline Diff Preview for patches */}
+										{hasPendingPatch && msg.patch && (
+											<InlineDiffPreview
+												patch={msg.patch}
+												messageId={msg.id}
+												onAccept={(hunkSelection) => {
+													handleAcceptPatch(hunkSelection, msg.id);
+												}}
+												onReject={() => {
+													setPendingChange(null);
+													updateMessagePatchStatus(msg.id, "rejected");
+													toast.info("Changes rejected");
+												}}
+												onViewDiff={(fileIndex) => {
+													const filePath = msg.patch?.changes[fileIndex]?.path;
+													if (filePath && msg.patch) {
+														// Ensure pendingChange is set before starting review
+														if (!pendingChange) {
+															// Initialize with all files selected
+															const fileSelections = new Map<number, boolean>();
+															const hunkSelections = new Map<
+																number,
+																Set<number>
+															>();
+															msg.patch.changes.forEach((_, i) => {
+																fileSelections.set(i, true);
+																hunkSelections.set(i, new Set([0])); // At least one hunk
+															});
+															setPendingChange({
+																messageId: msg.id,
+																patch: msg.patch,
+																fileSelections,
+																hunkSelections,
+																status: "pending",
+															});
+														}
+														openFile(filePath);
+														setViewMode(filePath, "diff");
+														startReview(fileIndex);
+													}
+												}}
+											/>
+										)}
+
+										{/* Show status badge for processed patches */}
+										{msg.patch && msg.patchStatus === "applied" && (
+											<div className="mt-2 flex items-center gap-2">
+												<span className="text-[10px] text-success">
+													✓ Changes applied
+												</span>
+												{isLastRevertablePatch && (
+													<button
+														type="button"
+														onClick={() => {
+															// Revert files to original contents
+															const originals = msg.appliedOriginalContents;
+															if (originals) {
+																const currentFiles =
+																	useFs.getState().filesByPath;
+																const newFiles = { ...currentFiles };
+																for (const [path, content] of Object.entries(
+																	originals,
+																)) {
+																	if (content === "") {
+																		// File was new, delete it
+																		delete newFiles[path];
+																	} else {
+																		newFiles[path] = {
+																			path,
+																			content,
+																			status: "clean",
+																		};
+																	}
+																}
+																setFiles(newFiles);
+																clearMessageOriginalContents(msg.id);
+																toast.success(
+																	`Reverted ${Object.keys(originals).length} file(s)`,
+																);
+															}
+														}}
+														className="flex items-center gap-1 text-[10px] px-2 py-0.5 bg-warning/10 hover:bg-warning/20 border border-warning/30 rounded text-warning transition-colors"
+													>
+														<RotateCcw className="h-3 w-3" />
+														Revert
+													</button>
+												)}
+											</div>
+										)}
+										{msg.patch && msg.patchStatus === "rejected" && (
+											<div className="mt-2 text-[10px] text-fg-muted flex items-center gap-1">
+												<span>✗ Changes rejected</span>
+											</div>
+										)}
 									</div>
 								</div>
 							);
@@ -560,15 +662,6 @@ export function ChatPane() {
 					</p>
 				</div>
 			</div>
-
-			{/* Diff Review Modal */}
-			{reviewingPatch && (
-				<DiffReviewModal
-					patch={reviewingPatch}
-					onAccept={handleAcceptPatch}
-					onCancel={() => setReviewingPatch(null)}
-				/>
-			)}
 		</div>
 	);
 }
