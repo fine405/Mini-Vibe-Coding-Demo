@@ -7,11 +7,18 @@ import {
 	RotateCcw,
 	Send,
 	Sparkles,
+	Trash2,
 	User,
 	X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useFs } from "@/modules/fs/store";
 import {
 	applySelectedHunksAsync,
@@ -23,29 +30,70 @@ import { cn } from "@/utils/cn";
 import { DiffReviewModal, type HunkSelection } from "./DiffReviewModal";
 import { useChatStore } from "./store";
 
+// Format timestamp to relative or absolute time
+function formatTime(timestamp: number): string {
+	const now = Date.now();
+	const diff = now - timestamp;
+	const minutes = Math.floor(diff / 60000);
+	const hours = Math.floor(diff / 3600000);
+
+	if (minutes < 1) return "just now";
+	if (minutes < 60) return `${minutes}m ago`;
+	if (hours < 24) return `${hours}h ago`;
+
+	return new Date(timestamp).toLocaleTimeString([], {
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+
 export function ChatPane() {
-	const { messages, isLoading, addMessage, setLoading } = useChatStore();
+	const { messages, isLoading, addMessage, setLoading, clearMessages } =
+		useChatStore();
 	const { setFiles, revertAllChanges, getModifiedFiles, acceptAllChanges } =
 		useFs();
 	const [input, setInput] = useState("");
 	const [patches, setPatches] = useState<Patch[]>([]);
 	const [reviewingPatch, setReviewingPatch] = useState<Patch | null>(null);
 	const [showSuggestions, setShowSuggestions] = useState(true);
+	const [streamingText, setStreamingText] = useState("");
+	const [isStreaming, setIsStreaming] = useState(false);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const suggestionsScrollRef = useRef<HTMLDivElement>(null);
+
+	// Simulate streaming text output
+	const streamText = useCallback((text: string): Promise<void> => {
+		return new Promise((resolve) => {
+			setIsStreaming(true);
+			setStreamingText("");
+			let index = 0;
+			const chunkSize = 3; // Characters per tick
+			const interval = setInterval(() => {
+				if (index < text.length) {
+					setStreamingText(text.slice(0, index + chunkSize));
+					index += chunkSize;
+				} else {
+					clearInterval(interval);
+					setIsStreaming(false);
+					setStreamingText("");
+					resolve();
+				}
+			}, 20);
+		});
+	}, []);
 
 	// Load patches on mount
 	useEffect(() => {
 		loadPatches().then(setPatches);
 	}, []);
 
-	// Auto-scroll to bottom when messages change
-	// biome-ignore lint/correctness/useExhaustiveDependencies: only want to trigger on messages change
+	// Auto-scroll to bottom when messages change or streaming
+	// biome-ignore lint/correctness/useExhaustiveDependencies: only want to trigger on messages/streaming change
 	useEffect(() => {
 		if (scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
 		}
-	}, [messages]);
+	}, [messages, streamingText]);
 
 	const handleSend = async () => {
 		const trimmedInput = input.trim();
@@ -63,20 +111,26 @@ export function ChatPane() {
 		const matchedPatch = matchPatchByTrigger(patches, trimmedInput);
 
 		if (matchedPatch) {
+			const responseText = `I can help you with that! ${matchedPatch.summary}`;
+			// Stream the response
+			await streamText(responseText);
 			// Add assistant message with patch
 			addMessage({
 				role: "assistant",
-				content: `I can help you with that! ${matchedPatch.summary}`,
+				content: responseText,
 				patch: matchedPatch,
 			});
 			// Open diff review modal
 			setReviewingPatch(matchedPatch);
 		} else {
+			const responseText =
+				"I don't have a pre-built solution for that yet. Try asking for 'create a react todo app' or similar requests.";
+			// Stream the response
+			await streamText(responseText);
 			// No match found
 			addMessage({
 				role: "assistant",
-				content:
-					"I don't have a pre-built solution for that yet. Try asking for 'create a react todo app' or similar requests.",
+				content: responseText,
 			});
 		}
 
@@ -229,8 +283,29 @@ export function ChatPane() {
 	return (
 		<div className="h-full w-full flex flex-col border-r border-border-primary bg-bg-primary text-fg-primary animate-fade-in">
 			{/* Header */}
-			<div className="shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-muted border-b border-border-primary">
-				Chat
+			<div className="shrink-0 px-3 py-2 flex items-center justify-between border-b border-border-primary">
+				<span className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+					Chat
+				</span>
+				{messages.length > 0 && (
+					<TooltipProvider delayDuration={300}>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<button
+									type="button"
+									onClick={() => {
+										clearMessages();
+										toast.success("Chat cleared");
+									}}
+									className="p-1 hover:bg-bg-tertiary rounded transition-colors group"
+								>
+									<Trash2 className="h-3.5 w-3.5 text-fg-muted group-hover:text-fg-primary" />
+								</button>
+							</TooltipTrigger>
+							<TooltipContent side="bottom">Clear chat</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
+				)}
 			</div>
 
 			{/* Messages */}
@@ -310,6 +385,16 @@ export function ChatPane() {
 											<span className="whitespace-pre-wrap break-words">
 												{msg.content}
 											</span>
+											{/* Timestamp */}
+											<div
+												className={`text-[10px] mt-1 ${
+													msg.role === "user"
+														? "text-white/60"
+														: "text-fg-muted"
+												}`}
+											>
+												{formatTime(msg.timestamp)}
+											</div>
 											{isLastAppliedPatch && getModifiedFiles().length > 0 && (
 												<button
 													type="button"
@@ -329,7 +414,25 @@ export function ChatPane() {
 								</div>
 							);
 						})}
-						{isLoading && (
+						{/* Streaming message */}
+						{isStreaming && streamingText && (
+							<div className="flex gap-2.5 animate-slide-in-left">
+								<div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center bg-success/20 text-success">
+									<Bot className="h-3.5 w-3.5" />
+								</div>
+								<div className="flex-1 min-w-0">
+									<div className="inline-block text-xs rounded-lg px-3 py-2 max-w-full bg-bg-tertiary border border-border-primary text-fg-secondary rounded-bl-sm relative overflow-hidden">
+										<span className="whitespace-pre-wrap break-words">
+											{streamingText}
+											<span className="inline-block w-0.5 h-3.5 bg-fg-secondary ml-0.5 animate-pulse align-middle" />
+										</span>
+										{/* Fade gradient at the end */}
+										<span className="absolute right-0 top-0 bottom-0 w-12 bg-linear-to-l from-bg-tertiary to-transparent pointer-events-none" />
+									</div>
+								</div>
+							</div>
+						)}
+						{isLoading && !isStreaming && (
 							<div className="flex gap-2.5">
 								<div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center bg-success/20 text-success">
 									<Bot className="h-3.5 w-3.5" />
