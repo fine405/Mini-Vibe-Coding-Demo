@@ -1,16 +1,19 @@
 import { useSandpackConsole } from "@codesandbox/sandpack-react";
 import { AlertCircle, AlertTriangle, Info, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
 	CONSOLE_BRIDGE_EVENT,
 	type ConsoleBridgePayload,
 } from "./consoleBridge";
+import { useConsoleStore } from "./consoleStore";
 
 export function ConsolePanel() {
 	const { reset: sandpackReset } = useSandpackConsole({
 		resetOnPreviewRestart: true,
 	});
-	const [logs, setLogs] = useState<ConsoleBridgePayload[]>([]);
+	const logs = useConsoleStore((state) => state.logs);
+	const addLog = useConsoleStore((state) => state.addLog);
+	const clearLogs = useConsoleStore((state) => state.clearLogs);
 
 	useEffect(() => {
 		if (typeof window === "undefined") {
@@ -23,18 +26,18 @@ export function ConsolePanel() {
 				return;
 			}
 
-			setLogs((prev) => [...prev, data.payload as ConsoleBridgePayload]);
+			addLog(data.payload as ConsoleBridgePayload);
 		};
 
 		window.addEventListener("message", handleMessage);
 		return () => {
 			window.removeEventListener("message", handleMessage);
 		};
-	}, []);
+	}, [addLog]);
 
 	const handleClear = () => {
 		sandpackReset();
-		setLogs([]);
+		clearLogs();
 	};
 
 	const getLogIcon = (type: string) => {

@@ -44,5 +44,5 @@ const stateCreator = immer<ChatStore>((set) => ({
 }));
 
 export const useChatStore = create<ChatStore>()(
-	devtools(stateCreator, { name: "ChatStore" }),
+	devtools(stateCreator, { name: "chat-store" }),
 );
