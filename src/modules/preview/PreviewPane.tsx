@@ -3,8 +3,8 @@ import {
 	SandpackProvider,
 	useSandpack,
 } from "@codesandbox/sandpack-react";
-import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { Loader2, Maximize2, Minimize2, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useFs } from "@/modules/fs/store";
 import { useLayoutStore } from "@/modules/layout/store";
@@ -17,28 +17,60 @@ function SandpackConsoleBridgeListener() {
 	return null;
 }
 
-function RefreshButton() {
+function PreviewToolbar({
+	isFullscreen,
+	onToggleFullscreen,
+}: {
+	isFullscreen: boolean;
+	onToggleFullscreen: () => void;
+}) {
 	const { sandpack } = useSandpack();
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
 	const handleRefresh = useCallback(() => {
 		setIsRefreshing(true);
-		// Force a refresh by updating the client
 		sandpack.runSandpack();
 		setTimeout(() => setIsRefreshing(false), 500);
 	}, [sandpack]);
 
 	return (
-		<button
-			type="button"
-			onClick={handleRefresh}
-			className="p-1 rounded hover:bg-bg-tertiary text-fg-secondary hover:text-fg-primary transition-colors"
-			title="Refresh Preview"
-		>
-			<RefreshCw
-				className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-			/>
-		</button>
+		<div className="px-3 py-2 text-xs border-b border-border-primary flex items-center gap-2">
+			<span className="font-semibold uppercase tracking-wide text-fg-secondary">
+				Preview
+			</span>
+
+			{/* URL Bar */}
+			<div className="flex-1 flex items-center gap-1.5 px-2 py-1 bg-bg-secondary rounded border border-border-secondary text-fg-muted">
+				<div className="w-2 h-2 rounded-full bg-success/60" />
+				<span className="text-[10px] font-mono truncate">localhost:3000</span>
+			</div>
+
+			{/* Actions */}
+			<div className="flex items-center gap-0.5">
+				<button
+					type="button"
+					onClick={handleRefresh}
+					className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+					title="Refresh (⌘R)"
+				>
+					<RefreshCw
+						className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+					/>
+				</button>
+				<button
+					type="button"
+					onClick={onToggleFullscreen}
+					className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+					title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+				>
+					{isFullscreen ? (
+						<Minimize2 className="h-3.5 w-3.5" />
+					) : (
+						<Maximize2 className="h-3.5 w-3.5" />
+					)}
+				</button>
+			</div>
+		</div>
 	);
 }
 
@@ -46,6 +78,31 @@ export function PreviewPane() {
 	const { filesByPath } = useFs();
 	const { showConsole } = useLayoutStore();
 	const { resolvedTheme } = useThemeStore();
+	const [isFullscreen, setIsFullscreen] = useState(false);
+	const containerRef = useRef<HTMLDivElement>(null);
+
+	const toggleFullscreen = useCallback(() => {
+		if (!containerRef.current) return;
+
+		if (!document.fullscreenElement) {
+			containerRef.current.requestFullscreen();
+			setIsFullscreen(true);
+		} else {
+			document.exitFullscreen();
+			setIsFullscreen(false);
+		}
+	}, []);
+
+	// Listen for fullscreen changes (e.g., user presses Escape)
+	useEffect(() => {
+		const handleFullscreenChange = () => {
+			setIsFullscreen(!!document.fullscreenElement);
+		};
+		document.addEventListener("fullscreenchange", handleFullscreenChange);
+		return () => {
+			document.removeEventListener("fullscreenchange", handleFullscreenChange);
+		};
+	}, []);
 
 	const files = useMemo(
 		() =>
@@ -83,7 +140,10 @@ export function PreviewPane() {
 	}
 
 	return (
-		<div className="h-full w-full flex flex-col bg-bg-primary text-fg-primary">
+		<div
+			ref={containerRef}
+			className="h-full w-full flex flex-col bg-bg-primary text-fg-primary"
+		>
 			<SandpackProvider
 				key={sandpackKey}
 				files={files}
@@ -105,10 +165,10 @@ export function PreviewPane() {
 				className="flex-1 flex flex-col overflow-hidden"
 			>
 				<SandpackConsoleBridgeListener />
-				<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-secondary border-b border-border-primary flex items-center justify-between">
-					<span>Preview</span>
-					<RefreshButton />
-				</div>
+				<PreviewToolbar
+					isFullscreen={isFullscreen}
+					onToggleFullscreen={toggleFullscreen}
+				/>
 				<PanelGroup direction="vertical" className="flex-1 overflow-hidden">
 					<Panel defaultSize={showConsole ? 75 : 100} minSize={30}>
 						<div className="h-full overflow-hidden">
