@@ -290,7 +290,10 @@ export function ChatPane() {
 	};
 
 	return (
-		<div className="h-full w-full flex flex-col border-r border-border-primary bg-bg-primary text-fg-primary animate-fade-in">
+		<div
+			id="tour-chat-pane"
+			className="h-full w-full flex flex-col border-r border-border-primary bg-bg-primary text-fg-primary animate-fade-in"
+		>
 			{/* Header */}
 			<div className="shrink-0 px-3 py-2 flex items-center justify-between border-b border-border-primary">
 				<span className="text-xs font-semibold uppercase tracking-wide text-fg-muted">

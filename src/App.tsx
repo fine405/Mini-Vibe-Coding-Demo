@@ -1,6 +1,6 @@
 import "./App.css";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	Save,
 	FolderOpen,
@@ -43,9 +43,16 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
 import { Header } from "./components/Header";
 import { useLayoutStore } from "./modules/layout/store";
+import {
+	TourProvider,
+	TourAlertDialog,
+	tourSteps,
+	useTour,
+} from "./modules/tour";
 
-export default function App() {
+function AppContent() {
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+	const [tourDialogOpen, setTourDialogOpen] = useState(true);
 	const {
 		filesByPath,
 		saveToIndexedDB,
@@ -58,6 +65,12 @@ export default function App() {
 	const { closeAllFiles } = useEditor();
 	const { clearMessages } = useChatStore();
 	const { showChat, toggleChat, toggleConsole } = useLayoutStore();
+	const { setSteps, startTour, setIsTourCompleted } = useTour();
+
+	// Initialize tour steps
+	useEffect(() => {
+		setSteps(tourSteps);
+	}, [setSteps]);
 
 	// Dialog states
 	const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
@@ -66,6 +79,12 @@ export default function App() {
 	const [exportFormat, setExportFormat] = useState<"json" | "zip">("json");
 	const [exportProjectName, setExportProjectName] = useState("my-project");
 	const exportInputRef = useRef<HTMLInputElement>(null);
+
+	const handleStartTour = () => {
+		setIsTourCompleted(false);
+		setTourDialogOpen(false);
+		startTour();
+	};
 
 	// Define command actions
 	const commandActions: CommandAction[] = [
@@ -309,6 +328,7 @@ export default function App() {
 						onExportZip={handleExportZip}
 						onImportJSON={handleImportJSON}
 						onImportZip={handleImportZip}
+						onStartTour={handleStartTour}
 					/>
 					<div className="flex-1 overflow-hidden">
 						<PanelGroup direction="horizontal" className="h-full">
@@ -458,7 +478,21 @@ export default function App() {
 						</DialogContent>
 					</Dialog>
 				</div>
+
+				{/* Tour Welcome Dialog */}
+				<TourAlertDialog
+					isOpen={tourDialogOpen}
+					setIsOpen={setTourDialogOpen}
+				/>
 			</PersistenceLoader>
 		</ErrorBoundary>
+	);
+}
+
+export default function App() {
+	return (
+		<TourProvider>
+			<AppContent />
+		</TourProvider>
 	);
 }

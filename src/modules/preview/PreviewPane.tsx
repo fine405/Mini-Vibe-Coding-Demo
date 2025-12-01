@@ -141,6 +141,7 @@ export function PreviewPane() {
 
 	return (
 		<div
+			id="tour-preview"
 			ref={containerRef}
 			className="h-full w-full flex flex-col bg-bg-primary text-fg-primary"
 		>

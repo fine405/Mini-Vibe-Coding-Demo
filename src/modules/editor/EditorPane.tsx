@@ -182,7 +182,10 @@ export function EditorPane() {
 		isReviewingCurrentFile;
 
 	return (
-		<div className="h-full w-full flex flex-col bg-bg-primary text-fg-primary">
+		<div
+			id="tour-editor"
+			className="h-full w-full flex flex-col bg-bg-primary text-fg-primary"
+		>
 			{/* Tabs */}
 			<EditorTabs
 				openFiles={openFiles}

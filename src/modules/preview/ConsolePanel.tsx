@@ -83,6 +83,7 @@ export function ConsolePanel() {
 
 	return (
 		<div
+			id="tour-console"
 			className="h-full flex flex-col bg-bg-secondary animate-fade-in"
 			style={{ cursor: "var(--cursor-default)" }}
 		>

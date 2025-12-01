@@ -163,7 +163,10 @@ export function FileTreePane() {
 	};
 
 	return (
-		<div className="flex h-full w-full flex-col bg-bg-secondary text-fg-primary">
+		<div
+			id="tour-file-tree"
+			className="flex h-full w-full flex-col bg-bg-secondary text-fg-primary"
+		>
 			<div className="flex items-center justify-between border-b border-border-primary px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
 				<span>Files</span>
 				<div className="flex items-center gap-1">

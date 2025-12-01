@@ -6,6 +6,7 @@ import {
 	FileArchive,
 	FileJson,
 	FilePlus2,
+	HelpCircle,
 	MessageSquare,
 	TerminalSquare,
 	Upload,
@@ -32,6 +33,7 @@ interface HeaderProps {
 	onExportZip?: () => void;
 	onImportJSON?: () => void;
 	onImportZip?: () => void;
+	onStartTour?: () => void;
 }
 
 export function Header({
@@ -41,6 +43,7 @@ export function Header({
 	onExportZip,
 	onImportJSON,
 	onImportZip,
+	onStartTour,
 }: HeaderProps) {
 	const { showChat, showConsole, toggleChat, toggleConsole } = useLayoutStore();
 
@@ -140,6 +143,7 @@ export function Header({
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<button
+								id="tour-command-palette"
 								type="button"
 								onClick={onOpenCommandPalette}
 								className="flex items-center gap-2 px-2.5 py-1 rounded border border-border-primary bg-bg-secondary hover:bg-bg-tertiary transition-colors text-fg-secondary hover:text-fg-primary"
@@ -192,6 +196,26 @@ export function Header({
 
 				<div className="w-px h-4 bg-border-primary mx-2" />
 				<ThemeToggle />
+
+				{onStartTour && (
+					<>
+						<div className="w-px h-4 bg-border-primary mx-2" />
+						<TooltipProvider delayDuration={300}>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										type="button"
+										onClick={onStartTour}
+										className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+									>
+										<HelpCircle className="h-4 w-4" />
+									</button>
+								</TooltipTrigger>
+								<TooltipContent>Start Tour</TooltipContent>
+							</Tooltip>
+						</TooltipProvider>
+					</>
+				)}
 			</div>
 		</div>
 	);
