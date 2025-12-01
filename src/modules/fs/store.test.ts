@@ -16,7 +16,7 @@ describe("fs store", () => {
 
 	describe("updateFileContent", () => {
 		it("should store originalContent on first modification", () => {
-			const path = "/App.js";
+			const path = "/src/App.js";
 			const originalContent = useFs.getState().filesByPath[path].content;
 
 			useFs.getState().updateFileContent(path, "modified content");
@@ -28,7 +28,7 @@ describe("fs store", () => {
 		});
 
 		it("should not overwrite originalContent on subsequent modifications", () => {
-			const path = "/App.js";
+			const path = "/src/App.js";
 			const originalContent = useFs.getState().filesByPath[path].content;
 
 			useFs.getState().updateFileContent(path, "first modification");
@@ -42,7 +42,7 @@ describe("fs store", () => {
 
 	describe("revertFile", () => {
 		it("should restore original content and set status to clean", () => {
-			const path = "/App.js";
+			const path = "/src/App.js";
 			const originalContent = useFs.getState().filesByPath[path].content;
 
 			useFs.getState().updateFileContent(path, "modified content");
@@ -55,7 +55,7 @@ describe("fs store", () => {
 		});
 
 		it("should do nothing for clean files", () => {
-			const path = "/App.js";
+			const path = "/src/App.js";
 			const originalContent = useFs.getState().filesByPath[path].content;
 
 			useFs.getState().revertFile(path);
@@ -78,7 +78,7 @@ describe("fs store", () => {
 
 	describe("acceptAllChanges", () => {
 		it("should clear originalContent when accepting changes", () => {
-			const path = "/App.js";
+			const path = "/src/App.js";
 
 			useFs.getState().updateFileContent(path, "modified content");
 			expect(useFs.getState().filesByPath[path].originalContent).toBeDefined();
@@ -93,8 +93,8 @@ describe("fs store", () => {
 
 	describe("revertAllChanges", () => {
 		it("should revert all modified files to their original content", () => {
-			const path1 = "/App.js";
-			const path2 = "/index.js";
+			const path1 = "/src/App.js";
+			const path2 = "/src/index.js";
 			const originalContent1 = useFs.getState().filesByPath[path1].content;
 			const originalContent2 = useFs.getState().filesByPath[path2].content;
 
@@ -115,7 +115,7 @@ describe("fs store", () => {
 
 		it("should delete new files", () => {
 			useFs.getState().createFile("/new.js", "new file content");
-			useFs.getState().updateFileContent("/App.js", "modified App.js");
+			useFs.getState().updateFileContent("/src/App.js", "modified App.js");
 
 			useFs.getState().revertAllChanges();
 
@@ -123,7 +123,7 @@ describe("fs store", () => {
 		});
 
 		it("should not affect clean files", () => {
-			const path = "/App.js";
+			const path = "/src/App.js";
 			const originalContent = useFs.getState().filesByPath[path].content;
 
 			useFs.getState().revertAllChanges();
@@ -136,23 +136,23 @@ describe("fs store", () => {
 
 	describe("getModifiedFiles", () => {
 		it("should return list of modified file paths", () => {
-			useFs.getState().updateFileContent("/App.js", "modified App.js");
-			useFs.getState().updateFileContent("/index.js", "modified index.js");
+			useFs.getState().updateFileContent("/src/App.js", "modified App.js");
+			useFs.getState().updateFileContent("/src/index.js", "modified index.js");
 
 			const modifiedFiles = useFs.getState().getModifiedFiles();
 
-			expect(modifiedFiles).toContain("/App.js");
-			expect(modifiedFiles).toContain("/index.js");
+			expect(modifiedFiles).toContain("/src/App.js");
+			expect(modifiedFiles).toContain("/src/index.js");
 			expect(modifiedFiles.length).toBe(2);
 		});
 
 		it("should include new files", () => {
 			useFs.getState().createFile("/new.js", "new file content");
-			useFs.getState().updateFileContent("/App.js", "modified App.js");
+			useFs.getState().updateFileContent("/src/App.js", "modified App.js");
 
 			const modifiedFiles = useFs.getState().getModifiedFiles();
 
-			expect(modifiedFiles).toContain("/App.js");
+			expect(modifiedFiles).toContain("/src/App.js");
 			expect(modifiedFiles).toContain("/new.js");
 			expect(modifiedFiles.length).toBe(2);
 		});

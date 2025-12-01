@@ -5,24 +5,146 @@ import { clearWorkspace, loadWorkspace, saveWorkspace } from "./persistence";
 import type { VirtualFile, VirtualFileSystemState } from "./types";
 
 const INITIAL_FILES: Record<string, VirtualFile> = {
-	"/index.js": {
-		path: "/index.js",
+	"/package.json": {
+		path: "/package.json",
 		status: "clean",
-		content:
-			"import React from 'react';\n" +
-			"import { createRoot } from 'react-dom/client';\n" +
-			"import App from './App';\n" +
-			"const root = createRoot(document.getElementById('root'));\n" +
-			"root.render(<App />);\n",
+		content: `{
+  "name": "react-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
+`,
 	},
-	"/App.js": {
-		path: "/App.js",
+	"/index.html": {
+		path: "/index.html",
 		status: "clean",
-		content:
-			"import React from 'react';\n" +
-			"export default function App(){\n" +
-			"  return (<div style={{ padding: 16 }}><h1>Hello from virtual FS</h1></div>);\n" +
-			"}\n",
+		content: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+`,
+	},
+	"/src/index.js": {
+		path: "/src/index.js",
+		status: "clean",
+		content: `import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./styles.css";
+
+const root = createRoot(document.getElementById("root"));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+`,
+	},
+	"/src/App.js": {
+		path: "/src/App.js",
+		status: "clean",
+		content: `import { useState } from "react";
+
+export default function App() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div className="app">
+      <h1>Hello React</h1>
+      <div className="card">
+        <button onClick={() => setCount((c) => c + 1)}>
+          count is {count}
+        </button>
+      </div>
+      <p className="hint">
+        Edit <code>src/App.js</code> and save to see changes
+      </p>
+    </div>
+  );
+}
+`,
+	},
+	"/src/styles.css": {
+		path: "/src/styles.css",
+		status: "clean",
+		content: `:root {
+  font-family: Inter, system-ui, sans-serif;
+  line-height: 1.5;
+  color: #213547;
+  background-color: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#root {
+  padding: 2rem;
+  text-align: center;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+.card {
+  padding: 1rem;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+button:hover {
+  border-color: #646cff;
+}
+
+.hint {
+  color: #888;
+}
+
+code {
+  background: #f4f4f5;
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+}
+`,
 	},
 };
 

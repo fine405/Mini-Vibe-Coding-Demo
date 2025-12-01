@@ -88,6 +88,11 @@ export function PreviewPane() {
 					autorun: true,
 					autoReload: true,
 					bundlerURL: "https://sandpack-bundler-4bw.pages.dev",
+					activeFile: "/src/App.js",
+					visibleFiles: ["/src/App.js", "/src/index.js"],
+				}}
+				customSetup={{
+					entry: "/src/index.js",
 				}}
 				className="flex-1 flex flex-col overflow-hidden"
 			>
