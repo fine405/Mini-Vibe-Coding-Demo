@@ -4,6 +4,7 @@ import type { UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentChatMessage, ChatPane } from "@/modules/chat/ChatPane";
 import { useFs } from "@/modules/fs/store";
+import { TOUR_STEP_IDS } from "@/modules/tour/constants";
 import {
 	browserWorkspace,
 	useBrowserWorkspaceFiles,
@@ -34,6 +35,18 @@ function WorkspacePreviewProbe() {
 }
 
 describe("AgentChatMessage", () => {
+	it("exposes the chat pane as the first tour target", () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => new Promise<Response>(() => {})),
+		);
+		render(<ChatPane />);
+
+		expect(
+			screen.getByRole("region", { name: "Coding agent" }),
+		).toHaveAttribute("id", TOUR_STEP_IDS.CHAT_PANE);
+	});
+
 	it("renders streamed model text and reasoning with AI Elements", async () => {
 		const message = {
 			id: "assistant-1",

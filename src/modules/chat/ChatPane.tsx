@@ -53,6 +53,7 @@ import { resolveProviderSelection } from "@/modules/agent-chat/provider-selectio
 import { useAgentChatSessionStore } from "@/modules/agent-chat/session-store";
 import { useProviderCatalog } from "@/modules/agent-chat/use-provider-catalog";
 import type { ModelSelection } from "@/modules/providers/types";
+import { TOUR_STEP_IDS } from "@/modules/tour/constants";
 import { browserWorkspace } from "@/modules/workspace/browser";
 import { workspaceChangeSetSchema } from "@/modules/workspace/schema";
 import type {
@@ -358,7 +359,7 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 		<section
 			aria-label="Coding agent"
 			className="flex h-full min-w-0 flex-col border-r bg-background text-foreground"
-			id="tour-chat"
+			id={TOUR_STEP_IDS.CHAT_PANE}
 		>
 			<header className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
 				<div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">

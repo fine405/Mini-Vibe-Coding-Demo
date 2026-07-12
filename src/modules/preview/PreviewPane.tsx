@@ -156,6 +156,9 @@ export function PreviewPane() {
 				options={{
 					autorun: true,
 					autoReload: true,
+					bundlerTimeOut: 15_000,
+					classes: { "sp-loading": "hidden" },
+					initMode: "immediate",
 					activeFile: "/src/App.js",
 					visibleFiles: ["/src/App.js", "/src/index.js"],
 				}}

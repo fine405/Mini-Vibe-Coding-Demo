@@ -29,9 +29,20 @@ vi.mock("@codesandbox/sandpack-react", () => ({
 	}: {
 		children: React.ReactNode;
 		files: Record<string, { code: string }>;
-		options?: { bundlerURL?: string };
+		options?: {
+			bundlerTimeOut?: number;
+			bundlerURL?: string;
+			classes?: Record<string, string>;
+			initMode?: string;
+		};
 	}) => (
-		<div data-bundler-url={options?.bundlerURL} data-testid="sandpack-provider">
+		<div
+			data-bundler-timeout={options?.bundlerTimeOut}
+			data-bundler-url={options?.bundlerURL}
+			data-init-mode={options?.initMode}
+			data-loading-class={options?.classes?.["sp-loading"]}
+			data-testid="sandpack-provider"
+		>
 			{Object.entries(files).map(([path, file]) => (
 				<div key={path} data-testid={`file-${path}`}>
 					{file.code}
@@ -58,7 +69,7 @@ vi.mock("../workspace/browser", () => ({
 }));
 
 describe("Preview Refresh", () => {
-	it("uses the Sandpack default bundler", () => {
+	it("starts the Sandpack default bundler immediately with a bounded timeout", () => {
 		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue({
 			"/src/App.js": {
 				path: "/src/App.js",
@@ -69,9 +80,11 @@ describe("Preview Refresh", () => {
 
 		render(<PreviewPane />);
 
-		expect(screen.getByTestId("sandpack-provider")).not.toHaveAttribute(
-			"data-bundler-url",
-		);
+		const provider = screen.getByTestId("sandpack-provider");
+		expect(provider).not.toHaveAttribute("data-bundler-url");
+		expect(provider).toHaveAttribute("data-init-mode", "immediate");
+		expect(provider).toHaveAttribute("data-bundler-timeout", "15000");
+		expect(provider).toHaveAttribute("data-loading-class", "hidden");
 	});
 
 	it("should render preview with initial files", () => {

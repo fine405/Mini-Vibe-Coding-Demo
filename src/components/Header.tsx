@@ -1,6 +1,5 @@
 import { clsx } from "clsx";
 import {
-	ChevronDown,
 	Command,
 	Download,
 	FileArchive,
@@ -85,12 +84,11 @@ export function Header({
 									<DropdownMenuTrigger asChild>
 										<Button
 											aria-label="Import project"
-											className="gap-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
+											className="text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
 											size="icon-sm"
 											variant="ghost"
 										>
 											<Upload className="h-4 w-4" />
-											<ChevronDown className="h-3 w-3" />
 										</Button>
 									</DropdownMenuTrigger>
 								</TooltipTrigger>
@@ -115,12 +113,11 @@ export function Header({
 									<DropdownMenuTrigger asChild>
 										<Button
 											aria-label="Export project"
-											className="gap-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
+											className="text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
 											size="icon-sm"
 											variant="ghost"
 										>
 											<Download className="h-4 w-4" />
-											<ChevronDown className="h-3 w-3" />
 										</Button>
 									</DropdownMenuTrigger>
 								</TooltipTrigger>
