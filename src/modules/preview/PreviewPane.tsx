@@ -156,7 +156,6 @@ export function PreviewPane() {
 				options={{
 					autorun: true,
 					autoReload: true,
-					bundlerURL: "https://sandpack-bundler-4bw.pages.dev",
 					activeFile: "/src/App.js",
 					visibleFiles: ["/src/App.js", "/src/index.js"],
 				}}

@@ -25,11 +25,13 @@ vi.mock("@codesandbox/sandpack-react", () => ({
 	SandpackProvider: ({
 		children,
 		files,
+		options,
 	}: {
 		children: React.ReactNode;
 		files: Record<string, { code: string }>;
+		options?: { bundlerURL?: string };
 	}) => (
-		<div data-testid="sandpack-provider">
+		<div data-bundler-url={options?.bundlerURL} data-testid="sandpack-provider">
 			{Object.entries(files).map(([path, file]) => (
 				<div key={path} data-testid={`file-${path}`}>
 					{file.code}
@@ -56,6 +58,22 @@ vi.mock("../workspace/browser", () => ({
 }));
 
 describe("Preview Refresh", () => {
+	it("uses the Sandpack default bundler", () => {
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue({
+			"/src/App.js": {
+				path: "/src/App.js",
+				content: "export default function App() { return <h1>Hello</h1>; }",
+				status: "clean" as const,
+			},
+		});
+
+		render(<PreviewPane />);
+
+		expect(screen.getByTestId("sandpack-provider")).not.toHaveAttribute(
+			"data-bundler-url",
+		);
+	});
+
 	it("should render preview with initial files", () => {
 		const mockFilesByPath = {
 			"/index.js": {

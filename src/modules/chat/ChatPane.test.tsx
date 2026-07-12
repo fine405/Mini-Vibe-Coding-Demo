@@ -72,6 +72,27 @@ describe("AgentChatMessage", () => {
 		expect(screen.getByText("File not found")).toBeVisible();
 	});
 
+	it("renders finalize_changes before its input is available", () => {
+		const message = {
+			id: "assistant-tool-streaming",
+			role: "assistant",
+			parts: [
+				{
+					type: "dynamic-tool",
+					toolName: "finalize_changes",
+					toolCallId: "call-finalize-streaming",
+					state: "input-streaming",
+					input: undefined,
+				},
+			],
+		} as unknown as UIMessage;
+
+		expect(() =>
+			render(<AgentChatMessage isStreaming={true} message={message} />),
+		).not.toThrow();
+		expect(screen.getByText("Pending")).toBeVisible();
+	});
+
 	it("hands a finalized tool result through review into preview workspace state", async () => {
 		const user = userEvent.setup();
 		const before = useFs.getState().filesByPath["/src/App.js"].content;
