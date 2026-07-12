@@ -11,20 +11,22 @@ import {
 	TerminalSquare,
 	Upload,
 } from "lucide-react";
-import { useLayoutStore } from "@/modules/layout/store";
-import { ThemeToggle } from "./ThemeToggle";
+import { BrandMark } from "@/components/BrandMark";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
-} from "./ui/tooltip";
+} from "@/components/ui/tooltip";
+import { useLayoutStore } from "@/modules/layout/store";
 
 interface HeaderProps {
 	onOpenCommandPalette?: () => void;
@@ -51,11 +53,7 @@ export function Header({
 		<div className="h-10 w-full bg-bg-primary border-b border-border-primary flex items-center justify-between px-4 shrink-0 text-fg-primary">
 			<div className="flex items-center gap-3">
 				<div className="flex items-center gap-1.5">
-					<img
-						src="https://lovable.dev/icon.svg?9e0c9b5bb1bae062"
-						alt="Lovable"
-						className="h-5 w-5"
-					/>
+					<BrandMark className="size-5" />
 					<span className="text-sm font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">
 						Mini Lovable
 					</span>
@@ -67,13 +65,15 @@ export function Header({
 					<div className="flex items-center gap-1">
 						<Tooltip>
 							<TooltipTrigger asChild>
-								<button
-									type="button"
+								<Button
+									aria-label="Start a new project"
+									className="text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
 									onClick={onNewProject}
-									className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+									size="icon-sm"
+									variant="ghost"
 								>
 									<FilePlus2 className="h-4 w-4" />
-								</button>
+								</Button>
 							</TooltipTrigger>
 							<TooltipContent>Start a new project</TooltipContent>
 						</Tooltip>
@@ -83,13 +83,15 @@ export function Header({
 							<Tooltip>
 								<TooltipTrigger asChild>
 									<DropdownMenuTrigger asChild>
-										<button
-											type="button"
-											className="flex items-center gap-0.5 p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+										<Button
+											aria-label="Import project"
+											className="gap-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
+											size="icon-sm"
+											variant="ghost"
 										>
 											<Upload className="h-4 w-4" />
 											<ChevronDown className="h-3 w-3" />
-										</button>
+										</Button>
 									</DropdownMenuTrigger>
 								</TooltipTrigger>
 								<TooltipContent>Import Project</TooltipContent>
@@ -111,13 +113,15 @@ export function Header({
 							<Tooltip>
 								<TooltipTrigger asChild>
 									<DropdownMenuTrigger asChild>
-										<button
-											type="button"
-											className="flex items-center gap-0.5 p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+										<Button
+											aria-label="Export project"
+											className="gap-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
+											size="icon-sm"
+											variant="ghost"
 										>
 											<Download className="h-4 w-4" />
 											<ChevronDown className="h-3 w-3" />
-										</button>
+										</Button>
 									</DropdownMenuTrigger>
 								</TooltipTrigger>
 								<TooltipContent>Export Project</TooltipContent>
@@ -142,17 +146,19 @@ export function Header({
 					{/* Command Palette Trigger */}
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<button
+							<Button
+								aria-label="Open command palette"
+								className="h-7 gap-2 border-border-primary bg-bg-secondary px-2.5 text-fg-secondary hover:bg-bg-tertiary hover:text-fg-primary"
 								id="tour-command-palette"
-								type="button"
 								onClick={onOpenCommandPalette}
-								className="flex items-center gap-2 px-2.5 py-1 rounded border border-border-primary bg-bg-secondary hover:bg-bg-tertiary transition-colors text-fg-secondary hover:text-fg-primary"
+								size="sm"
+								variant="outline"
 							>
 								<Command className="h-3.5 w-3.5 text-fg-muted" />
 								<span className="text-xs font-medium tracking-wide">
 									Command Palette
 								</span>
-							</button>
+							</Button>
 						</TooltipTrigger>
 						<TooltipContent>Open Command Palette (⌘K)</TooltipContent>
 					</Tooltip>
@@ -161,16 +167,18 @@ export function Header({
 
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<button
-								type="button"
-								onClick={toggleChat}
+							<Button
+								aria-label="Toggle chat panel"
 								className={clsx(
-									"p-1.5 rounded hover:bg-bg-tertiary transition-colors",
+									"hover:bg-bg-tertiary",
 									showChat ? "text-fg-primary" : "text-fg-muted",
 								)}
+								onClick={toggleChat}
+								size="icon-sm"
+								variant="ghost"
 							>
 								<MessageSquare className="h-4 w-4" />
-							</button>
+							</Button>
 						</TooltipTrigger>
 						<TooltipContent>Toggle Chat Panel (⌘1)</TooltipContent>
 					</Tooltip>
@@ -179,16 +187,18 @@ export function Header({
 
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<button
-								type="button"
-								onClick={toggleConsole}
+							<Button
+								aria-label="Toggle console panel"
 								className={clsx(
-									"p-1.5 rounded hover:bg-bg-tertiary transition-colors",
+									"hover:bg-bg-tertiary",
 									showConsole ? "text-fg-primary" : "text-fg-muted",
 								)}
+								onClick={toggleConsole}
+								size="icon-sm"
+								variant="ghost"
 							>
 								<TerminalSquare className="h-4 w-4" />
-							</button>
+							</Button>
 						</TooltipTrigger>
 						<TooltipContent>Toggle Console Panel (⌘2)</TooltipContent>
 					</Tooltip>
@@ -203,13 +213,15 @@ export function Header({
 						<TooltipProvider delayDuration={300}>
 							<Tooltip>
 								<TooltipTrigger asChild>
-									<button
-										type="button"
+									<Button
+										aria-label="Start feature tour"
+										className="text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
 										onClick={onStartTour}
-										className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
+										size="icon-sm"
+										variant="ghost"
 									>
 										<HelpCircle className="h-4 w-4" />
-									</button>
+									</Button>
 								</TooltipTrigger>
 								<TooltipContent>Start Tour</TooltipContent>
 							</Tooltip>

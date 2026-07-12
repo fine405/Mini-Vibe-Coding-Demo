@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import type { OpenFile, ViewMode } from "./types";
+import type { OpenFile, ViewMode } from "@/modules/editor/types";
 
 interface EditorStore {
 	openFiles: OpenFile[];

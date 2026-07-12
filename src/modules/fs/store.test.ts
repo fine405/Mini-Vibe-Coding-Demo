@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useFs } from "./store";
+import { clearWorkspace } from "@/modules/fs/persistence";
+import { useFs } from "@/modules/fs/store";
 
 // Mock persistence module
 vi.mock("./persistence", () => ({
 	saveWorkspace: vi.fn().mockResolvedValue(undefined),
+	scheduleWorkspaceSave: vi.fn(),
 	loadWorkspace: vi.fn().mockResolvedValue(null),
 	clearWorkspace: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("fs store", () => {
-	beforeEach(() => {
+	beforeEach(async () => {
 		// Reset store to initial state
-		useFs.getState().resetFs();
+		await useFs.getState().resetFs();
 	});
 
 	describe("updateFileContent", () => {
@@ -37,6 +39,38 @@ describe("fs store", () => {
 			const file = useFs.getState().filesByPath[path];
 			expect(file.content).toBe("second modification");
 			expect(file.originalContent).toBe(originalContent);
+		});
+	});
+
+	describe("resetFs", () => {
+		it("does not resolve until durable workspace cleanup completes", async () => {
+			const path = "/src/App.js";
+			useFs.getState().updateFileContent(path, "pending reset");
+			let finishClear: (() => void) | undefined;
+			vi.mocked(clearWorkspace).mockImplementationOnce(
+				() =>
+					new Promise<void>((resolve) => {
+						finishClear = resolve;
+					}),
+			);
+			let settled = false;
+
+			const reset = useFs
+				.getState()
+				.resetFs()
+				.then(() => {
+					settled = true;
+				});
+			await Promise.resolve();
+
+			expect(settled).toBe(false);
+			expect(useFs.getState().filesByPath[path].content).toBe("pending reset");
+			finishClear?.();
+			await reset;
+			expect(settled).toBe(true);
+			expect(useFs.getState().filesByPath[path].content).toContain(
+				"Hello React",
+			);
 		});
 	});
 

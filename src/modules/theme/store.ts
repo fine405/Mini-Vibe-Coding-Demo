@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ResolvedTheme, ThemeMode, ThemeState } from "./types";
+import type {
+	ResolvedTheme,
+	ThemeMode,
+	ThemeState,
+} from "@/modules/theme/types";
 
 const THEME_STORAGE_KEY = "mini-lovable-theme";
 
@@ -23,6 +27,7 @@ const applyTheme = (theme: ResolvedTheme) => {
 	if (typeof document === "undefined") return;
 	const root = document.documentElement;
 	root.setAttribute("data-theme", theme);
+	root.classList.toggle("dark", theme === "dark");
 
 	// Update meta color-scheme for OS integration
 	root.style.colorScheme = theme;

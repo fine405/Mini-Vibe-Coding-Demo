@@ -1,8 +1,13 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import { clearWorkspace, loadWorkspace, saveWorkspace } from "./persistence";
-import type { VirtualFile, VirtualFileSystemState } from "./types";
+import {
+	clearWorkspace,
+	loadWorkspace,
+	saveWorkspace,
+	scheduleWorkspaceSave,
+} from "@/modules/fs/persistence";
+import type { VirtualFile, VirtualFileSystemState } from "@/modules/fs/types";
 
 const INITIAL_FILES: Record<string, VirtualFile> = {
 	"/package.json": {
@@ -154,7 +159,6 @@ const cloneInitialFiles = (): Record<string, VirtualFile> =>
 	);
 
 interface FsStore extends VirtualFileSystemState {
-	activeFilePath: string | null;
 	setFiles: (files: Record<string, VirtualFile>) => void;
 	updateFileContent: (path: string, content: string) => void;
 	createFile: (path: string, content?: string) => void;
@@ -162,8 +166,7 @@ interface FsStore extends VirtualFileSystemState {
 	renameFile: (oldPath: string, newPath: string) => void;
 	deleteDirectory: (dirPath: string) => void;
 	renameDirectory: (oldDirPath: string, newDirPath: string) => void;
-	resetFs: () => void;
-	setActiveFile: (path: string | null) => void;
+	resetFs: () => Promise<void>;
 	loadFromPersistence: () => Promise<boolean>;
 	saveToIndexedDB: () => Promise<void>;
 	acceptAllChanges: () => void;
@@ -174,14 +177,10 @@ interface FsStore extends VirtualFileSystemState {
 
 const stateCreator = immer<FsStore>((set) => ({
 	filesByPath: cloneInitialFiles(),
-	activeFilePath: null,
 	setFiles(files) {
 		set({ filesByPath: files });
 		// Auto-save to IndexedDB
-		saveWorkspace(files).catch(console.error);
-	},
-	setActiveFile(path) {
-		set({ activeFilePath: path });
+		scheduleWorkspaceSave(files);
 	},
 	updateFileContent(path, content) {
 		set((state) => {
@@ -210,7 +209,7 @@ const stateCreator = immer<FsStore>((set) => ({
 		});
 		// Auto-save to IndexedDB
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
 	createFile(path, content = "") {
 		set((state) => {
@@ -222,7 +221,7 @@ const stateCreator = immer<FsStore>((set) => ({
 		});
 		// Auto-save to IndexedDB
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
 	deleteFile(path) {
 		set((state) => {
@@ -232,7 +231,7 @@ const stateCreator = immer<FsStore>((set) => ({
 		});
 		// Auto-save to IndexedDB
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
 	renameFile(oldPath, newPath) {
 		set((state) => {
@@ -247,7 +246,7 @@ const stateCreator = immer<FsStore>((set) => ({
 		});
 		// Auto-save to IndexedDB
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
 	deleteDirectory(dirPath) {
 		set((state) => {
@@ -259,7 +258,7 @@ const stateCreator = immer<FsStore>((set) => ({
 			}
 		});
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
 	renameDirectory(oldDirPath, newDirPath) {
 		set((state) => {
@@ -291,12 +290,12 @@ const stateCreator = immer<FsStore>((set) => ({
 			}
 		});
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
-	resetFs() {
+	async resetFs() {
+		// Clear durable state before publishing the reset in memory.
+		await clearWorkspace();
 		set({ filesByPath: cloneInitialFiles() });
-		// Clear IndexedDB when resetting
-		clearWorkspace().catch(console.error);
 	},
 	async loadFromPersistence() {
 		try {
@@ -327,7 +326,7 @@ const stateCreator = immer<FsStore>((set) => ({
 		});
 		// Auto-save to IndexedDB
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
 	revertFile(path) {
 		set((state) => {
@@ -341,7 +340,7 @@ const stateCreator = immer<FsStore>((set) => ({
 		});
 		// Auto-save to IndexedDB
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
 	revertAllChanges() {
 		set((state) => {
@@ -363,7 +362,7 @@ const stateCreator = immer<FsStore>((set) => ({
 		});
 		// Auto-save to IndexedDB
 		const state = useFs.getState();
-		saveWorkspace(state.filesByPath).catch(console.error);
+		scheduleWorkspaceSave(state.filesByPath);
 	},
 	getModifiedFiles(): string[] {
 		const { filesByPath } = useFs.getState();

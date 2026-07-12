@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useEditor } from "./store";
+import { useEditor } from "@/modules/editor/store";
 
 describe("editor store", () => {
 	beforeEach(() => {

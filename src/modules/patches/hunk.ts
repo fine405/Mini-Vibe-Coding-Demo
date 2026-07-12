@@ -3,7 +3,7 @@ import {
 	applySelectedHunksInWorker,
 	parseHunksInWorker,
 	shouldUseWorker,
-} from "./diffWorkerManager";
+} from "@/modules/patches/diffWorkerManager";
 
 /**
  * Represents a single hunk (chunk) of changes within a file diff

@@ -1,5 +1,5 @@
-import { fuzzyMatch } from "./fuzzyMatch";
-import type { VirtualFile } from "./types";
+import { fuzzyMatch } from "@/modules/fs/fuzzyMatch";
+import type { VirtualFile } from "@/modules/fs/types";
 
 export interface TreeNode {
 	name: string;

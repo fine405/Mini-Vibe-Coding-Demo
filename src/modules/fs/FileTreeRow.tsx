@@ -8,9 +8,9 @@ import {
 	ContextMenuShortcut,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { fuzzyMatch } from "./fuzzyMatch";
-import type { TreeNode } from "./tree";
-import type { VirtualFile } from "./types";
+import { fuzzyMatch } from "@/modules/fs/fuzzyMatch";
+import type { TreeNode } from "@/modules/fs/tree";
+import type { VirtualFile } from "@/modules/fs/types";
 
 interface HighlightedTextProps {
 	text: string;
@@ -104,15 +104,10 @@ export function TreeRow({
 		return node.children?.some(checkNode) ?? false;
 	}, [node, filesByPath]);
 
-	if (isRenaming && renameValue !== node.path && renameValue === "") {
-		setRenameValue(node.path);
-	}
-
 	useEffect(() => {
 		if (isRenaming && inputRef.current) {
 			const input = inputRef.current;
 			input.focus();
-			setRenameValue(node.path);
 			const lastSlash = node.path.lastIndexOf("/");
 			const lastDot = node.path.lastIndexOf(".");
 			const filenameStart = lastSlash + 1;
@@ -122,6 +117,10 @@ export function TreeRow({
 			}, 0);
 		}
 	}, [isRenaming, node.path]);
+	const beginRename = () => {
+		setRenameValue(node.path);
+		onRename(node.path, node.isDir);
+	};
 
 	const handleClick = () => {
 		if (node.isDir) {
@@ -134,7 +133,7 @@ export function TreeRow({
 		if (e.key === "Enter" && isSelected && !isRenaming) {
 			e.preventDefault();
 			e.stopPropagation();
-			onRename(node.path, node.isDir);
+			beginRename();
 		}
 		if (e.key === "Backspace" && e.metaKey && isSelected && !isRenaming) {
 			e.preventDefault();
@@ -256,7 +255,7 @@ export function TreeRow({
 						Copy Relative Path <ContextMenuShortcut>⇧⌥⌘C</ContextMenuShortcut>
 					</ContextMenuItem>
 					<ContextMenuSeparator />
-					<ContextMenuItem onClick={() => onRename(node.path, node.isDir)}>
+					<ContextMenuItem onClick={beginRename}>
 						Rename... <ContextMenuShortcut>Enter</ContextMenuShortcut>
 					</ContextMenuItem>
 					<ContextMenuItem

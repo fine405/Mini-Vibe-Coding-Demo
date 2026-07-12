@@ -27,3 +27,12 @@ const indexedDB = {
 };
 
 global.indexedDB = indexedDB as unknown as IDBFactory;
+
+class ResizeObserverMock implements ResizeObserver {
+	disconnect() {}
+	observe() {}
+	unobserve() {}
+}
+
+global.ResizeObserver = ResizeObserverMock;
+Element.prototype.scrollIntoView = () => {};

@@ -8,7 +8,7 @@ import {
 	useState,
 } from "react";
 import { cn } from "@/lib/utils";
-import { TOUR_STORAGE_KEY } from "./constants";
+import { TOUR_STORAGE_KEY } from "@/modules/tour/constants";
 
 export interface TourStep {
 	content: ReactNode;
@@ -127,11 +127,12 @@ export function TourProvider({
 	}, [currentStep, steps]);
 
 	useEffect(() => {
-		updateElementPosition();
+		const frame = window.requestAnimationFrame(updateElementPosition);
 		window.addEventListener("resize", updateElementPosition);
 		window.addEventListener("scroll", updateElementPosition);
 
 		return () => {
+			window.cancelAnimationFrame(frame);
 			window.removeEventListener("resize", updateElementPosition);
 			window.removeEventListener("scroll", updateElementPosition);
 		};

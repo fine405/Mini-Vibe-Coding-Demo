@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { describe, expect, it, vi } from "vitest";
-import { importProjectFromZip } from "./export";
+import { importProjectFromZip } from "@/modules/fs/export";
 
 // Mock URL and document APIs for export tests
 const mockCreateObjectURL = vi.fn(() => "blob:mock-url");

@@ -6,11 +6,11 @@ import {
 import { Loader2, Maximize2, Minimize2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { useFs } from "@/modules/fs/store";
 import { useLayoutStore } from "@/modules/layout/store";
+import { ConsolePanel } from "@/modules/preview/ConsolePanel";
+import { useSandpackConsoleBridge } from "@/modules/preview/consoleBridge";
 import { useThemeStore } from "@/modules/theme/store";
-import { ConsolePanel } from "./ConsolePanel";
-import { useSandpackConsoleBridge } from "./consoleBridge";
+import { useBrowserWorkspaceFiles } from "@/modules/workspace/browser";
 
 function SandpackConsoleBridgeListener() {
 	useSandpackConsoleBridge();
@@ -75,7 +75,7 @@ function PreviewToolbar({
 }
 
 export function PreviewPane() {
-	const { filesByPath } = useFs();
+	const filesByPath = useBrowserWorkspaceFiles();
 	const { showConsole } = useLayoutStore();
 	const { resolvedTheme } = useThemeStore();
 	const [isFullscreen, setIsFullscreen] = useState(false);

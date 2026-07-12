@@ -10,4 +10,4 @@ pre-push:
     build:
       run: pnpm build
     test:
-      run: pnpm test run
+      run: pnpm test

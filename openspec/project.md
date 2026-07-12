@@ -2,125 +2,61 @@
 
 ## Purpose
 
-Mini-Lovable is a minimal "Lovable-style" AI coding surface that provides a browser-based IDE experience with:
-- **Chat-to-Code**: Left pane for chat with mocked AI that applies code patches
-- **File Tree + Editor**: Middle pane with file navigation and code editing
-- **Live Preview + Console**: Right pane with Sandpack-powered preview and console output
-
-The "AI" is fully mocked—recognized prompts trigger predefined JSON patches from `/public/patches/`. No external API calls are made.
+Mini Lovable Agent Studio 是一个浏览器内的 AI 编程工作台：真实 coding Agent、文件树、Monaco 编辑器、Sandpack 实时预览与 console 运行在同一个 TanStack Start 应用中。浏览器工作区是权威数据源；Agent 只能修改请求级 shadow workspace，并通过待审核 ChangeSet 提交结果。
 
 ## Tech Stack
 
-### Core
-- **TypeScript** ~5.9
-- **React** 19 with functional components and hooks
-- **Vite** (via rolldown-vite) for dev server and bundling
+- TypeScript 5.9、React 19、TanStack Start、Vite 8、Nitro Node runtime
+- Hono 4、Mastra 1、AI SDK 6 / `@ai-sdk/react` 3
+- AI Elements、shadcn/ui Radix base、Tailwind CSS 4
+- Zustand、Immer、IndexedDB
+- Monaco、Sandpack、`diff`
+- Vitest、Testing Library、jsdom
 
-### UI & Styling
-- **Tailwind CSS** v4 with `@tailwindcss/vite` plugin
-- **Radix UI** for accessible primitives (Dialog, ScrollArea)
-- **Lucide React** for icons
-- **clsx** + **tailwind-merge** for conditional class composition
-- **react-resizable-panels** for the 3-pane layout
-- **sonner** for toast notifications
-- **cmdk** for command palette
+运行时要求 Node.js `>=22.13.0`，包管理器为 pnpm。
 
-### State Management
-- **Zustand** for global state (file system, patches)
-- **Immer** for immutable state updates
+## Architecture
 
-### Editor & Preview
-- **@codesandbox/sandpack-react** for in-browser bundling and preview
-- **react-diff-view** + **diff** library for diff visualization
+- `src/routes/`：Start 文档壳、client-only IDE 路由、`/api/*` catch-all。
+- `src/server/providers/`：server-only Provider allowlist 与环境配置。
+- `src/server/agent/`：Mastra coding Agent、工具和 request-scoped `RunWorkspace`。
+- `src/modules/workspace/`：snapshot / preview / atomic apply / undo 深模块。
+- `src/modules/agent-chat/`：Provider 选择、hunk selection 与 ChangeSet review。
+- `src/modules/chat/`：AI SDK `useChat` 与 AI Elements 渲染。
+- `src/modules/fs/`：浏览器虚拟文件系统和 v2 IndexedDB 持久化。
 
-### Testing
-- **Vitest** for unit tests
-- **@testing-library/react** + **@testing-library/jest-dom** for component testing
-- **jsdom** as test environment
+## Domain Rules
 
-### Code Quality
-- **Biome** for formatting and linting (primary)
-- **ESLint** with TypeScript and React plugins
-- **Lefthook** for git hooks (pre-commit: biome check, pre-push: test + build)
+### Workspace
 
-### Package Manager
-- **pnpm** with lockfile
+- 浏览器文件和 IndexedDB 是权威项目状态；服务端不持久化项目。
+- Agent 快照带 deterministic revision 与逐文件 hash，并过滤 secret、binary、blocked/oversized paths。
+- ChangeSet 支持 create/update/delete；应用前先验证全部选择，任何冲突都必须原子失败。
+- UI 不得直接拼装替换文件 map；变更只能通过 `Workspace.apply()`，撤销通过 transaction ID。
 
-## Project Conventions
+### Agent
 
-### Code Style
-- **Formatting**: Biome handles formatting; run `pnpm format` to auto-fix
-- **Naming**: 
-  - PascalCase for components and types
-  - camelCase for functions, variables, hooks
-  - kebab-case for file names (except components which use PascalCase)
-- **Imports**: Absolute imports not configured; use relative paths
-- **Components**: Functional components only; no class components
-- **Hooks**: Custom hooks in `src/hooks/`, prefixed with `use`
+- 每次请求创建隔离 `RunWorkspace`。
+- 工具为 list/read/search/write/delete/finalize；现有文件必须 read-before-write/delete。
+- 没有 shell、任意网络、部署、宿主文件系统工具。
+- `finalize_changes` 只产生待审核 ChangeSet，不能直接提交浏览器工作区。
+- 默认最多 12 步，客户端停止和 120 秒超时均通过 abort signal 传入模型执行。
 
-### Architecture Patterns
-- **Module-based structure**: Domain logic organized under `src/modules/`
-  - `fs/` — Virtual file system, persistence, file tree UI
-  - `patches/` — Patch loading, application, and types
-  - `chat/` — Chat UI and trigger-to-patch mapping
-  - `preview/` — Sandpack wrapper and console bridge
-  - `editor/` — Editor components (tabs, diff)
-- **Shared components**: Generic UI in `src/components/`
-- **State colocation**: Zustand stores live alongside their modules (e.g., `fs/store.tsx`)
-- **Pure patch engine**: Patch application logic is pure and testable; UI just sends inputs and renders results
+### Providers
 
-### Testing Strategy
-- **Unit tests**: Colocated with source files (e.g., `apply.test.ts` next to `apply.ts`)
-- **Minimum coverage**: At least 3 tests covering patch application, persistence, and preview refresh
-- **Test runner**: `pnpm test` (Vitest in watch mode), `pnpm test run` for CI
-- **Pre-push hook**: Tests must pass before push
+- OpenAI、Qwen、DeepSeek、Anthropic、Google、Moonshot、xAI、OpenRouter 始终出现在公开目录。
+- Key 只从服务端环境按请求读取；公开 API 只能返回 `configured`、缺少的变量名和公开模型描述。
+- 模型 ID 必须通过服务端 allowlist；浏览器只持久化 Provider/模型 ID。
 
-### Git Workflow
-- **Hooks**: Lefthook manages pre-commit (biome check + auto-fix) and pre-push (lint, test, build)
-- **Commits**: Keep commits atomic and descriptive
-- **Branches**: Feature branches merged via PR
+## Conventions
 
-## Domain Context
+- 使用 `@/` 绝对导入；组件 PascalCase，函数/变量 camelCase。
+- shadcn/AI Elements registry 源码保留在 `src/components/`，不使用 `@ts-nocheck`。
+- 领域测试与源码 colocate；`pnpm check` 依次运行 typecheck、lint、test、build。
+- Provider key、prompt 和文件内容默认不得写入日志；结构化日志只记录请求 ID、Provider/模型、时长、步骤、usage 和错误类别。
 
-### Virtual File System
-- Files are stored in-memory and persisted to IndexedDB
-- Each file tracks: `path`, `content`, `status` (new/modified/unchanged)
-- No real filesystem access; everything runs in the browser
+## Deployment and Security
 
-### Patch System
-- Patches are JSON files in `/public/patches/` with structure:
-  ```json
-  {
-    "id": "patch-id",
-    "trigger": "user prompt substring",
-    "summary": "Description of changes",
-    "changes": [
-      { "op": "create", "path": "file.tsx", "content": "..." },
-      { "op": "update", "path": "file.tsx", "patch": { ... } },
-      { "op": "delete", "path": "file.tsx" }
-    ]
-  }
-  ```
-- Operations: `create`, `update`, `delete`
-- Updates can be whole-file replacement or range-replace
-
-### Diff Review Flow
-1. User sends chat message
-2. If message contains a known trigger, load corresponding patch
-3. Show Diff Review modal with changes
-4. User can Accept All or Revert per file
-5. Accepted changes update the virtual FS and refresh preview
-
-## Important Constraints
-
-- **No backend**: Everything runs client-side in the browser
-- **No external AI calls**: AI is fully mocked via local JSON patches
-- **Browser storage**: Persistence via IndexedDB; no server-side storage
-- **Performance target**: Patch apply for ~100KB file in <500ms
-- **Timebox**: Project scoped for 6-8 hours of focused work
-
-## External Dependencies
-
-- **Sandpack**: In-browser bundler for live preview (no external service)
-- **IndexedDB**: Browser API for persistence (no external database)
-- **No API keys required**: Fully self-contained
+- `pnpm build` 输出 Nitro Node server 到 `.output/server/index.mjs`，`pnpm start` 启动。
+- 公开互联网部署前必须增加认证、用户级限流和配额；当前阶段面向本地或受控可信环境。
+- 保持同源 API，拒绝显式 cross-site 请求；聊天请求和 Agent 快照有独立大小限制。

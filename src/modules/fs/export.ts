@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import type { VirtualFile } from "./types";
+import type { VirtualFile } from "@/modules/fs/types";
 
 /**
  * Project export format

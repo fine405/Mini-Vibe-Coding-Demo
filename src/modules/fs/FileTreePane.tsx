@@ -9,20 +9,16 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { useEditor } from "@/modules/editor";
-import { TreeRow } from "./FileTreeRow";
-import { useFs } from "./store";
-import { buildTree, filterTree } from "./tree";
+import { useEditor } from "@/modules/editor/store";
+import { TreeRow } from "@/modules/fs/FileTreeRow";
+import { buildTree, filterTree } from "@/modules/fs/tree";
+import {
+	browserWorkspace,
+	useBrowserWorkspaceFiles,
+} from "@/modules/workspace/browser";
 
 export function FileTreePane() {
-	const {
-		filesByPath,
-		createFile,
-		deleteFile,
-		renameFile,
-		deleteDirectory,
-		renameDirectory,
-	} = useFs();
+	const filesByPath = useBrowserWorkspaceFiles();
 
 	const {
 		openFile,
@@ -91,9 +87,15 @@ export function FileTreePane() {
 			setNewFileError("File already exists");
 			return;
 		}
-		createFile(trimmedPath, "// New file\n");
-		openFile(trimmedPath);
-		handleNewFileDialogChange(false);
+		void browserWorkspace
+			.createFile(trimmedPath, "// New file\n")
+			.then(() => {
+				openFile(trimmedPath);
+				handleNewFileDialogChange(false);
+			})
+			.catch((error: unknown) => {
+				setNewFileError(workspaceErrorMessage(error));
+			});
 	};
 
 	const handleRename = (path: string, isDir: boolean) => {
@@ -121,17 +123,25 @@ export function FileTreePane() {
 				alert("A directory or file with that path already exists");
 				return;
 			}
-			renameDirectory(oldPath, newPath);
-			// Update open tabs for files inside the renamed directory
-			renameOpenFilesInDirectory(oldPath, newPath);
+			void browserWorkspace
+				.renameDirectory(oldPath, newPath)
+				.then(() => {
+					// Update open tabs for files inside the renamed directory
+					renameOpenFilesInDirectory(oldPath, newPath);
+				})
+				.catch((error: unknown) => alert(workspaceErrorMessage(error)));
 		} else {
 			if (filesByPath[newPath]) {
 				alert("A file with that path already exists");
 				return;
 			}
-			renameFile(oldPath, newPath);
-			// Update the tab for the renamed file
-			renameOpenFile(oldPath, newPath);
+			void browserWorkspace
+				.renameFile(oldPath, newPath)
+				.then(() => {
+					// Update the tab for the renamed file
+					renameOpenFile(oldPath, newPath);
+				})
+				.catch((error: unknown) => alert(workspaceErrorMessage(error)));
 		}
 	};
 
@@ -145,21 +155,20 @@ export function FileTreePane() {
 	};
 
 	const confirmDelete = () => {
-		if (fileToDelete) {
-			if (isDeleteDir) {
-				deleteDirectory(fileToDelete);
-				// Close all open files inside the deleted directory
-				closeFilesInDirectory(fileToDelete);
-			} else {
-				deleteFile(fileToDelete);
-				if (activeFilePath === fileToDelete) {
-					closeFile(fileToDelete);
-				}
-			}
-		}
-		setDeleteDialogOpen(false);
-		setFileToDelete(null);
-		setIsDeleteDir(false);
+		if (!fileToDelete) return;
+		const path = fileToDelete;
+		const mutation = isDeleteDir
+			? browserWorkspace.deleteDirectory(path)
+			: browserWorkspace.deleteFile(path);
+		void mutation
+			.then(() => {
+				if (isDeleteDir) closeFilesInDirectory(path);
+				else if (activeFilePath === path) closeFile(path);
+				setDeleteDialogOpen(false);
+				setFileToDelete(null);
+				setIsDeleteDir(false);
+			})
+			.catch((error: unknown) => alert(workspaceErrorMessage(error)));
 	};
 
 	return (
@@ -331,4 +340,8 @@ export function FileTreePane() {
 			</Dialog>
 		</div>
 	);
+}
+
+function workspaceErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : "Workspace mutation failed";
 }

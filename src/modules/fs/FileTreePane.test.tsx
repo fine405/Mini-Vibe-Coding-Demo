@@ -1,31 +1,34 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { FileTreePane } from "./FileTreePane";
+import { FileTreePane } from "@/modules/fs/FileTreePane";
 
 // Mock dependencies
-vi.mock("./store", () => ({
-	useFs: () => ({
-		filesByPath: {
-			"/src/index.ts": { content: "", path: "/src/index.ts" },
-			"/src/components/Button.tsx": {
-				content: "",
-				path: "/src/components/Button.tsx",
-			},
+vi.mock("@/modules/workspace/browser", () => ({
+	useBrowserWorkspaceFiles: () => ({
+		"/src/index.ts": { content: "", path: "/src/index.ts" },
+		"/src/components/Button.tsx": {
+			content: "",
+			path: "/src/components/Button.tsx",
 		},
+	}),
+	browserWorkspace: {
 		createFile: vi.fn(),
 		deleteFile: vi.fn(),
 		renameFile: vi.fn(),
-		setFiles: vi.fn(),
-		resetFs: vi.fn(),
-	}),
+		deleteDirectory: vi.fn(),
+		renameDirectory: vi.fn(),
+	},
 }));
 
-vi.mock("@/modules/editor", () => ({
+vi.mock("@/modules/editor/store", () => ({
 	useEditor: () => ({
 		openFile: vi.fn(),
 		activeFilePath: "/src/index.ts",
 		closeAllFiles: vi.fn(),
 		closeFile: vi.fn(),
+		closeFilesInDirectory: vi.fn(),
+		renameOpenFile: vi.fn(),
+		renameOpenFilesInDirectory: vi.fn(),
 	}),
 }));
 

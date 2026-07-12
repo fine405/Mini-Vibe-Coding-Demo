@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import type { ConsoleBridgePayload } from "./consoleBridge";
+import type { ConsoleBridgePayload } from "@/modules/preview/consoleBridge";
 
 interface ConsoleState {
 	logs: ConsoleBridgePayload[];

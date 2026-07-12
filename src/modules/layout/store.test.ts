@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { useLayoutStore } from "./store";
+import { useLayoutStore } from "@/modules/layout/store";
 
 describe("Layout Store", () => {
 	it("should toggle chat visibility", () => {

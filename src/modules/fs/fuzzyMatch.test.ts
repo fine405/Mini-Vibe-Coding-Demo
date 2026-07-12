@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fuzzyFilter, fuzzyMatch } from "./fuzzyMatch";
+import { fuzzyFilter, fuzzyMatch } from "@/modules/fs/fuzzyMatch";
 
 describe("fuzzyMatch", () => {
 	it("should match exact strings", () => {

@@ -1,8 +1,5 @@
 import { FileCode2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useEditor } from "@/modules/editor";
-import { fuzzyMatch } from "@/modules/fs/fuzzyMatch";
-import { useFs } from "@/modules/fs/store";
+import { useState } from "react";
 import {
 	Command,
 	CommandEmpty,
@@ -12,8 +9,11 @@ import {
 	CommandList,
 	CommandSeparator,
 	CommandShortcut,
-} from "./ui/command";
-import { Dialog, DialogContent } from "./ui/dialog";
+} from "@/components/ui/command";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useEditor } from "@/modules/editor/store";
+import { fuzzyMatch } from "@/modules/fs/fuzzyMatch";
+import { useBrowserWorkspaceFiles } from "@/modules/workspace/browser";
 
 export interface CommandAction {
 	id: string;
@@ -37,16 +37,9 @@ export function CommandPalette({
 	onClose,
 	customActions = [],
 }: CommandPaletteProps) {
-	const { filesByPath } = useFs();
+	const filesByPath = useBrowserWorkspaceFiles();
 	const { openFile } = useEditor();
 	const [search, setSearch] = useState("");
-
-	// Reset search when dialog closes
-	useEffect(() => {
-		if (!isOpen) {
-			setSearch("");
-		}
-	}, [isOpen]);
 
 	// Get all files for "Open File" action
 	const files = Object.values(filesByPath);
@@ -81,11 +74,17 @@ export function CommandPalette({
 
 	const handleSelect = (callback: () => void) => {
 		callback();
+		setSearch("");
+		onClose();
+	};
+	const handleOpenChange = (open: boolean) => {
+		if (open) return;
+		setSearch("");
 		onClose();
 	};
 
 	return (
-		<Dialog open={isOpen} onOpenChange={onClose}>
+		<Dialog open={isOpen} onOpenChange={handleOpenChange}>
 			<DialogContent className="overflow-hidden p-0 shadow-lg bg-bg-secondary text-fg-primary border-border-primary">
 				<Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-fg-muted [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
 					<CommandInput

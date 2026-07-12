@@ -1,4 +1,4 @@
-export { TOUR_STEP_IDS, TOUR_STORAGE_KEY } from "./constants";
-export { tourSteps } from "./steps";
-export { TourProvider, type TourStep, useTour } from "./Tour";
-export { TourAlertDialog } from "./TourAlertDialog";
+export { TOUR_STEP_IDS, TOUR_STORAGE_KEY } from "@/modules/tour/constants";
+export { tourSteps } from "@/modules/tour/steps";
+export { TourProvider, type TourStep, useTour } from "@/modules/tour/Tour";
+export { TourAlertDialog } from "@/modules/tour/TourAlertDialog";

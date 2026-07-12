@@ -1,9 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { useFs } from "../fs/store";
-import type { VirtualFile } from "../fs/types";
-import { PreviewPane } from "./PreviewPane";
+import { PreviewPane } from "@/modules/preview/PreviewPane";
+import { useBrowserWorkspaceFiles } from "@/modules/workspace/browser";
 
 beforeAll(() => {
 	Object.defineProperty(window, "matchMedia", {
@@ -51,16 +50,10 @@ vi.mock("@codesandbox/sandpack-react", () => ({
 	}),
 }));
 
-// Mock FS store
-vi.mock("../fs/store", () => ({
-	useFs: vi.fn(),
+// Mock the browser Workspace read interface
+vi.mock("../workspace/browser", () => ({
+	useBrowserWorkspaceFiles: vi.fn(),
 }));
-
-function mockFsState(filesByPath: Record<string, VirtualFile>) {
-	return {
-		filesByPath,
-	} as unknown as ReturnType<typeof useFs>;
-}
 
 describe("Preview Refresh", () => {
 	it("should render preview with initial files", () => {
@@ -72,7 +65,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue(mockFsState(mockFilesByPath));
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue(mockFilesByPath);
 
 		render(<PreviewPane />);
 
@@ -91,7 +84,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue(mockFsState(mockFilesByPath));
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue(mockFilesByPath);
 
 		const { rerender } = render(<PreviewPane />);
 
@@ -106,7 +99,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue(mockFsState(updatedFilesByPath));
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue(updatedFilesByPath);
 
 		rerender(<PreviewPane />);
 
@@ -132,7 +125,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue(mockFsState(mockFilesByPath));
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue(mockFilesByPath);
 
 		render(<PreviewPane />);
 
@@ -150,7 +143,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue(mockFsState(initialFiles));
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue(initialFiles);
 
 		const { rerender } = render(<PreviewPane />);
 
@@ -166,7 +159,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue(mockFsState(updatedFiles));
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue(updatedFiles);
 
 		rerender(<PreviewPane />);
 
@@ -190,7 +183,7 @@ describe("Preview Refresh", () => {
 			},
 		};
 
-		vi.mocked(useFs).mockReturnValue(mockFsState(initialFiles));
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue(initialFiles);
 
 		const { rerender } = render(<PreviewPane />);
 
@@ -201,7 +194,7 @@ describe("Preview Refresh", () => {
 			"/index.js": initialFiles["/index.js"],
 		};
 
-		vi.mocked(useFs).mockReturnValue(mockFsState(updatedFiles));
+		vi.mocked(useBrowserWorkspaceFiles).mockReturnValue(updatedFiles);
 
 		rerender(<PreviewPane />);
 

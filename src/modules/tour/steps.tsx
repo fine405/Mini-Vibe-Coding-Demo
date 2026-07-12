@@ -6,8 +6,8 @@ import {
 	MessageSquare,
 	Terminal,
 } from "lucide-react";
-import { TOUR_STEP_IDS } from "./constants";
-import type { TourStep } from "./Tour";
+import { TOUR_STEP_IDS } from "@/modules/tour/constants";
+import type { TourStep } from "@/modules/tour/Tour";
 
 export const tourSteps: TourStep[] = [
 	{
@@ -20,9 +20,8 @@ export const tourSteps: TourStep[] = [
 					<h3 className="font-semibold text-fg-primary">Chat Pane</h3>
 				</div>
 				<p className="text-sm text-fg-secondary leading-relaxed">
-					Send messages here to trigger AI code patches. Try typing "add
-					filters" or "add localstorage" to see the AI apply changes to your
-					code.
+					Ask the coding agent for a feature, refactor, or bug fix. It works in
+					an isolated copy and returns file and hunk changes for your approval.
 				</p>
 			</div>
 		),
@@ -53,8 +52,8 @@ export const tourSteps: TourStep[] = [
 					<h3 className="font-semibold text-fg-primary">Code Editor</h3>
 				</div>
 				<p className="text-sm text-fg-secondary leading-relaxed">
-					View and edit your code here. When AI patches are applied, you'll see
-					a diff view showing the changes before accepting them.
+					View and edit your code here. Accepted agent changes remain visible as
+					local modifications until you mark them clean or undo them.
 				</p>
 			</div>
 		),

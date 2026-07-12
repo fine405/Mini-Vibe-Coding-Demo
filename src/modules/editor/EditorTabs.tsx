@@ -5,7 +5,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { OpenFile } from "./types";
+import type { OpenFile } from "@/modules/editor/types";
 
 interface EditorTabsProps {
 	openFiles: OpenFile[];

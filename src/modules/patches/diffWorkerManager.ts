@@ -8,8 +8,8 @@ import type {
 	ParseHunksPayload,
 	WorkerRequest,
 	WorkerResponse,
-} from "./diff.worker";
-import type { ParsedHunks } from "./hunk";
+} from "@/modules/patches/diff.worker";
+import type { ParsedHunks } from "@/modules/patches/hunk";
 
 // Threshold for using worker (50KB or 1000 lines)
 const WORKER_SIZE_THRESHOLD = 50 * 1024; // 50KB

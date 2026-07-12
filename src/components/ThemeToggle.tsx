@@ -1,5 +1,6 @@
 import { Laptop, Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useThemeStore } from "@/modules/theme/store";
 import type { ThemeMode } from "@/modules/theme/types";
@@ -22,12 +23,13 @@ export function ThemeToggle() {
 		MODE_SEQUENCE[(MODE_SEQUENCE.indexOf(mode) + 1) % MODE_SEQUENCE.length];
 
 	return (
-		<button
-			type="button"
-			onClick={() => setMode(nextMode)}
-			className="relative flex h-9 w-9 items-center justify-center rounded-full text-fg-secondary  transition-all duration-300 hover:text-fg-primary"
-			title={`Switch theme (current: ${MODE_LABELS[mode]})`}
+		<Button
 			aria-label={`Switch theme, current ${MODE_LABELS[mode]}, next ${MODE_LABELS[nextMode]}`}
+			className="relative flex h-9 w-9 items-center justify-center rounded-full text-fg-secondary  transition-all duration-300 hover:text-fg-primary"
+			onClick={() => setMode(nextMode)}
+			size="icon"
+			title={`Switch theme (current: ${MODE_LABELS[mode]})`}
+			variant="ghost"
 		>
 			<span className="flex h-6 w-6 items-center justify-center rounded-full bg-bg-primary/70">
 				<span
@@ -43,6 +45,6 @@ export function ThemeToggle() {
 					{MODE_ICONS[mode]}
 				</span>
 			</span>
-		</button>
+		</Button>
 	);
 }

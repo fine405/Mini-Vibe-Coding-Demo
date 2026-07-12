@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { useFs } from "@/modules/fs/store";
+import { BrandMark } from "@/components/BrandMark";
+import { installWorkspacePersistenceFlush } from "@/modules/fs/persistence";
+import { browserWorkspace } from "@/modules/workspace/browser";
 
 type LoadingPhase = "loading" | "transitioning" | "done";
 
@@ -14,13 +16,14 @@ const HEADER_LOGO_SIZE = 20; // Header logo size
  * Component that loads persisted workspace on mount with animated transition
  */
 export function PersistenceLoader({ children }: { children: React.ReactNode }) {
-	const { loadFromPersistence } = useFs();
 	const [phase, setPhase] = useState<LoadingPhase>("loading");
+
+	useEffect(() => installWorkspacePersistenceFlush(), []);
 
 	useEffect(() => {
 		const loadData = async () => {
 			try {
-				const loaded = await loadFromPersistence();
+				const loaded = await browserWorkspace.load();
 				if (loaded) {
 					console.log("✅ Workspace loaded from IndexedDB");
 				} else {
@@ -43,7 +46,7 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 		};
 
 		loadData();
-	}, [loadFromPersistence]);
+	}, []);
 
 	return (
 		<>
@@ -90,10 +93,10 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 						</motion.div>
 
 						{/* Logo that flies to header */}
-						<motion.img
-							src="https://lovable.dev/icon.svg?9e0c9b5bb1bae062"
-							alt="Lovable"
+						<motion.div
+							aria-label="Mini Lovable"
 							className="z-30"
+							role="img"
 							style={{
 								position: "fixed",
 								width: phase === "transitioning" ? HEADER_LOGO_SIZE : LOGO_SIZE,
@@ -122,7 +125,9 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 									ease: "easeInOut",
 								},
 							}}
-						/>
+						>
+							<BrandMark className="size-full" />
+						</motion.div>
 
 						{/* Loading content */}
 						<motion.div

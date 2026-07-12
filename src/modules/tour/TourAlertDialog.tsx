@@ -1,4 +1,6 @@
 import { motion } from "framer-motion";
+import { BrandMark } from "@/components/BrandMark";
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -6,7 +8,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { useTour } from "./Tour";
+import { useTour } from "@/modules/tour/Tour";
 
 interface TourAlertDialogProps {
 	isOpen: boolean;
@@ -42,11 +44,7 @@ export function TourAlertDialog({ isOpen, setIsOpen }: TourAlertDialogProps) {
 							animate={{ scale: 1, opacity: 1 }}
 							transition={{ duration: 0.3, ease: "easeOut" }}
 						>
-							<img
-								src="https://lovable.dev/icon.svg?9e0c9b5bb1bae062"
-								alt="Lovable"
-								className="h-16 w-16"
-							/>
+							<BrandMark className="size-16" />
 						</motion.div>
 					</div>
 					<DialogTitle className="text-center text-xl font-medium">
@@ -58,20 +56,16 @@ export function TourAlertDialog({ isOpen, setIsOpen }: TourAlertDialogProps) {
 					</DialogDescription>
 				</DialogHeader>
 				<div className="mt-6 space-y-3">
-					<button
-						type="button"
-						onClick={handleStart}
-						className="w-full px-4 py-2.5 text-sm rounded-md bg-accent hover:bg-accent-hover text-white font-medium transition-colors"
-					>
+					<Button onClick={handleStart} className="h-10 w-full">
 						Start Tour
-					</button>
-					<button
-						type="button"
+					</Button>
+					<Button
 						onClick={handleSkip}
-						className="w-full px-4 py-2.5 text-sm rounded-md bg-bg-tertiary hover:bg-bg-secondary text-fg-secondary transition-colors"
+						className="h-10 w-full"
+						variant="secondary"
 					>
 						Skip Tour
-					</button>
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>

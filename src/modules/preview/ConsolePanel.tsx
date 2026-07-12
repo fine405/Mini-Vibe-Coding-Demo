@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import {
 	CONSOLE_BRIDGE_EVENT,
 	type ConsoleBridgePayload,
-} from "./consoleBridge";
-import { useConsoleStore } from "./consoleStore";
+} from "@/modules/preview/consoleBridge";
+import { useConsoleStore } from "@/modules/preview/consoleStore";
 
 export function ConsolePanel() {
 	const { reset: sandpackReset } = useSandpackConsole({

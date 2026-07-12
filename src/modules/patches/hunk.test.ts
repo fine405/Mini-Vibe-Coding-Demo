@@ -7,7 +7,7 @@ import {
 	type Hunk,
 	parseHunks,
 	parseHunksAsync,
-} from "./hunk";
+} from "@/modules/patches/hunk";
 
 describe("parseHunks", () => {
 	it("should parse create operation as single hunk", () => {
