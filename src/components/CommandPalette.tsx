@@ -1,3 +1,4 @@
+import { defaultFilter } from "cmdk";
 import { FileCode2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -62,6 +63,15 @@ export function CommandPalette({
 	// Group custom actions by group
 	const groupedActions = customActions.reduce(
 		(acc, action) => {
+			const actionText = [
+				action.label,
+				action.description,
+				action.shortcut,
+			].join(" ");
+			if (search && defaultFilter(actionText, search, action.keywords) === 0) {
+				return acc;
+			}
+
 			const group = action.group || "Actions";
 			if (!acc[group]) {
 				acc[group] = [];
@@ -82,11 +92,47 @@ export function CommandPalette({
 		setSearch("");
 		onClose();
 	};
+	const fileResults = sortedFiles.length > 0 && (
+		<>
+			{customActions.length > 0 && (
+				<CommandSeparator className="bg-border-primary" />
+			)}
+			<CommandGroup heading="Files">
+				{sortedFiles.slice(0, 10).map((file) => (
+					<CommandItem
+						key={file.path}
+						onSelect={() => handleSelect(() => openFile(file.path))}
+						className="data-[selected=true]:bg-bg-tertiary data-[selected=true]:text-fg-primary"
+					>
+						<FileCode2 className="mr-2 h-4 w-4" />
+						<span className="flex-1 truncate">{file.path}</span>
+						{file.status !== "clean" && (
+							<span
+								className={`text-xs ${
+									file.status === "new" ? "text-success" : "text-accent"
+								}`}
+							>
+								{file.status === "new" ? "New" : "Modified"}
+							</span>
+						)}
+					</CommandItem>
+				))}
+				{sortedFiles.length > 10 && (
+					<div className="px-2 py-1.5 text-xs text-fg-muted">
+						+{sortedFiles.length - 10} more files
+					</div>
+				)}
+			</CommandGroup>
+		</>
+	);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={handleOpenChange}>
 			<DialogContent className="overflow-hidden p-0 shadow-lg bg-bg-secondary text-fg-primary border-border-primary">
-				<Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-fg-muted [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+				<Command
+					shouldFilter={false}
+					className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-fg-muted [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
+				>
 					<CommandInput
 						placeholder="Type a command or search..."
 						value={search}
@@ -98,7 +144,7 @@ export function CommandPalette({
 							No results found.
 						</CommandEmpty>
 
-						{/* Custom Action Groups */}
+						{search && fileResults}
 						{Object.entries(groupedActions).map(([groupName, actions]) => (
 							<CommandGroup key={groupName} heading={groupName}>
 								{actions.map((action) => (
@@ -125,43 +171,7 @@ export function CommandPalette({
 								))}
 							</CommandGroup>
 						))}
-
-						{/* Files */}
-						{sortedFiles.length > 0 && (
-							<>
-								{customActions.length > 0 && (
-									<CommandSeparator className="bg-border-primary" />
-								)}
-								<CommandGroup heading="Files">
-									{sortedFiles.slice(0, 10).map((file) => (
-										<CommandItem
-											key={file.path}
-											onSelect={() => handleSelect(() => openFile(file.path))}
-											className="data-[selected=true]:bg-bg-tertiary data-[selected=true]:text-fg-primary"
-										>
-											<FileCode2 className="mr-2 h-4 w-4" />
-											<span className="flex-1 truncate">{file.path}</span>
-											{file.status !== "clean" && (
-												<span
-													className={`text-xs ${
-														file.status === "new"
-															? "text-success"
-															: "text-accent"
-													}`}
-												>
-													{file.status === "new" ? "New" : "Modified"}
-												</span>
-											)}
-										</CommandItem>
-									))}
-									{sortedFiles.length > 10 && (
-										<div className="px-2 py-1.5 text-xs text-fg-muted">
-											+{sortedFiles.length - 10} more files
-										</div>
-									)}
-								</CommandGroup>
-							</>
-						)}
+						{!search && fileResults}
 					</CommandList>
 				</Command>
 			</DialogContent>

@@ -83,6 +83,7 @@ export function TreeRow({
 	onRenameCancel,
 }: TreeRowProps) {
 	const [expanded, setExpanded] = useState(true);
+	const isExpanded = expanded || Boolean(searchQuery);
 	const isSelected = selectedPath === node.path;
 	const isActive = activePath === node.path;
 	const fileStatus = !node.isDir ? filesByPath[node.path]?.status : null;
@@ -177,7 +178,7 @@ export function TreeRow({
 						style={{ paddingLeft: 8 + depth * 12 }}
 					>
 						{node.isDir ? (
-							expanded ? (
+							isExpanded ? (
 								<ChevronDown className="h-3 w-3 text-fg-muted" />
 							) : (
 								<ChevronRight className="h-3 w-3 text-fg-muted" />
@@ -266,27 +267,30 @@ export function TreeRow({
 					</ContextMenuItem>
 				</ContextMenuContent>
 			</ContextMenu>
-			{node.isDir && expanded && node.children && node.children.length > 0 && (
-				<div>
-					{node.children.map((child) => (
-						<TreeRow
-							key={child.path}
-							node={child}
-							depth={depth + 1}
-							activePath={activePath}
-							selectedPath={selectedPath}
-							onSelect={onSelect}
-							filesByPath={filesByPath}
-							searchQuery={searchQuery}
-							onRename={onRename}
-							onDelete={onDelete}
-							renamingPath={renamingPath}
-							onRenameSubmit={onRenameSubmit}
-							onRenameCancel={onRenameCancel}
-						/>
-					))}
-				</div>
-			)}
+			{node.isDir &&
+				isExpanded &&
+				node.children &&
+				node.children.length > 0 && (
+					<div>
+						{node.children.map((child) => (
+							<TreeRow
+								key={child.path}
+								node={child}
+								depth={depth + 1}
+								activePath={activePath}
+								selectedPath={selectedPath}
+								onSelect={onSelect}
+								filesByPath={filesByPath}
+								searchQuery={searchQuery}
+								onRename={onRename}
+								onDelete={onDelete}
+								renamingPath={renamingPath}
+								onRenameSubmit={onRenameSubmit}
+								onRenameCancel={onRenameCancel}
+							/>
+						))}
+					</div>
+				)}
 		</div>
 	);
 }
