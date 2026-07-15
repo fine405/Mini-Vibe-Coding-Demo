@@ -162,6 +162,40 @@ textarea {
 	display: none; /* Chrome, Safari and Opera */
 }
 
+.agent-change-review-surface {
+	container-type: inline-size;
+}
+
+.agent-change-toolbar {
+	max-width: calc(100% - 1rem);
+}
+
+@container (max-width: 30rem) {
+	.agent-change-action-label {
+		display: none;
+	}
+}
+
+@container (max-width: 24rem) {
+	.agent-change-toolbar {
+		gap: 0.125rem;
+		padding: 0.25rem;
+	}
+
+	.agent-change-divider {
+		margin-inline: 0.125rem;
+	}
+
+	.agent-change-current {
+		min-width: 4rem;
+		padding-inline: 0.375rem;
+	}
+
+	.agent-change-file-name {
+		display: none;
+	}
+}
+
 @theme inline {
 	--color-bg-primary: var(--app-bg-primary);
 	--color-bg-secondary: var(--app-bg-secondary);

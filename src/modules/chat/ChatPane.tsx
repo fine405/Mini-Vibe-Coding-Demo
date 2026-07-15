@@ -3,6 +3,7 @@ import {
 	DefaultChatTransport,
 	type DynamicToolUIPart,
 	isToolOrDynamicToolUIPart,
+	type PrepareSendMessagesRequest,
 	type ToolUIPart,
 	type UIMessage,
 } from "ai";
@@ -17,7 +18,7 @@ import {
 	SearchIcon,
 	WrenchIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	Conversation,
 	ConversationContent,
@@ -57,10 +58,13 @@ import {
 	useKeyboardShortcuts,
 } from "@/hooks/useKeyboardShortcuts";
 import { ChangeSetReview } from "@/modules/agent-chat/ChangeSetReview";
+import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { ProviderModelSelector } from "@/modules/agent-chat/ProviderModelSelector";
 import { resolveProviderSelection } from "@/modules/agent-chat/provider-selection";
 import { useAgentChatSessionStore } from "@/modules/agent-chat/session-store";
+import { projectCompletedAgentTools } from "@/modules/agent-chat/tool-projection";
 import { useProviderCatalog } from "@/modules/agent-chat/use-provider-catalog";
+import { useEditor } from "@/modules/editor/store";
 import type { ModelSelection } from "@/modules/providers/types";
 import { TOUR_STEP_IDS } from "@/modules/tour/constants";
 import { browserWorkspace } from "@/modules/workspace/browser";
@@ -76,6 +80,18 @@ const COMPOSER_TRANSITION = {
 	ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
 };
 const REDUCED_MOTION_TRANSITION = { duration: 0 };
+
+class AgentRunToken {
+	#value: string | null = null;
+
+	set(value: string | null) {
+		this.#value = value;
+	}
+
+	get(): string | null {
+		return this.#value;
+	}
+}
 
 const starterPrompts = [
 	{
@@ -293,6 +309,8 @@ export function AgentChatMessage({
 
 function AgentChatPane({ sessionId }: { sessionId: string }) {
 	const reduceMotion = useReducedMotion();
+	const processedToolCallIdsRef = useRef(new Set<string>());
+	const [activeRunToken] = useState(() => new AgentRunToken());
 	const {
 		providers,
 		isLoading,
@@ -315,33 +333,51 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 	);
 	const canSend = Boolean(selection && selectedProvider?.configured);
 
+	const prepareSendMessagesRequest = useCallback<
+		PrepareSendMessagesRequest<UIMessage>
+	>(
+		async ({ messages, trigger, messageId }) => {
+			if (!providerId || !modelId) {
+				throw new Error("No AI model is selected");
+			}
+			useAgentChangeSessionStore.getState().clear();
+			const preflight = await browserWorkspace.getSnapshot();
+			useAgentChangeSessionStore.getState().begin(preflight.snapshot);
+			activeRunToken.set(useAgentChangeSessionStore.getState().runId);
+			setSnapshotOmissions(preflight.omissions);
+			return {
+				body: {
+					messages,
+					trigger,
+					messageId,
+					providerId,
+					modelId,
+					workspace: preflight.snapshot,
+				},
+			};
+		},
+		[activeRunToken, providerId, modelId],
+	);
 	const transport = useMemo(
 		() =>
 			new DefaultChatTransport<UIMessage>({
 				api: "/api/chat",
-				prepareSendMessagesRequest: async ({
-					messages,
-					trigger,
-					messageId,
-				}) => {
-					if (!providerId || !modelId) {
-						throw new Error("No AI model is selected");
-					}
-					const preflight = await browserWorkspace.getSnapshot();
-					setSnapshotOmissions(preflight.omissions);
-					return {
-						body: {
-							messages,
-							trigger,
-							messageId,
-							providerId,
-							modelId,
-							workspace: preflight.snapshot,
-						},
-					};
-				},
+				prepareSendMessagesRequest,
 			}),
-		[providerId, modelId],
+		[prepareSendMessagesRequest],
+	);
+	const projectMessages = useCallback(
+		(nextMessages: UIMessage[]) => {
+			const openedPath = projectCompletedAgentTools(
+				nextMessages,
+				processedToolCallIdsRef.current,
+				activeRunToken.get(),
+			);
+			if (openedPath) {
+				useEditor.getState().openFile(openedPath);
+			}
+		},
+		[activeRunToken],
 	);
 	const {
 		messages,
@@ -356,8 +392,26 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 		id: sessionId,
 		transport,
 		experimental_throttle: 50,
+		onFinish: ({ messages: finishedMessages }) => {
+			const runId = activeRunToken.get();
+			projectMessages(finishedMessages);
+			const session = useAgentChangeSessionStore.getState();
+			if (!runId || session.runId !== runId) return;
+			if (
+				session.phase !== "finalized" ||
+				session.changeSet?.changes.length === 0
+			) {
+				session.clear();
+			}
+		},
 	});
 	const generating = status === "submitted" || status === "streaming";
+	const stopRun = useCallback(async () => {
+		const runId = activeRunToken.get();
+		await stop();
+		const session = useAgentChangeSessionStore.getState();
+		if (runId && session.runId === runId) session.clear();
+	}, [activeRunToken, stop]);
 	const submitReady = canSend && status === "ready";
 	const stopShortcuts = useMemo<KeyboardShortcut[]>(
 		() => [
@@ -365,7 +419,7 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 				action: (event) => {
 					if (event.defaultPrevented || event.repeat) return;
 					event.preventDefault();
-					void stop();
+					void stopRun();
 				},
 				altKey: false,
 				ctrlKey: false,
@@ -375,9 +429,22 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 				shiftKey: false,
 			},
 		],
-		[stop],
+		[stopRun],
 	);
 	useKeyboardShortcuts(stopShortcuts, generating);
+	const discardAllRequested = useAgentChangeSessionStore(
+		(state) => state.discardAllRequested,
+	);
+
+	useEffect(() => {
+		projectMessages(messages);
+	}, [messages, projectMessages]);
+
+	useEffect(() => {
+		if (!discardAllRequested) return;
+		if (generating) void stopRun();
+		else useAgentChangeSessionStore.getState().clear();
+	}, [discardAllRequested, generating, stopRun]);
 
 	const selectModel = (next: ModelSelection) => {
 		setPreferredSelection(next);
@@ -394,7 +461,9 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 		void sendMessage({ text: prompt });
 	};
 	const clearConversation = async () => {
-		if (generating) await stop();
+		if (generating) await stopRun();
+		else useAgentChangeSessionStore.getState().clear();
+		processedToolCallIdsRef.current.clear();
 		setMessages([]);
 		clearError();
 	};
@@ -481,7 +550,7 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 								: "rounded-lg"
 						}
 						disabled={!canSend}
-						onStop={() => void stop()}
+						onStop={() => void stopRun()}
 						status={status}
 						title={generating ? "Stop (Esc)" : undefined}
 					/>

@@ -23,6 +23,10 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
+	type AgentReviewSelections,
+	useAgentChangeSessionStore,
+} from "@/modules/agent-chat/change-session";
+import {
 	selectAllChangeHunks,
 	toWorkspaceChangeSelection,
 } from "@/modules/agent-chat/review-selection";
@@ -75,6 +79,25 @@ function cloneSelections(
 ): Map<number, Set<number>> {
 	return new Map(
 		[...selections].map(([index, selected]) => [index, new Set(selected)]),
+	);
+}
+
+function toAgentReviewSelections(
+	selections: Map<number, Set<number>>,
+): AgentReviewSelections {
+	return Object.fromEntries(
+		[...selections].map(([index, selected]) => [index, [...selected]]),
+	);
+}
+
+function fromAgentReviewSelections(
+	selections: AgentReviewSelections,
+): Map<number, Set<number>> {
+	return new Map(
+		Object.entries(selections).map(([index, selected]) => [
+			Number(index),
+			new Set(selected),
+		]),
 	);
 }
 
@@ -199,6 +222,12 @@ export function ChangeSetReview({
 	const [error, setError] = useState<string | null>(null);
 	const [hasConflict, setHasConflict] = useState(false);
 	const [detailIndex, setDetailIndex] = useState<number | null>(null);
+	const currentChangeSetId = useAgentChangeSessionStore(
+		(state) => state.changeSet?.id ?? null,
+	);
+	const sessionSelections = useAgentChangeSessionStore((state) =>
+		state.changeSet?.id === changeSet.id ? state.reviewSelections : null,
+	);
 
 	useEffect(() => {
 		let active = true;
@@ -220,14 +249,35 @@ export function ChangeSetReview({
 		};
 	}, [changeSet, sourceFiles]);
 
+	useEffect(() => {
+		if (!review || currentChangeSetId !== changeSet.id || sessionSelections) {
+			return;
+		}
+		useAgentChangeSessionStore
+			.getState()
+			.initializeReviewSelections(
+				changeSet.id,
+				toAgentReviewSelections(review.selections),
+			);
+	}, [changeSet.id, currentChangeSetId, review, sessionSelections]);
+
+	const selections = useMemo(() => {
+		if (!review) return null;
+		return currentChangeSetId === changeSet.id && sessionSelections
+			? fromAgentReviewSelections(sessionSelections)
+			: review.selections;
+	}, [changeSet.id, currentChangeSetId, review, sessionSelections]);
+
 	const totals = useMemo(() => {
-		if (!review) return { files: 0, hunks: 0, additions: 0, deletions: 0 };
+		if (!review || !selections) {
+			return { files: 0, hunks: 0, additions: 0, deletions: 0 };
+		}
 		let files = 0;
 		let hunks = 0;
 		let additions = 0;
 		let deletions = 0;
 		for (let index = 0; index < review.hunks.length; index += 1) {
-			const selected = review.selections.get(index) ?? new Set<number>();
+			const selected = selections.get(index) ?? new Set<number>();
 			if (selected.size > 0) files += 1;
 			hunks += selected.size;
 			const stats = countHunkLines(review.hunks[index].hunks, selected);
@@ -235,17 +285,25 @@ export function ChangeSetReview({
 			deletions += stats.deletions;
 		}
 		return { files, hunks, additions, deletions };
-	}, [review]);
+	}, [review, selections]);
 
 	const updateSelections = (
 		updater: (selections: Map<number, Set<number>>) => void,
 	) => {
-		setReview((current) => {
-			if (!current) return current;
-			const selections = cloneSelections(current.selections);
-			updater(selections);
-			return { ...current, selections };
-		});
+		if (!review || !selections) return;
+		const nextSelections = cloneSelections(selections);
+		updater(nextSelections);
+		setReview((current) =>
+			current ? { ...current, selections: nextSelections } : current,
+		);
+		if (currentChangeSetId === changeSet.id) {
+			useAgentChangeSessionStore
+				.getState()
+				.setReviewSelections(
+					changeSet.id,
+					toAgentReviewSelections(nextSelections),
+				);
+		}
 	};
 	const toggleFile = (fileIndex: number, checked: boolean) => {
 		if (!review) return;
@@ -272,14 +330,16 @@ export function ChangeSetReview({
 	};
 
 	const apply = async () => {
-		if (!review || totals.hunks === 0 || status !== "pending") return;
+		if (!review || !selections || totals.hunks === 0 || status !== "pending") {
+			return;
+		}
 		setStatus("applying");
 		setError(null);
 		setHasConflict(false);
 		try {
 			const result = await browserWorkspace.apply(
 				changeSet,
-				toWorkspaceChangeSelection(review.selections),
+				toWorkspaceChangeSelection(selections),
 			);
 			if (!result.ok) {
 				setStatus("pending");
@@ -293,6 +353,11 @@ export function ChangeSetReview({
 			}
 			setTransactionId(result.transactionId);
 			setStatus("applied");
+			if (
+				useAgentChangeSessionStore.getState().changeSet?.id === changeSet.id
+			) {
+				useAgentChangeSessionStore.getState().clear();
+			}
 			toast.success(`Applied ${result.affectedPaths.length} file change(s)`);
 		} catch (applyError) {
 			setStatus("pending");
@@ -307,6 +372,9 @@ export function ChangeSetReview({
 		setError(null);
 		setHasConflict(false);
 		setStatus("rejected");
+		if (useAgentChangeSessionStore.getState().changeSet?.id === changeSet.id) {
+			useAgentChangeSessionStore.getState().clear();
+		}
 	};
 	const undo = async () => {
 		if (!transactionId) return;
@@ -371,7 +439,7 @@ export function ChangeSetReview({
 							onToggleFile={toggleFile}
 							onToggleHunk={toggleHunk}
 							parsed={review.hunks[index]}
-							selected={review.selections.get(index) ?? new Set()}
+							selected={selections?.get(index) ?? new Set()}
 						/>
 					))}
 				</div>

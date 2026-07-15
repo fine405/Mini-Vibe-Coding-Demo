@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { useAgentChatSessionStore } from "@/modules/agent-chat/session-store";
 import { useEditor } from "@/modules/editor/store";
 import {
@@ -47,9 +48,12 @@ export function useProjectController(): ProjectController {
 	);
 
 	const confirmNewProject = () => {
+		const agentSession = useAgentChangeSessionStore.getState();
+		if (agentSession.phase !== "idle") agentSession.requestDiscardAll();
 		void browserWorkspace
 			.reset()
 			.then(() => {
+				useAgentChangeSessionStore.getState().clear();
 				closeAllFiles();
 				resetChatSession();
 				setNewProjectDialogOpen(false);
