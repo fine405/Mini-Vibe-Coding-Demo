@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { PreviewPane } from "@/modules/preview/PreviewPane";
 import { useBrowserWorkspaceFiles } from "@/modules/workspace/browser";
@@ -53,8 +53,10 @@ vi.mock("@codesandbox/sandpack-react", () => ({
 	),
 	SandpackPreview: () => <div data-testid="sandpack-preview" />,
 	useSandpack: () => ({
+		listen: () => vi.fn(),
 		sandpack: {
-			runSandpack: vi.fn(),
+			clients: { preview: { status: "done" } },
+			status: "running",
 		},
 	}),
 	useSandpackConsole: () => ({
@@ -194,10 +196,16 @@ describe("Preview Refresh", () => {
 
 		rerender(<PreviewPane />);
 
-		expect(screen.getByTestId("file-/new.js")).toBeInTheDocument();
-		expect(screen.getByTestId("file-/new.js")).toHaveTextContent(
-			"export const x = 1;",
-		);
+		const activeRuntime = screen
+			.getAllByTestId("preview-runtime")
+			.find((runtime) => runtime.dataset.active === "true");
+		expect(activeRuntime).toBeDefined();
+		expect(
+			within(activeRuntime!).getByTestId("file-/new.js"),
+		).toBeInTheDocument();
+		expect(
+			within(activeRuntime!).getByTestId("file-/new.js"),
+		).toHaveTextContent("export const x = 1;");
 	});
 
 	it("should handle file deletion", () => {

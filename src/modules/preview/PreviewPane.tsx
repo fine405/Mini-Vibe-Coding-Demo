@@ -17,22 +17,74 @@ function SandpackConsoleBridgeListener() {
 	return null;
 }
 
+function SandpackClientFileSync({
+	onStalledFiles,
+	sourceFiles,
+}: {
+	onStalledFiles: (files: PreviewFiles) => void;
+	sourceFiles: Record<string, { code: string }>;
+}) {
+	const { sandpack } = useSandpack();
+	const { clients, status } = sandpack;
+	const lastObservedFilesRef = useRef(sourceFiles);
+
+	useEffect(() => {
+		if (status !== "running" || lastObservedFilesRef.current === sourceFiles) {
+			return;
+		}
+		lastObservedFilesRef.current = sourceFiles;
+
+		const currentClients = Object.values(clients);
+		if (
+			currentClients.length > 0 &&
+			currentClients.every((client) => client.status === "done")
+		) {
+			return;
+		}
+
+		const timeout = window.setTimeout(() => onStalledFiles(sourceFiles), 200);
+		return () => window.clearTimeout(timeout);
+	}, [clients, onStalledFiles, sourceFiles, status]);
+
+	return null;
+}
+
+function SandpackReadyListener({ onReady }: { onReady: () => void }) {
+	const { listen } = useSandpack();
+	const isReadyRef = useRef(false);
+
+	useEffect(
+		() =>
+			listen((message) => {
+				if (!isReadyRef.current && message.type === "done") {
+					isReadyRef.current = true;
+					onReady();
+				}
+			}),
+		[listen, onReady],
+	);
+
+	return null;
+}
+
+type PreviewFiles = Record<string, { code: string }>;
+
+interface PreviewRuntime {
+	files: PreviewFiles;
+	id: number;
+}
+
 function PreviewToolbar({
 	isFullscreen,
+	isRefreshing,
+	onRefresh,
 	onToggleFullscreen,
 }: {
 	isFullscreen: boolean;
+	isRefreshing: boolean;
+	onRefresh: () => void;
 	onToggleFullscreen: () => void;
 }) {
-	const { sandpack } = useSandpack();
-	const [isRefreshing, setIsRefreshing] = useState(false);
-
-	const handleRefresh = useCallback(() => {
-		setIsRefreshing(true);
-		sandpack.runSandpack();
-		setTimeout(() => setIsRefreshing(false), 500);
-	}, [sandpack]);
-
 	return (
 		<div className="px-3 py-2 text-xs border-b border-border-primary flex items-center gap-2">
 			<span className="font-semibold uppercase tracking-wide text-fg-secondary">
@@ -49,7 +101,7 @@ function PreviewToolbar({
 			<div className="flex items-center gap-0.5">
 				<button
 					type="button"
-					onClick={handleRefresh}
+					onClick={onRefresh}
 					className="p-1.5 rounded hover:bg-bg-tertiary text-fg-muted hover:text-fg-primary transition-colors"
 					title="Refresh (⌘R)"
 				>
@@ -78,8 +130,75 @@ export function PreviewPane() {
 	const filesByPath = useBrowserWorkspaceFiles();
 	const { showConsole } = useLayoutStore();
 	const { resolvedTheme } = useThemeStore();
+	const files = useMemo(
+		() =>
+			Object.fromEntries(
+				Object.entries(filesByPath).map(([path, file]) => [
+					path,
+					{ code: file.content },
+				]),
+			),
+		[filesByPath],
+	);
 	const [isFullscreen, setIsFullscreen] = useState(false);
+	const [isRefreshing, setIsRefreshing] = useState(false);
+	const [runtimes, setRuntimes] = useState<PreviewRuntime[]>(() => [
+		{ files, id: 0 },
+	]);
+	const [activeRuntimeId, setActiveRuntimeId] = useState(0);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const activeRuntimeIdRef = useRef(0);
+	const nextRuntimeIdRef = useRef(0);
+	const pendingRuntimeIdRef = useRef<number | null>(null);
+	const pendingFilesRef = useRef<PreviewFiles | null>(null);
+	const latestFilesRef = useRef(files);
+	useEffect(() => {
+		latestFilesRef.current = files;
+	}, [files]);
+
+	const stageRuntime = useCallback((nextFiles: PreviewFiles) => {
+		if (pendingFilesRef.current === nextFiles) return;
+
+		const nextRuntime = {
+			files: nextFiles,
+			id: ++nextRuntimeIdRef.current,
+		};
+		pendingFilesRef.current = nextFiles;
+		pendingRuntimeIdRef.current = nextRuntime.id;
+		setRuntimes((current) => {
+			const activeRuntime = current.find(
+				(runtime) => runtime.id === activeRuntimeIdRef.current,
+			);
+			return activeRuntime ? [activeRuntime, nextRuntime] : [nextRuntime];
+		});
+	}, []);
+
+	const activateRuntime = useCallback(
+		(runtimeId: number) => {
+			if (pendingRuntimeIdRef.current !== runtimeId) return;
+
+			if (pendingFilesRef.current !== latestFilesRef.current) {
+				stageRuntime(latestFilesRef.current);
+				return;
+			}
+
+			activeRuntimeIdRef.current = runtimeId;
+			pendingRuntimeIdRef.current = null;
+			pendingFilesRef.current = null;
+			setActiveRuntimeId(runtimeId);
+			setRuntimes((current) =>
+				current.filter((runtime) => runtime.id === runtimeId),
+			);
+			setIsRefreshing(false);
+		},
+		[stageRuntime],
+	);
+
+	const refreshPreview = useCallback(() => {
+		setIsRefreshing(true);
+		stageRuntime(files);
+		window.setTimeout(() => setIsRefreshing(false), 500);
+	}, [files, stageRuntime]);
 
 	const toggleFullscreen = useCallback(() => {
 		if (!containerRef.current) return;
@@ -104,23 +223,13 @@ export function PreviewPane() {
 		};
 	}, []);
 
-	const files = useMemo(
-		() =>
-			Object.fromEntries(
-				Object.entries(filesByPath).map(([path, file]) => [
-					path,
-					{ code: file.content },
-				]),
-			),
-		[filesByPath],
-	);
-
-	// Generate a stable key based on file paths to force Sandpack remount when files change significantly
-	// This ensures preview updates after loading from persistence
-	const sandpackKey = useMemo(() => {
-		const paths = Object.keys(filesByPath).sort().join(",");
-		return `sandpack-${paths.length}-${paths.slice(0, 100)}`;
-	}, [filesByPath]);
+	const filePaths = useMemo(() => Object.keys(files).sort().join(","), [files]);
+	const previousFilePathsRef = useRef(filePaths);
+	useEffect(() => {
+		if (previousFilePathsRef.current === filePaths) return;
+		previousFilePathsRef.current = filePaths;
+		if (filePaths) stageRuntime(files);
+	}, [filePaths, files, stageRuntime]);
 
 	// Show loading state if no files
 	if (Object.keys(files).length === 0) {
@@ -145,53 +254,76 @@ export function PreviewPane() {
 			ref={containerRef}
 			className="h-full w-full flex flex-col bg-bg-primary text-fg-primary"
 		>
-			<SandpackProvider
-				key={sandpackKey}
-				files={files}
-				template="react"
-				theme={resolvedTheme}
-				style={{
-					height: "100%",
-				}}
-				options={{
-					autorun: true,
-					autoReload: true,
-					bundlerTimeOut: 15_000,
-					classes: { "sp-loading": "hidden" },
-					initMode: "immediate",
-					activeFile: "/src/App.js",
-					visibleFiles: ["/src/App.js", "/src/index.js"],
-				}}
-				customSetup={{
-					entry: "/src/index.js",
-				}}
-				className="flex-1 flex flex-col overflow-hidden"
-			>
-				<SandpackConsoleBridgeListener />
-				<PreviewToolbar
-					isFullscreen={isFullscreen}
-					onToggleFullscreen={toggleFullscreen}
-				/>
-				<PanelGroup direction="vertical" className="flex-1 overflow-hidden">
-					<Panel defaultSize={showConsole ? 75 : 100} minSize={30}>
-						<div className="h-full overflow-hidden">
-							<SandpackPreview
-								showOpenInCodeSandbox={false}
-								showRefreshButton={false}
-								style={{ height: "100%" }}
-							/>
-						</div>
-					</Panel>
-					{showConsole && (
-						<>
-							<PanelResizeHandle className="h-px bg-border-primary hover:bg-accent transition-colors cursor-row-resize" />
-							<Panel defaultSize={25} minSize={10}>
-								<ConsolePanel />
-							</Panel>
-						</>
-					)}
-				</PanelGroup>
-			</SandpackProvider>
+			<PreviewToolbar
+				isFullscreen={isFullscreen}
+				isRefreshing={isRefreshing}
+				onRefresh={refreshPreview}
+				onToggleFullscreen={toggleFullscreen}
+			/>
+			<PanelGroup direction="vertical" className="flex-1 overflow-hidden">
+				<Panel defaultSize={showConsole ? 75 : 100} minSize={30}>
+					<div className="relative h-full overflow-hidden">
+						{runtimes.map((runtime) => {
+							const isActive = runtime.id === activeRuntimeId;
+							const shouldBridgeConsole = runtimes.length === 1 || !isActive;
+							return (
+								<div
+									key={runtime.id}
+									aria-hidden={!isActive}
+									data-active={isActive}
+									data-testid="preview-runtime"
+									className={`absolute inset-0 ${
+										isActive ? "z-10" : "pointer-events-none z-0"
+									}`}
+								>
+									<SandpackProvider
+										files={isActive ? files : runtime.files}
+										template="react"
+										theme={resolvedTheme}
+										style={{ height: "100%" }}
+										options={{
+											autorun: true,
+											autoReload: true,
+											bundlerTimeOut: 15_000,
+											classes: { "sp-loading": "hidden" },
+											initMode: "immediate",
+											activeFile: "/src/App.js",
+											visibleFiles: ["/src/App.js", "/src/index.js"],
+										}}
+										customSetup={{ entry: "/src/index.js" }}
+										className="h-full overflow-hidden"
+									>
+										{isActive ? (
+											<SandpackClientFileSync
+												onStalledFiles={stageRuntime}
+												sourceFiles={files}
+											/>
+										) : (
+											<SandpackReadyListener
+												onReady={() => activateRuntime(runtime.id)}
+											/>
+										)}
+										{shouldBridgeConsole && <SandpackConsoleBridgeListener />}
+										<SandpackPreview
+											showOpenInCodeSandbox={false}
+											showRefreshButton={false}
+											style={{ height: "100%" }}
+										/>
+									</SandpackProvider>
+								</div>
+							);
+						})}
+					</div>
+				</Panel>
+				{showConsole && (
+					<>
+						<PanelResizeHandle className="h-px bg-border-primary hover:bg-accent transition-colors cursor-row-resize" />
+						<Panel defaultSize={25} minSize={10}>
+							<ConsolePanel />
+						</Panel>
+					</>
+				)}
+			</PanelGroup>
 		</div>
 	);
 }

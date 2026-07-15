@@ -1,4 +1,3 @@
-import { useSandpackConsole } from "@codesandbox/sandpack-react";
 import { AlertCircle, AlertTriangle, Info, Trash2 } from "lucide-react";
 import { useEffect } from "react";
 import {
@@ -8,9 +7,6 @@ import {
 import { useConsoleStore } from "@/modules/preview/consoleStore";
 
 export function ConsolePanel() {
-	const { reset: sandpackReset } = useSandpackConsole({
-		resetOnPreviewRestart: true,
-	});
 	const logs = useConsoleStore((state) => state.logs);
 	const addLog = useConsoleStore((state) => state.addLog);
 	const clearLogs = useConsoleStore((state) => state.clearLogs);
@@ -36,7 +32,6 @@ export function ConsolePanel() {
 	}, [addLog]);
 
 	const handleClear = () => {
-		sandpackReset();
 		clearLogs();
 	};
 
