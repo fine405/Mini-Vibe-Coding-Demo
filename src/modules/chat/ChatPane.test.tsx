@@ -45,6 +45,12 @@ describe("AgentChatMessage", () => {
 		expect(
 			screen.getByRole("region", { name: "Coding agent" }),
 		).toHaveAttribute("id", TOUR_STEP_IDS.CHAT_PANE);
+		expect(
+			screen.getByRole("heading", {
+				name: "Build with a real coding agent",
+			}),
+		).toBeVisible();
+		expect(screen.getByText("Try a starter")).toBeVisible();
 	});
 
 	it("renders streamed model text and reasoning with AI Elements", async () => {
@@ -158,7 +164,7 @@ describe("AgentChatMessage", () => {
 		);
 	});
 
-	it("aborts the active chat request when Stop is clicked", async () => {
+	it("aborts the active chat request when Escape is pressed after sending", async () => {
 		const user = userEvent.setup();
 		useFs
 			.getState()
@@ -216,14 +222,33 @@ describe("AgentChatMessage", () => {
 		const input = await screen.findByPlaceholderText(
 			"Describe what you want to build…",
 		);
+		expect(screen.getByRole("button", { name: "Submit" })).toHaveClass(
+			"bg-blue-600",
+		);
+		expect(
+			document.querySelectorAll('[data-slot="agent-chat-composer"]'),
+		).toHaveLength(1);
 		await user.type(input, "Update the app");
 		await user.click(screen.getByRole("button", { name: "Submit" }));
+		expect(
+			screen.queryByRole("heading", {
+				name: "Build with a real coding agent",
+			}),
+		).not.toBeInTheDocument();
+		expect(
+			document.querySelectorAll('[data-slot="agent-chat-composer"]'),
+		).toHaveLength(1);
 		expect(await screen.findByText("/.npmrc")).toBeVisible();
 		expect(screen.getByText(/credential or secret path/i)).toBeVisible();
 		expect(screen.queryByText(/must-not-render/)).toBeNull();
-		const stop = await screen.findByRole("button", { name: "Stop" });
-		await user.click(stop);
+		expect(await screen.findByRole("button", { name: "Stop" })).toBeVisible();
+		await user.keyboard("{Escape}");
 
 		await waitFor(() => expect(chatSignal?.aborted).toBe(true));
+		await waitFor(() =>
+			expect(screen.getByRole("button", { name: "Submit" })).toHaveClass(
+				"bg-blue-600",
+			),
+		);
 	});
 });

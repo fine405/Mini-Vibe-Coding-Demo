@@ -6,11 +6,16 @@ import {
 	type ToolUIPart,
 	type UIMessage,
 } from "ai";
+import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import {
 	AlertTriangleIcon,
+	ArrowRightIcon,
 	BotIcon,
 	KeyRoundIcon,
+	PlusIcon,
 	RefreshCwIcon,
+	SearchIcon,
+	WrenchIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -47,6 +52,10 @@ import {
 	type ToolPart,
 } from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
+import {
+	type KeyboardShortcut,
+	useKeyboardShortcuts,
+} from "@/hooks/useKeyboardShortcuts";
 import { ChangeSetReview } from "@/modules/agent-chat/ChangeSetReview";
 import { ProviderModelSelector } from "@/modules/agent-chat/ProviderModelSelector";
 import { resolveProviderSelection } from "@/modules/agent-chat/provider-selection";
@@ -62,12 +71,26 @@ import type {
 } from "@/modules/workspace/types";
 
 const MODEL_SELECTION_STORAGE_KEY = "mini-lovable-agent-model";
+const COMPOSER_TRANSITION = {
+	duration: 0.42,
+	ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+};
+const REDUCED_MOTION_TRANSITION = { duration: 0 };
 
 const starterPrompts = [
-	"Review the current app and improve its UX",
-	"Add a useful feature to this project",
-	"Find and fix problems in the codebase",
-];
+	{
+		icon: SearchIcon,
+		prompt: "Review the current app and improve its UX",
+	},
+	{
+		icon: PlusIcon,
+		prompt: "Add a useful feature to this project",
+	},
+	{
+		icon: WrenchIcon,
+		prompt: "Find and fix problems in the codebase",
+	},
+] as const;
 
 const omissionReasonLabels: Record<SnapshotOmissionReason, string> = {
 	secret: "credential or secret path",
@@ -269,6 +292,7 @@ export function AgentChatMessage({
 }
 
 function AgentChatPane({ sessionId }: { sessionId: string }) {
+	const reduceMotion = useReducedMotion();
 	const {
 		providers,
 		isLoading,
@@ -334,6 +358,26 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 		experimental_throttle: 50,
 	});
 	const generating = status === "submitted" || status === "streaming";
+	const submitReady = canSend && status === "ready";
+	const stopShortcuts = useMemo<KeyboardShortcut[]>(
+		() => [
+			{
+				action: (event) => {
+					if (event.defaultPrevented || event.repeat) return;
+					event.preventDefault();
+					void stop();
+				},
+				altKey: false,
+				ctrlKey: false,
+				key: "Escape",
+				metaKey: false,
+				preventDefault: false,
+				shiftKey: false,
+			},
+		],
+		[stop],
+	);
+	useKeyboardShortcuts(stopShortcuts, generating);
 
 	const selectModel = (next: ModelSelection) => {
 		setPreferredSelection(next);
@@ -354,6 +398,97 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 		setMessages([]);
 		clearError();
 	};
+	const notices = (
+		<>
+			{catalogError && (
+				<div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
+					<AlertTriangleIcon className="size-4 shrink-0" />
+					<span className="min-w-0 flex-1">{catalogError}</span>
+					<Button onClick={reload} size="xs" variant="ghost">
+						Retry
+					</Button>
+				</div>
+			)}
+			{!isLoading &&
+				providers.length > 0 &&
+				!providers.some((provider) => provider.configured) && (
+					<div className="flex gap-2 rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
+						<KeyRoundIcon className="mt-0.5 size-3.5 shrink-0" />
+						<span>
+							Configure a provider key in the server environment to enable chat.
+						</span>
+					</div>
+				)}
+			<SnapshotOmissionsNotice omissions={snapshotOmissions} />
+			{error && (
+				<div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
+					<span className="min-w-0 flex-1">{error.message}</span>
+					<Button
+						onClick={() => {
+							clearError();
+							void regenerate();
+						}}
+						size="xs"
+						variant="ghost"
+					>
+						Retry
+					</Button>
+				</div>
+			)}
+		</>
+	);
+	const renderPromptInput = (prominent = false) => (
+		<motion.div
+			className="w-full"
+			data-slot="agent-chat-composer"
+			layoutId="agent-chat-composer"
+			transition={
+				reduceMotion ? REDUCED_MOTION_TRANSITION : COMPOSER_TRANSITION
+			}
+		>
+			<PromptInput
+				className={
+					prominent
+						? "[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:border-blue-500/40 [&_[data-slot=input-group]]:bg-card/50 [&_[data-slot=input-group]]:shadow-[0_20px_60px_-36px_rgba(37,99,235,0.8)]"
+						: "[&_[data-slot=input-group]]:rounded-xl"
+				}
+				onSubmit={submit}
+			>
+				<PromptInputBody>
+					<PromptInputTextarea
+						className={prominent ? "min-h-20 px-4 pt-4 text-sm" : undefined}
+						disabled={!canSend || generating}
+						placeholder={
+							canSend
+								? "Describe what you want to build…"
+								: "Configure a provider key to start"
+						}
+					/>
+				</PromptInputBody>
+				<PromptInputFooter className={prominent ? "px-3 pb-3" : undefined}>
+					<PromptInputTools className="min-w-0 flex-1">
+						<ProviderModelSelector
+							isLoading={isLoading}
+							onSelect={selectModel}
+							providers={providers}
+							selection={selection}
+						/>
+					</PromptInputTools>
+					<PromptInputSubmit
+						className={
+							submitReady
+								? "rounded-lg bg-blue-600 text-white hover:bg-blue-500"
+								: "rounded-lg"
+						}
+						disabled={!canSend}
+						onStop={() => void stop()}
+						status={status}
+						title={generating ? "Stop (Esc)" : undefined}
+					/>
+				</PromptInputFooter>
+			</PromptInput>
+		</motion.div>
+	);
 
 	return (
 		<section
@@ -384,116 +519,84 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 				</Button>
 			</header>
 
-			<Conversation>
-				<ConversationContent>
-					{messages.length === 0 ? (
-						<ConversationEmptyState
-							description="Ask for a feature, refactor, or bug fix. The agent can inspect and edit a shadow copy, then returns a reviewable ChangeSet."
-							icon={<BotIcon className="size-7" />}
-							title="Build with a real coding agent"
-						>
-							<div className="mt-3 flex w-full max-w-sm flex-col gap-2">
-								{starterPrompts.map((prompt) => (
-									<Button
-										className="h-auto justify-start whitespace-normal text-left text-xs"
-										disabled={!canSend}
-										key={prompt}
-										onClick={() => sendStarter(prompt)}
-										variant="outline"
-									>
-										{prompt}
-									</Button>
-								))}
-							</div>
-						</ConversationEmptyState>
-					) : (
-						messages.map((message, index) => (
-							<AgentChatMessage
-								isStreaming={
-									status === "streaming" && index === messages.length - 1
-								}
-								key={message.id}
-								message={message}
-								onRegenerate={() => {
-									clearError();
-									void regenerate({ messageId: message.id });
-								}}
-							/>
-						))
-					)}
-				</ConversationContent>
-				<ConversationScrollButton />
-			</Conversation>
+			<LayoutGroup id={`agent-chat-${sessionId}`}>
+				<Conversation>
+					<ConversationContent
+						className={messages.length === 0 ? "min-h-full p-0" : undefined}
+					>
+						{messages.length === 0 ? (
+							<ConversationEmptyState className="min-h-full justify-start overflow-y-auto px-4 py-6">
+								<div className="flex w-full max-w-2xl flex-1 flex-col items-center justify-center py-6">
+									<div className="flex size-14 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-[0_0_48px_-16px_rgba(59,130,246,0.9)]">
+										<BotIcon className="size-7" />
+									</div>
+									<h2 className="mt-6 text-balance text-xl font-semibold tracking-tight">
+										Build with a real coding agent
+									</h2>
+									<p className="mt-3 max-w-lg text-pretty text-sm leading-6 text-muted-foreground">
+										Ask for a feature, refactor, or bug fix. The agent can
+										inspect and edit a shadow copy, then returns a reviewable
+										ChangeSet.
+									</p>
 
-			<div className="shrink-0 space-y-2 border-t p-3">
-				{catalogError && (
-					<div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
-						<AlertTriangleIcon className="size-4 shrink-0" />
-						<span className="min-w-0 flex-1">{catalogError}</span>
-						<Button onClick={reload} size="xs" variant="ghost">
-							Retry
-						</Button>
+									<div className="mt-8 w-full max-w-xl text-left">
+										<div className="space-y-2">
+											{notices}
+											{renderPromptInput(true)}
+										</div>
+
+										<div className="mt-6 flex items-center gap-3">
+											<div className="h-px flex-1 bg-border" />
+											<p className="shrink-0 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+												Try a starter
+											</p>
+											<div className="h-px flex-1 bg-border" />
+										</div>
+
+										<div className="mt-3 flex flex-col gap-2">
+											{starterPrompts.map(({ icon: StarterIcon, prompt }) => (
+												<Button
+													className="group h-auto min-h-11 w-full justify-start gap-3 whitespace-normal rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 text-left text-xs font-normal text-foreground shadow-none hover:border-border hover:bg-muted/50"
+													disabled={!canSend}
+													key={prompt}
+													onClick={() => sendStarter(prompt)}
+													variant="ghost"
+												>
+													<StarterIcon className="size-4 shrink-0 text-blue-500" />
+													<span className="min-w-0 flex-1">{prompt}</span>
+													<ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+												</Button>
+											))}
+										</div>
+									</div>
+								</div>
+							</ConversationEmptyState>
+						) : (
+							messages.map((message, index) => (
+								<AgentChatMessage
+									isStreaming={
+										status === "streaming" && index === messages.length - 1
+									}
+									key={message.id}
+									message={message}
+									onRegenerate={() => {
+										clearError();
+										void regenerate({ messageId: message.id });
+									}}
+								/>
+							))
+						)}
+					</ConversationContent>
+					<ConversationScrollButton />
+				</Conversation>
+
+				{messages.length > 0 && (
+					<div className="shrink-0 space-y-2 border-t bg-background/95 p-3">
+						{notices}
+						{renderPromptInput()}
 					</div>
 				)}
-				{!isLoading &&
-					providers.length > 0 &&
-					!providers.some((provider) => provider.configured) && (
-						<div className="flex gap-2 rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
-							<KeyRoundIcon className="mt-0.5 size-3.5 shrink-0" />
-							<span>
-								Configure a provider key in the server environment to enable
-								chat.
-							</span>
-						</div>
-					)}
-				<SnapshotOmissionsNotice omissions={snapshotOmissions} />
-				{error && (
-					<div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
-						<span className="min-w-0 flex-1">{error.message}</span>
-						<Button
-							onClick={() => {
-								clearError();
-								void regenerate();
-							}}
-							size="xs"
-							variant="ghost"
-						>
-							Retry
-						</Button>
-					</div>
-				)}
-
-				<PromptInput
-					className="[&_[data-slot=input-group]]:rounded-xl"
-					onSubmit={submit}
-				>
-					<PromptInputBody>
-						<PromptInputTextarea
-							disabled={!canSend || generating}
-							placeholder={
-								canSend
-									? "Describe what you want to build…"
-									: "Configure a provider key to start"
-							}
-						/>
-					</PromptInputBody>
-					<PromptInputFooter>
-						<PromptInputTools className="min-w-0 flex-1">
-							<ProviderModelSelector
-								isLoading={isLoading}
-								onSelect={selectModel}
-								providers={providers}
-								selection={selection}
-							/>
-						</PromptInputTools>
-						<PromptInputSubmit
-							disabled={!canSend}
-							onStop={() => void stop()}
-							status={status}
-						/>
-					</PromptInputFooter>
-				</PromptInput>
-			</div>
+			</LayoutGroup>
 		</section>
 	);
 }
