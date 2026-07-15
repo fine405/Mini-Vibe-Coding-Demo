@@ -1,9 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { useFs } from "@/modules/fs/store";
+import { useConsoleStore } from "@/modules/preview/consoleStore";
 import { PreviewPane } from "@/modules/preview/PreviewPane";
 import { browserWorkspace } from "@/modules/workspace/browser";
+import { hashText } from "@/modules/workspace/domain";
 
 const sandpackMock = vi.hoisted(() => ({
 	nextProviderId: 0,
@@ -123,6 +127,8 @@ describe("PreviewPane workspace integration", () => {
 		sandpackMock.nextProviderId = 0;
 		sandpackMock.previewEvents.length = 0;
 		await useFs.getState().resetFs();
+		useAgentChangeSessionStore.getState().clear();
+		useConsoleStore.getState().clearLogs();
 	});
 
 	it("updates Sandpack when the editor changes a workspace file", async () => {
@@ -164,6 +170,270 @@ describe("PreviewPane workspace integration", () => {
 		const currentUnmountedAt = sandpackMock.previewEvents.indexOf("unmount:1");
 		expect(replacementMountedAt).toBeGreaterThan(-1);
 		expect(currentUnmountedAt).toBeGreaterThan(replacementMountedAt);
+	});
+
+	it("previews an Agent draft without applying it to the workspace", async () => {
+		const path = "/src/App.js";
+		const before = useFs.getState().filesByPath[path].content;
+		const after = before.replace("Hello React", "Agent Draft");
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		render(<PreviewPane />);
+
+		act(() => {
+			const session = useAgentChangeSessionStore.getState();
+			session.begin(snapshot);
+			useAgentChangeSessionStore.getState().projectToolResult({
+				toolName: "write_file",
+				input: { path, content: after },
+				output: {
+					path,
+					hash: hashText(after),
+					bytes: new TextEncoder().encode(after).byteLength,
+				},
+			});
+		});
+
+		await waitFor(() =>
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Agent Draft",
+			),
+		);
+		expect(screen.getByRole("button", { name: "Agent Draft" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		expect(useFs.getState().filesByPath[path].content).toBe(before);
+	});
+
+	it("switches between the current workspace and the Agent draft", async () => {
+		const user = userEvent.setup();
+		const path = "/src/App.js";
+		const before = useFs.getState().filesByPath[path].content;
+		const after = before.replace("Hello React", "Switchable Draft");
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		render(<PreviewPane />);
+		const clearConsole = screen.getByRole("button", { name: "Clear Console" });
+
+		act(() => {
+			useAgentChangeSessionStore.getState().begin(snapshot);
+			useAgentChangeSessionStore.getState().projectToolResult({
+				toolName: "write_file",
+				input: { path, content: after },
+				output: { path, hash: hashText(after) },
+			});
+		});
+
+		await waitFor(() =>
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Switchable Draft",
+			),
+		);
+		await user.click(screen.getByRole("button", { name: "Current" }));
+		await waitFor(() =>
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Hello React",
+			),
+		);
+		expect(screen.getByRole("button", { name: "Current" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+
+		await user.click(screen.getByRole("button", { name: "Agent Draft" }));
+		await waitFor(() =>
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Switchable Draft",
+			),
+		);
+		expect(screen.getByRole("button", { name: "Clear Console" })).toBe(
+			clearConsole,
+		);
+	});
+
+	it("previews only the Agent hunks selected for approval", async () => {
+		const path = "/src/App.js";
+		const before = [
+			"export default function App() {",
+			"  return (",
+			"    <main>",
+			"      <h1>Current heading</h1>",
+			...Array.from(
+				{ length: 10 },
+				(_, index) => `      <p>Spacer ${index}</p>`,
+			),
+			"      <footer>Current footer</footer>",
+			"    </main>",
+			"  );",
+			"}",
+		].join("\n");
+		const after = before
+			.replace("Current heading", "Selected draft heading")
+			.replace("Current footer", "Unselected draft footer");
+		useFs.getState().updateFileContent(path, before);
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		const changeSet = {
+			id: "agent:selected-preview",
+			baseRevision: snapshot.revision,
+			summary: "Update two distant regions",
+			changes: [
+				{
+					op: "update" as const,
+					path,
+					beforeHash: snapshot.files[path].hash,
+					content: after,
+				},
+			],
+		};
+		render(<PreviewPane />);
+
+		act(() => {
+			useAgentChangeSessionStore.getState().begin(snapshot);
+			useAgentChangeSessionStore.getState().projectToolResult({
+				toolName: "finalize_changes",
+				input: { summary: changeSet.summary },
+				output: changeSet,
+			});
+			useAgentChangeSessionStore
+				.getState()
+				.initializeReviewSelections(changeSet.id, { 0: [0] });
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Selected draft heading",
+			);
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Current footer",
+			);
+		});
+		expect(screen.getByTestId(`file-${path}`)).not.toHaveTextContent(
+			"Unselected draft footer",
+		);
+		expect(useFs.getState().filesByPath[path].content).toBe(before);
+	});
+
+	it("returns to the current workspace when the Agent draft is rejected", async () => {
+		const path = "/src/App.js";
+		const before = useFs.getState().filesByPath[path].content;
+		const after = before.replace("Hello React", "Rejected Draft");
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		render(<PreviewPane />);
+		const clearConsole = screen.getByRole("button", { name: "Clear Console" });
+
+		act(() => {
+			useAgentChangeSessionStore.getState().begin(snapshot);
+			useAgentChangeSessionStore.getState().projectToolResult({
+				toolName: "write_file",
+				input: { path, content: after },
+				output: { path, hash: hashText(after) },
+			});
+		});
+		await waitFor(() =>
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Rejected Draft",
+			),
+		);
+
+		act(() => useAgentChangeSessionStore.getState().clear());
+
+		await waitFor(() =>
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Hello React",
+			),
+		);
+		expect(
+			screen.queryByRole("button", { name: "Agent Draft" }),
+		).not.toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Clear Console" })).toBe(
+			clearConsole,
+		);
+		expect(useFs.getState().filesByPath[path].content).toBe(before);
+	});
+
+	it("promotes an approved Agent draft to the current workspace", async () => {
+		const path = "/src/App.js";
+		const before = useFs.getState().filesByPath[path].content;
+		const after = before.replace("Hello React", "Approved Draft");
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		const changeSet = {
+			id: "agent:approved-preview",
+			baseRevision: snapshot.revision,
+			summary: "Approve the draft preview",
+			changes: [
+				{
+					op: "update" as const,
+					path,
+					beforeHash: snapshot.files[path].hash,
+					content: after,
+				},
+			],
+		};
+		render(<PreviewPane />);
+		const clearConsole = screen.getByRole("button", { name: "Clear Console" });
+
+		act(() => {
+			useAgentChangeSessionStore.getState().begin(snapshot);
+			useAgentChangeSessionStore.getState().projectToolResult({
+				toolName: "finalize_changes",
+				input: { summary: changeSet.summary },
+				output: changeSet,
+			});
+		});
+		await waitFor(() =>
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Approved Draft",
+			),
+		);
+		expect(useFs.getState().filesByPath[path].content).toBe(before);
+
+		let result: Awaited<ReturnType<typeof browserWorkspace.apply>> | undefined;
+		await act(async () => {
+			result = await browserWorkspace.apply(changeSet);
+			useAgentChangeSessionStore.getState().clear();
+		});
+
+		expect(result).toMatchObject({ ok: true });
+		await waitFor(() =>
+			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
+				"Approved Draft",
+			),
+		);
+		expect(
+			screen.queryByRole("button", { name: "Agent Draft" }),
+		).not.toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Clear Console" })).toBe(
+			clearConsole,
+		);
+		expect(useFs.getState().filesByPath[path].content).toBe(after);
+	});
+
+	it("separates Console output when switching to the Agent draft", async () => {
+		const path = "/src/App.js";
+		const before = useFs.getState().filesByPath[path].content;
+		const after = before.replace("Hello React", "Draft Console");
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		useConsoleStore.getState().addLog({
+			id: "current-log",
+			method: "log",
+			data: ["current output"],
+			timestamp: 0,
+		});
+		render(<PreviewPane />);
+		expect(screen.getByText("current output")).toBeInTheDocument();
+
+		act(() => {
+			useAgentChangeSessionStore.getState().begin(snapshot);
+			useAgentChangeSessionStore.getState().projectToolResult({
+				toolName: "write_file",
+				input: { path, content: after },
+				output: { path, hash: hashText(after) },
+			});
+		});
+
+		await waitFor(() =>
+			expect(screen.queryByText("current output")).not.toBeInTheDocument(),
+		);
+		expect(screen.getByText("Agent Draft", { selector: "span" })).toBeVisible();
 	});
 
 	it("updates Sandpack when an Agent change is applied", async () => {

@@ -6,7 +6,7 @@ import {
 } from "@/modules/preview/consoleBridge";
 import { useConsoleStore } from "@/modules/preview/consoleStore";
 
-export function ConsolePanel() {
+export function ConsolePanel({ sourceLabel }: { sourceLabel: string }) {
 	const logs = useConsoleStore((state) => state.logs);
 	const addLog = useConsoleStore((state) => state.addLog);
 	const clearLogs = useConsoleStore((state) => state.clearLogs);
@@ -86,6 +86,9 @@ export function ConsolePanel() {
 			<div className="flex items-center justify-between px-3 py-1.5 border-b border-border-secondary shrink-0">
 				<div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-secondary">
 					<span>Console</span>
+					<span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-[9px] font-medium normal-case tracking-normal text-fg-muted">
+						{sourceLabel}
+					</span>
 					{logs.length > 0 && (
 						<span className="px-1.5 py-0.5 text-[10px] font-medium bg-bg-tertiary rounded">
 							{logs.length}
