@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { FileTreePane } from "@/modules/fs/FileTreePane";
 
@@ -118,5 +118,22 @@ describe("FileTreePane", () => {
 		// Check if context menu triggers are present
 		const triggers = screen.getAllByTestId("context-menu-trigger");
 		expect(triggers.length).toBeGreaterThan(0);
+	});
+
+	it("shows fuzzy matches inside a collapsed directory", () => {
+		render(<FileTreePane />);
+
+		fireEvent.click(screen.getByRole("button", { name: "src" }));
+		expect(
+			screen.queryByRole("button", { name: /Button\.tsx/ }),
+		).not.toBeInTheDocument();
+
+		fireEvent.change(screen.getByPlaceholderText("Search files..."), {
+			target: { value: "btx" },
+		});
+
+		expect(
+			screen.getByRole("button", { name: /Button\.tsx/ }),
+		).toBeInTheDocument();
 	});
 });
