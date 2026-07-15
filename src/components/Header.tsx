@@ -123,7 +123,10 @@ export function Header({
 								</TooltipTrigger>
 								<TooltipContent>Export Project</TooltipContent>
 							</Tooltip>
-							<DropdownMenuContent align="start">
+							<DropdownMenuContent
+								align="start"
+								className="w-max whitespace-nowrap"
+							>
 								<DropdownMenuItem onClick={onExportJSON}>
 									<FileJson className="h-4 w-4" />
 									<span>Export as JSON</span>
