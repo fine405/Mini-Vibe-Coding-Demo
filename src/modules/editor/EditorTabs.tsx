@@ -42,28 +42,32 @@ export function EditorTabs({
 					const isModified = status === "modified" || status === "new";
 
 					return (
-						<button
-							type="button"
+						<div
 							key={file.path}
-							className={`group flex items-center gap-1 px-3 py-1.5 text-xs border-r border-border-secondary cursor-pointer transition-colors ${
+							className={`group flex items-center gap-1 text-xs border-r border-border-secondary transition-colors ${
 								isActive
 									? "bg-bg-primary text-fg-primary"
 									: "text-fg-secondary hover:bg-bg-tertiary hover:text-fg-primary"
 							}`}
-							onClick={() => onSelectTab(file.path)}
-							title={file.path}
 						>
-							<FileCode2 className="h-3 w-3 text-fg-muted shrink-0" />
-							<span className="truncate max-w-32">{fileName}</span>
+							<button
+								type="button"
+								className="flex min-w-0 items-center gap-1 py-1.5 pl-3 cursor-pointer"
+								onClick={() => onSelectTab(file.path)}
+								title={file.path}
+							>
+								<FileCode2 className="h-3 w-3 text-fg-muted shrink-0" />
+								<span className="truncate max-w-32">{fileName}</span>
 
-							{/* Status indicator */}
-							{isModified && (
-								<span
-									className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-										status === "new" ? "bg-success" : "bg-accent"
-									}`}
-								/>
-							)}
+								{/* Status indicator */}
+								{isModified && (
+									<span
+										className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+											status === "new" ? "bg-success" : "bg-accent"
+										}`}
+									/>
+								)}
+							</button>
 
 							{/* View mode toggle (only for modified files) */}
 							{isModified && (
@@ -118,12 +122,12 @@ export function EditorTabs({
 									e.stopPropagation();
 									onCloseTab(file.path);
 								}}
-								className="p-0.5 rounded text-fg-muted hover:text-fg-primary hover:bg-bg-tertiary opacity-0 group-hover:opacity-100 transition-opacity"
+								className="mr-3 p-0.5 rounded text-fg-muted hover:text-fg-primary hover:bg-bg-tertiary opacity-0 group-hover:opacity-100 transition-opacity"
 								title="Close"
 							>
 								<X className="h-3 w-3" />
 							</button>
-						</button>
+						</div>
 					);
 				})}
 			</div>
