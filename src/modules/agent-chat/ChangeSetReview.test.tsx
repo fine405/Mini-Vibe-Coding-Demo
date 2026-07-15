@@ -2,8 +2,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChangeSetReview } from "@/modules/agent-chat/ChangeSetReview";
+import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { useFs } from "@/modules/fs/store";
 import { browserWorkspace } from "@/modules/workspace/browser";
+import type {
+	WorkspaceChangeSet,
+	WorkspaceSnapshot,
+} from "@/modules/workspace/types";
 
 vi.mock("@/modules/fs/persistence", () => ({
 	clearWorkspace: vi.fn().mockResolvedValue(undefined),
@@ -15,30 +20,42 @@ vi.mock("@/modules/fs/persistence", () => ({
 describe("ChangeSetReview", () => {
 	beforeEach(async () => {
 		await useFs.getState().resetFs();
+		useAgentChangeSessionStore.getState().clear();
 	});
+
+	function finalizeSession(
+		snapshot: WorkspaceSnapshot,
+		changeSet: WorkspaceChangeSet,
+	) {
+		const session = useAgentChangeSessionStore.getState();
+		session.begin(snapshot);
+		session.projectToolResult({
+			toolName: "finalize_changes",
+			input: { summary: changeSet.summary },
+			output: changeSet,
+		});
+	}
 
 	it("applies an approved ChangeSet through Workspace and can undo it", async () => {
 		const user = userEvent.setup();
 		const before = useFs.getState().filesByPath["/src/App.js"].content;
 		const { snapshot } = await browserWorkspace.getSnapshot();
 		const after = before.replace("Hello React", "Agent Approved");
-		render(
-			<ChangeSetReview
-				changeSet={{
-					id: "agent:component-review",
-					baseRevision: snapshot.revision,
-					summary: "Update the heading",
-					changes: [
-						{
-							op: "update",
-							path: "/src/App.js",
-							beforeHash: snapshot.files["/src/App.js"].hash,
-							content: after,
-						},
-					],
-				}}
-			/>,
-		);
+		const changeSet = {
+			id: "agent:component-review",
+			baseRevision: snapshot.revision,
+			summary: "Update the heading",
+			changes: [
+				{
+					op: "update" as const,
+					path: "/src/App.js",
+					beforeHash: snapshot.files["/src/App.js"].hash,
+					content: after,
+				},
+			],
+		} satisfies WorkspaceChangeSet;
+		finalizeSession(snapshot, changeSet);
+		render(<ChangeSetReview changeSet={changeSet} />);
 
 		expect(await screen.findByText("Workspace change proposal")).toBeVisible();
 		await user.click(
@@ -47,6 +64,7 @@ describe("ChangeSetReview", () => {
 		await waitFor(() => {
 			expect(useFs.getState().filesByPath["/src/App.js"].content).toBe(after);
 		});
+		expect(useAgentChangeSessionStore.getState().phase).toBe("idle");
 
 		await user.click(await screen.findByRole("button", { name: "Undo" }));
 		await waitFor(() => {
@@ -59,23 +77,21 @@ describe("ChangeSetReview", () => {
 		const path = "/src/App.js";
 		const before = useFs.getState().filesByPath[path].content;
 		const { snapshot } = await browserWorkspace.getSnapshot();
-		render(
-			<ChangeSetReview
-				changeSet={{
-					id: "agent:reject",
-					baseRevision: snapshot.revision,
-					summary: "Reject this update",
-					changes: [
-						{
-							op: "update",
-							path,
-							beforeHash: snapshot.files[path].hash,
-							content: "rejected content",
-						},
-					],
-				}}
-			/>,
-		);
+		const changeSet = {
+			id: "agent:reject",
+			baseRevision: snapshot.revision,
+			summary: "Reject this update",
+			changes: [
+				{
+					op: "update" as const,
+					path,
+					beforeHash: snapshot.files[path].hash,
+					content: "rejected content",
+				},
+			],
+		} satisfies WorkspaceChangeSet;
+		finalizeSession(snapshot, changeSet);
+		render(<ChangeSetReview changeSet={changeSet} />);
 
 		await user.click(await screen.findByRole("button", { name: "Reject" }));
 
@@ -85,6 +101,57 @@ describe("ChangeSetReview", () => {
 		expect(screen.queryByRole("button", { name: "Review again" })).toBeNull();
 		expect(screen.queryByRole("button", { name: "Apply selected" })).toBeNull();
 		expect(useFs.getState().filesByPath[path].content).toBe(before);
+		expect(useAgentChangeSessionStore.getState().phase).toBe("idle");
+	});
+
+	it("shares file selections with the current editor change session", async () => {
+		const user = userEvent.setup();
+		const firstPath = "/src/App.js";
+		const secondPath = "/src/index.js";
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		const changeSet = {
+			id: "agent:shared-selection",
+			baseRevision: snapshot.revision,
+			summary: "Update two files",
+			changes: [
+				{
+					op: "update" as const,
+					path: firstPath,
+					beforeHash: snapshot.files[firstPath].hash,
+					content: snapshot.files[firstPath].content.replace(
+						"Hello React",
+						"Shared selection",
+					),
+				},
+				{
+					op: "update" as const,
+					path: secondPath,
+					beforeHash: snapshot.files[secondPath].hash,
+					content: `${snapshot.files[secondPath].content}\n// Agent change\n`,
+				},
+			],
+		} satisfies WorkspaceChangeSet;
+		finalizeSession(snapshot, changeSet);
+		useAgentChangeSessionStore.getState().discardPath(firstPath);
+
+		render(<ChangeSetReview changeSet={changeSet} />);
+
+		const firstFile = await screen.findByRole("checkbox", {
+			name: `Select all changes in ${firstPath}`,
+		});
+		const secondFile = await screen.findByRole("checkbox", {
+			name: `Select all changes in ${secondPath}`,
+		});
+		await waitFor(() => expect(firstFile).not.toBeChecked());
+		expect(secondFile).toBeChecked();
+
+		await user.click(firstFile);
+		expect(useAgentChangeSessionStore.getState().discardedPaths).toEqual([]);
+
+		await user.click(secondFile);
+		expect(useAgentChangeSessionStore.getState().discardedPaths).toEqual([
+			secondPath,
+		]);
 	});
 
 	it("offers regeneration from current files after an apply conflict", async () => {
@@ -92,24 +159,23 @@ describe("ChangeSetReview", () => {
 		const onRegenerate = vi.fn();
 		const path = "/src/App.js";
 		const { snapshot } = await browserWorkspace.getSnapshot();
+		const changeSet = {
+			id: "agent:conflict",
+			baseRevision: snapshot.revision,
+			summary: "Conflicting update",
+			changes: [
+				{
+					op: "update" as const,
+					path,
+					beforeHash: snapshot.files[path].hash,
+					content: "agent content",
+				},
+			],
+		} satisfies WorkspaceChangeSet;
+		finalizeSession(snapshot, changeSet);
 		await browserWorkspace.updateFileContent(path, "user edited while running");
 		render(
-			<ChangeSetReview
-				changeSet={{
-					id: "agent:conflict",
-					baseRevision: snapshot.revision,
-					summary: "Conflicting update",
-					changes: [
-						{
-							op: "update",
-							path,
-							beforeHash: snapshot.files[path].hash,
-							content: "agent content",
-						},
-					],
-				}}
-				onRegenerate={onRegenerate}
-			/>,
+			<ChangeSetReview changeSet={changeSet} onRegenerate={onRegenerate} />,
 		);
 
 		await user.click(
@@ -118,6 +184,7 @@ describe("ChangeSetReview", () => {
 		const regenerate = await screen.findByRole("button", {
 			name: "Regenerate from current workspace",
 		});
+		expect(useAgentChangeSessionStore.getState().phase).toBe("finalized");
 		await user.click(regenerate);
 
 		expect(onRegenerate).toHaveBeenCalledOnce();

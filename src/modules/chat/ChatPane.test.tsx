@@ -1,14 +1,22 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { UIMessage } from "ai";
+import {
+	createUIMessageStreamResponse,
+	type UIMessage,
+	type UIMessageChunk,
+} from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { AgentChatMessage, ChatPane } from "@/modules/chat/ChatPane";
+import { EditorPane } from "@/modules/editor/EditorPane";
+import { useEditor } from "@/modules/editor/store";
 import { useFs } from "@/modules/fs/store";
 import { TOUR_STEP_IDS } from "@/modules/tour/constants";
 import {
 	browserWorkspace,
 	useBrowserWorkspaceFiles,
 } from "@/modules/workspace/browser";
+import { hashText } from "@/modules/workspace/domain";
 
 vi.mock("@/modules/fs/persistence", () => ({
 	clearWorkspace: vi.fn().mockResolvedValue(undefined),
@@ -17,8 +25,35 @@ vi.mock("@/modules/fs/persistence", () => ({
 	scheduleWorkspaceSave: vi.fn(),
 }));
 
+vi.mock("@/modules/editor/EditorDiffView", () => ({
+	EditorDiffView: ({
+		originalContent,
+		modifiedContent,
+		inline,
+	}: {
+		originalContent: string;
+		modifiedContent: string;
+		inline?: boolean;
+	}) => (
+		<output
+			data-inline={String(inline)}
+			data-modified={modifiedContent}
+			data-original={originalContent}
+			data-testid="streamed-agent-diff"
+		/>
+	),
+}));
+
+vi.mock("@/modules/editor/MonacoEditor", () => ({
+	MonacoEditorWrapper: ({ value }: { value: string }) => (
+		<output data-testid="streamed-code-editor">{value}</output>
+	),
+}));
+
 beforeEach(async () => {
 	await useFs.getState().resetFs();
+	useEditor.getState().closeAllFiles();
+	useAgentChangeSessionStore.getState().clear();
 });
 
 afterEach(() => {
@@ -32,6 +67,28 @@ function WorkspacePreviewProbe() {
 			{files["/src/App.js"]?.content}
 		</output>
 	);
+}
+
+function configuredProviderCatalogResponse() {
+	return Response.json({
+		providers: [
+			{
+				id: "openai",
+				name: "OpenAI",
+				description: "OpenAI models",
+				configured: true,
+				missingEnvVars: [],
+				defaultModelId: "openai/gpt-5.4",
+				models: [
+					{
+						id: "openai/gpt-5.4",
+						label: "GPT-5.4",
+						description: "Default",
+					},
+				],
+			},
+		],
+	});
 }
 
 describe("AgentChatMessage", () => {
@@ -164,6 +221,126 @@ describe("AgentChatMessage", () => {
 		);
 	});
 
+	it("projects a streamed write immediately and applies it only after approval", async () => {
+		const user = userEvent.setup();
+		const path = "/src/App.js";
+		const before = useFs.getState().filesByPath[path].content;
+		const after = before.replace("Hello React", "Live Agent Draft");
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		let streamController:
+			| ReadableStreamDefaultController<UIMessageChunk>
+			| undefined;
+		const stream = new ReadableStream<UIMessageChunk>({
+			start(controller) {
+				streamController = controller;
+			},
+		});
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((input: string | URL | Request) => {
+				const url =
+					typeof input === "string"
+						? input
+						: input instanceof URL
+							? input.href
+							: input.url;
+				if (url.endsWith("/api/providers")) {
+					return Promise.resolve(configuredProviderCatalogResponse());
+				}
+				return Promise.resolve(createUIMessageStreamResponse({ stream }));
+			}),
+		);
+
+		render(
+			<>
+				<ChatPane />
+				<EditorPane />
+				<WorkspacePreviewProbe />
+			</>,
+		);
+		const input = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await user.type(input, "Update the heading");
+		await user.click(screen.getByRole("button", { name: "Submit" }));
+
+		act(() => {
+			streamController?.enqueue({
+				type: "start",
+				messageId: "assistant-live-draft",
+			});
+			streamController?.enqueue({ type: "start-step" });
+			streamController?.enqueue({
+				type: "tool-input-available",
+				toolCallId: "write-live-draft",
+				toolName: "write_file",
+				input: { path, content: after },
+				dynamic: true,
+			});
+			streamController?.enqueue({
+				type: "tool-output-available",
+				toolCallId: "write-live-draft",
+				output: {
+					path,
+					hash: hashText(after),
+					bytes: new TextEncoder().encode(after).byteLength,
+				},
+				dynamic: true,
+			});
+		});
+
+		await waitFor(() => {
+			const diff = screen.getByTestId("streamed-agent-diff");
+			expect(diff).toHaveAttribute("data-inline", "true");
+			expect(diff).toHaveAttribute("data-original", before);
+			expect(diff).toHaveAttribute("data-modified", after);
+		});
+		expect(screen.getByTestId("workspace-preview")).toHaveTextContent(
+			"Hello React",
+		);
+		expect(useEditor.getState().activeFilePath).toBe(path);
+
+		act(() => {
+			streamController?.enqueue({
+				type: "tool-input-available",
+				toolCallId: "finalize-live-draft",
+				toolName: "finalize_changes",
+				input: { summary: "Update the heading" },
+				dynamic: true,
+			});
+			streamController?.enqueue({
+				type: "tool-output-available",
+				toolCallId: "finalize-live-draft",
+				output: {
+					id: "agent:live-draft",
+					baseRevision: snapshot.revision,
+					summary: "Update the heading",
+					changes: [
+						{
+							op: "update",
+							path,
+							beforeHash: snapshot.files[path].hash,
+							content: after,
+						},
+					],
+				},
+				dynamic: true,
+			});
+			streamController?.enqueue({ type: "finish-step" });
+			streamController?.enqueue({ type: "finish", finishReason: "stop" });
+			streamController?.close();
+		});
+
+		await user.click(
+			await screen.findByRole("button", { name: "Apply selected" }),
+		);
+		await waitFor(() =>
+			expect(screen.getByTestId("workspace-preview")).toHaveTextContent(
+				"Live Agent Draft",
+			),
+		);
+	});
+
 	it("aborts the active chat request when Escape is pressed after sending", async () => {
 		const user = userEvent.setup();
 		useFs
@@ -182,27 +359,7 @@ describe("AgentChatMessage", () => {
 							? input.href
 							: input.url;
 				if (url.endsWith("/api/providers")) {
-					return Promise.resolve(
-						Response.json({
-							providers: [
-								{
-									id: "openai",
-									name: "OpenAI",
-									description: "OpenAI models",
-									configured: true,
-									missingEnvVars: [],
-									defaultModelId: "openai/gpt-5.4",
-									models: [
-										{
-											id: "openai/gpt-5.4",
-											label: "GPT-5.4",
-											description: "Default",
-										},
-									],
-								},
-							],
-						}),
-					);
+					return Promise.resolve(configuredProviderCatalogResponse());
 				}
 
 				chatSignal =
@@ -238,6 +395,9 @@ describe("AgentChatMessage", () => {
 		expect(
 			document.querySelectorAll('[data-slot="agent-chat-composer"]'),
 		).toHaveLength(1);
+		await waitFor(() =>
+			expect(useAgentChangeSessionStore.getState().phase).toBe("running"),
+		);
 		expect(await screen.findByText("/.npmrc")).toBeVisible();
 		expect(screen.getByText(/credential or secret path/i)).toBeVisible();
 		expect(screen.queryByText(/must-not-render/)).toBeNull();
@@ -250,5 +410,54 @@ describe("AgentChatMessage", () => {
 				"bg-blue-600",
 			),
 		);
+		expect(useAgentChangeSessionStore.getState().phase).toBe("idle");
+	});
+
+	it("aborts the active chat request when the editor discards all drafts", async () => {
+		const user = userEvent.setup();
+		let chatSignal: AbortSignal | undefined;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				const url =
+					typeof input === "string"
+						? input
+						: input instanceof URL
+							? input.href
+							: input.url;
+				if (url.endsWith("/api/providers")) {
+					return Promise.resolve(configuredProviderCatalogResponse());
+				}
+				chatSignal =
+					init?.signal ??
+					(input instanceof Request ? input.signal : null) ??
+					undefined;
+				return new Promise<Response>((_resolve, reject) => {
+					const abort = () => reject(new DOMException("Stopped", "AbortError"));
+					if (chatSignal?.aborted) abort();
+					else chatSignal?.addEventListener("abort", abort, { once: true });
+				});
+			}),
+		);
+
+		render(<ChatPane />);
+		const input = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await user.type(input, "Update the app");
+		await user.click(screen.getByRole("button", { name: "Submit" }));
+		await waitFor(() =>
+			expect(useAgentChangeSessionStore.getState().phase).toBe("running"),
+		);
+
+		act(() => {
+			useAgentChangeSessionStore.getState().requestDiscardAll();
+		});
+
+		await waitFor(() => expect(chatSignal?.aborted).toBe(true));
+		expect(useAgentChangeSessionStore.getState()).toMatchObject({
+			phase: "idle",
+			discardAllRequested: false,
+		});
 	});
 });
