@@ -18,7 +18,10 @@ export const Route = createRootRoute({
 				title: "Mini Lovable Agent Studio",
 			},
 		],
-		links: [{ rel: "stylesheet", href: appCss }],
+		links: [
+			{ rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+			{ rel: "stylesheet", href: appCss },
+		],
 	}),
 	notFoundComponent: () => <main>页面不存在</main>,
 	shellComponent: RootDocument,

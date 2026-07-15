@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { BrandMark } from "@/components/BrandMark";
+import { BrandName } from "@/components/BrandName";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -48,7 +49,7 @@ export function TourAlertDialog({ isOpen, setIsOpen }: TourAlertDialogProps) {
 						</motion.div>
 					</div>
 					<DialogTitle className="text-center text-xl font-medium">
-						Welcome to Mini Lovable
+						Welcome to <BrandName className="text-xl" />
 					</DialogTitle>
 					<DialogDescription className="text-fg-muted mt-2 text-center text-sm">
 						Take a quick tour to learn about the key features and how to use

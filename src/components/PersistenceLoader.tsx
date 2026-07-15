@@ -1,6 +1,7 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
+import { BrandName } from "@/components/BrandName";
 import { installWorkspacePersistenceFlush } from "@/modules/fs/persistence";
 import { browserWorkspace } from "@/modules/workspace/browser";
 
@@ -9,7 +10,7 @@ type LoadingPhase = "loading" | "transitioning" | "done";
 // Header logo position
 const HEADER_LOGO_X = 26; // px from left edge to logo center
 const HEADER_LOGO_Y = 20; // px from top (half of 40px header)
-const LOGO_SIZE = 80; // Loading logo size
+const LOGO_SIZE = 96; // Loading logo size
 const HEADER_LOGO_SIZE = 20; // Header logo size
 
 /**
@@ -17,6 +18,7 @@ const HEADER_LOGO_SIZE = 20; // Header logo size
  */
 export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 	const [phase, setPhase] = useState<LoadingPhase>("loading");
+	const reduceMotion = useReducedMotion();
 
 	useEffect(() => installWorkspacePersistenceFlush(), []);
 
@@ -53,49 +55,51 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 			<AnimatePresence>
 				{phase !== "done" && (
 					<motion.div
-						className="fixed inset-0 z-50 bg-bg-primary flex items-center justify-center overflow-hidden"
+						className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-bg-primary text-fg-primary"
 						initial={{ opacity: 1 }}
 						exit={{ opacity: 0 }}
-						transition={{ duration: 0.2, delay: 0.3 }}
+						transition={{ duration: reduceMotion ? 0 : 0.25, delay: 0.2 }}
 					>
-						{/* Background gradient effect */}
 						<motion.div
-							className="absolute inset-0 pointer-events-none"
+							aria-hidden="true"
+							className="pointer-events-none absolute inset-0"
 							animate={
 								phase === "transitioning" ? { opacity: 0 } : { opacity: 1 }
 							}
-							transition={{ duration: 0.3 }}
+							transition={{ duration: reduceMotion ? 0 : 0.35 }}
 						>
-							<motion.div
-								className="absolute top-1/4 left-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl"
-								animate={{
-									scale: [1, 1.2, 1],
-									opacity: [0.5, 0.8, 0.5],
-								}}
-								transition={{
-									duration: 3,
-									repeat: Number.POSITIVE_INFINITY,
-									ease: "easeInOut",
+							<div
+								className="absolute inset-0"
+								style={{
+									backgroundImage:
+										"radial-gradient(circle at 50% 42%, rgba(99, 102, 241, 0.18), transparent 31%), radial-gradient(circle at 18% 18%, rgba(37, 99, 235, 0.1), transparent 25%), radial-gradient(circle at 82% 78%, rgba(244, 63, 94, 0.09), transparent 28%)",
 								}}
 							/>
-							<motion.div
-								className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"
-								animate={{
-									scale: [1.2, 1, 1.2],
-									opacity: [0.5, 0.8, 0.5],
+							<div
+								className="absolute inset-0 opacity-60"
+								style={{
+									backgroundImage:
+										"linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px)",
+									backgroundSize: "44px 44px",
+									maskImage:
+										"radial-gradient(circle at center, black, transparent 72%)",
+									WebkitMaskImage:
+										"radial-gradient(circle at center, black, transparent 72%)",
 								}}
-								transition={{
-									duration: 3,
-									repeat: Number.POSITIVE_INFINITY,
-									ease: "easeInOut",
+							/>
+							<div
+								className="absolute size-[26rem] rounded-full bg-indigo-500/10 blur-[100px]"
+								style={{
+									left: "50%",
+									top: "calc(50% - 90px)",
+									transform: "translate(-50%, -50%)",
 								}}
 							/>
 						</motion.div>
 
-						{/* Logo that flies to header */}
 						<motion.div
 							aria-label="Mini Lovable"
-							className="z-30"
+							className="z-30 drop-shadow-[0_24px_48px_rgba(49,46,129,0.28)]"
 							role="img"
 							style={{
 								position: "fixed",
@@ -105,22 +109,29 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 								top:
 									phase === "transitioning"
 										? HEADER_LOGO_Y - HEADER_LOGO_SIZE / 2
-										: "calc(50% - 108px)",
+										: "calc(50% - 138px)",
 								left:
 									phase === "transitioning"
 										? HEADER_LOGO_X - HEADER_LOGO_SIZE / 2
-										: "calc(50% - 190px)",
-								transform: "none",
-								transition:
-									"top 0.6s cubic-bezier(0.4, 0, 0.2, 1), left 0.6s cubic-bezier(0.4, 0, 0.2, 1), width 0.6s cubic-bezier(0.4, 0, 0.2, 1), height 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+										: `calc(50% - ${LOGO_SIZE / 2}px)`,
+								transition: reduceMotion
+									? "none"
+									: "top 0.6s cubic-bezier(0.22, 1, 0.36, 1), left 0.6s cubic-bezier(0.22, 1, 0.36, 1), width 0.6s cubic-bezier(0.22, 1, 0.36, 1), height 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
 							}}
 							initial={false}
-							animate={{
-								rotate: phase === "loading" ? [0, 5, -5, 0] : 0,
-							}}
+							animate={
+								phase === "loading" && !reduceMotion
+									? { scale: [1, 1.025, 1], y: [0, -4, 0] }
+									: { scale: 1, y: 0 }
+							}
 							transition={{
-								rotate: {
-									duration: 3,
+								scale: {
+									duration: 2.4,
+									repeat: Number.POSITIVE_INFINITY,
+									ease: "easeInOut",
+								},
+								y: {
+									duration: 2.4,
 									repeat: Number.POSITIVE_INFINITY,
 									ease: "easeInOut",
 								},
@@ -129,9 +140,8 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 							<BrandMark className="size-full" />
 						</motion.div>
 
-						{/* Loading content */}
 						<motion.div
-							className="flex flex-col items-center z-10"
+							className="z-10 flex w-full flex-col items-center px-6 text-center"
 							initial={{ opacity: 0, y: 20 }}
 							animate={
 								phase === "transitioning"
@@ -139,72 +149,55 @@ export function PersistenceLoader({ children }: { children: React.ReactNode }) {
 									: { opacity: 1, y: 0 }
 							}
 							transition={{
-								duration: phase === "transitioning" ? 0.3 : 0.5,
+								duration: reduceMotion
+									? 0
+									: phase === "transitioning"
+										? 0.25
+										: 0.5,
 								ease: "easeOut",
 							}}
 						>
-							{/* Logo placeholder + text row */}
-							<div className="flex items-center gap-4 mb-6">
-								{/* Invisible placeholder for logo */}
-								<div style={{ width: LOGO_SIZE, height: LOGO_SIZE }} />
-								<motion.span
-									className="text-5xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent"
-									animate={phase === "loading" ? { scale: [1, 1.02, 1] } : {}}
-									transition={{
-										duration: 2,
-										repeat: Number.POSITIVE_INFINITY,
-										ease: "easeInOut",
-									}}
-								>
-									Mini Lovable
-								</motion.span>
-							</div>
-
-							{/* Tagline */}
+							<div aria-hidden="true" className="h-28 w-24" />
+							<BrandName className="text-[clamp(2.75rem,8vw,4.5rem)] font-[680]" />
 							<motion.p
-								className="text-base text-fg-secondary mb-10"
+								className="mt-4 text-[15px] font-medium tracking-[-0.01em] text-fg-secondary"
 								initial={{ opacity: 0 }}
 								animate={{ opacity: 1 }}
-								transition={{ delay: 0.3 }}
+								transition={{ delay: reduceMotion ? 0 : 0.25 }}
 							>
 								Build beautiful apps with AI
 							</motion.p>
 
-							{/* Loading indicator */}
-							<div className="flex items-center gap-3 mb-4">
-								{[0, 1, 2].map((i) => (
-									<motion.div
-										key={i}
-										className={`w-4 h-4 rounded-full ${
-											i === 0
-												? "bg-pink-500"
-												: i === 1
-													? "bg-purple-500"
-													: "bg-indigo-500"
-										}`}
-										animate={{
-											y: [0, -12, 0],
-										}}
+							<div className="mt-10 w-56">
+								<div className="mb-3 flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-fg-muted">
+									<span>Preparing workspace</span>
+									<motion.span
+										aria-hidden="true"
+										className="size-1.5 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]"
+										animate={
+											reduceMotion
+												? { opacity: 1 }
+												: { opacity: [0.35, 1, 0.35], scale: [0.85, 1, 0.85] }
+										}
 										transition={{
-											duration: 0.6,
+											duration: 1.25,
 											repeat: Number.POSITIVE_INFINITY,
-											delay: i * 0.15,
 											ease: "easeInOut",
 										}}
 									/>
-								))}
+								</div>
+								<div className="h-0.5 overflow-hidden rounded-full bg-fg-primary/10">
+									<motion.div
+										className="h-full w-1/2 rounded-full bg-gradient-to-r from-blue-500 via-violet-500 to-rose-400"
+										animate={{ x: reduceMotion ? "100%" : ["-120%", "220%"] }}
+										transition={{
+											duration: 1.35,
+											repeat: Number.POSITIVE_INFINITY,
+											ease: "easeInOut",
+										}}
+									/>
+								</div>
 							</div>
-
-							<motion.p
-								className="text-sm text-fg-muted"
-								animate={{ opacity: [0.5, 1, 0.5] }}
-								transition={{
-									duration: 1.5,
-									repeat: Number.POSITIVE_INFINITY,
-								}}
-							>
-								Loading workspace...
-							</motion.p>
 						</motion.div>
 					</motion.div>
 				)}

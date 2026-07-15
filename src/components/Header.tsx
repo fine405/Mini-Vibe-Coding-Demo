@@ -11,6 +11,7 @@ import {
 	Upload,
 } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
+import { BrandName } from "@/components/BrandName";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,11 +52,9 @@ export function Header({
 	return (
 		<div className="h-10 w-full bg-bg-primary border-b border-border-primary flex items-center justify-between px-4 shrink-0 text-fg-primary">
 			<div className="flex items-center gap-3">
-				<div className="flex items-center gap-1.5">
+				<div className="flex items-center gap-2">
 					<BrandMark className="size-5" />
-					<span className="text-sm font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">
-						Mini Lovable
-					</span>
+					<BrandName className="text-[13px]" />
 				</div>
 
 				<div className="w-px h-4 bg-border-primary" />

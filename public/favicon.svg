@@ -1,0 +1,32 @@
+<svg fill="none" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+	<style>
+		@keyframes flow {
+			to { stroke-dashoffset: -1; }
+		}
+
+		.glint {
+			animation: flow 3.2s linear infinite;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.glint { animation: none; }
+		}
+	</style>
+	<defs>
+		<linearGradient gradientUnits="userSpaceOnUse" id="surface" x1="9" x2="55" y1="7" y2="58">
+			<stop stop-color="#171923" />
+			<stop offset="1" stop-color="#08090d" />
+		</linearGradient>
+		<linearGradient gradientUnits="userSpaceOnUse" id="ribbon" x1="13" x2="51" y1="30" y2="30">
+			<stop stop-color="#e8f0ff" />
+			<stop offset="0.38" stop-color="#8eacff" />
+			<stop offset="0.72" stop-color="#8b6cf6" />
+			<stop offset="1" stop-color="#c4a7ff" />
+		</linearGradient>
+	</defs>
+	<rect fill="url(#surface)" height="64" rx="19" width="64" />
+	<rect height="63" rx="18.5" stroke="white" stroke-opacity="0.08" width="63" x="0.5" y="0.5" />
+	<path d="M13 42 C16 18 25 18 32 39 C39 18 48 18 51 42" stroke="white" stroke-linecap="round" stroke-opacity="0.07" stroke-width="9" />
+	<path d="M13 42 C16 18 25 18 32 39 C39 18 48 18 51 42" stroke="url(#ribbon)" stroke-linecap="round" stroke-width="5.75" />
+	<path class="glint" d="M13 42 C16 18 25 18 32 39 C39 18 48 18 51 42" pathLength="1" stroke="white" stroke-dasharray="0.12 0.88" stroke-dashoffset="1" stroke-linecap="round" stroke-opacity="0.85" stroke-width="1.6" />
+</svg>
