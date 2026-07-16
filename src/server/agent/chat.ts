@@ -145,7 +145,7 @@ export async function createChatResponse(
 		requestContext.set("requestId", requestId);
 		const abortSignal = AbortSignal.any([
 			request.signal,
-			AbortSignal.timeout(120_000),
+			AbortSignal.timeout(10 * 60_000),
 		]);
 		const startedAt = performance.now();
 		let incompleteRun = false;

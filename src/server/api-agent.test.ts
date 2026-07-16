@@ -380,6 +380,77 @@ describe("POST /api/chat", () => {
 		expect(controller.signal.aborted).toBe(true);
 	});
 
+	it("allows an agent run to continue for ten minutes before timing out", async () => {
+		vi.useFakeTimers();
+		const timeoutSpy = vi
+			.spyOn(AbortSignal, "timeout")
+			.mockImplementation((timeoutMs) => {
+				const controller = new AbortController();
+				setTimeout(() => controller.abort(), timeoutMs);
+				return controller.signal;
+			});
+		try {
+			const { snapshot } = createWorkspaceSnapshot({
+				"/src/App.tsx": "old",
+			});
+			let wasAborted = false;
+			const model = new MockLanguageModelV3({
+				doStream: async ({ abortSignal }) => ({
+					stream: new ReadableStream<MockStreamChunk>({
+						start(controller) {
+							controller.enqueue({
+								type: "text-start",
+								id: "timeout-text",
+							});
+							abortSignal?.addEventListener(
+								"abort",
+								() => {
+									wasAborted = true;
+									controller.close();
+								},
+								{ once: true },
+							);
+						},
+					}),
+				}),
+			});
+			const api = createApi({
+				providerCatalog: new ProviderCatalog(
+					new ObjectProviderConfigSource({ OPENAI_API_KEY: "test-only" }),
+				),
+				modelResolver: () => model,
+			});
+
+			const response = await api.request("/api/chat", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					messages: [
+						{
+							id: "user-timeout",
+							role: "user",
+							parts: [{ type: "text", text: "Keep working" }],
+						},
+					],
+					providerId: "openai",
+					modelId: "openai/gpt-5.4",
+					workspace: snapshot,
+				}),
+			});
+			const consume = response.text();
+
+			await vi.advanceTimersByTimeAsync(10 * 60_000 - 1);
+			expect(wasAborted).toBe(false);
+
+			await vi.advanceTimersByTimeAsync(1);
+			expect(wasAborted).toBe(true);
+			await consume;
+		} finally {
+			timeoutSpy.mockRestore();
+			vi.useRealTimers();
+		}
+	});
+
 	it("streams bounded tool errors without mutating the submitted workspace", async () => {
 		const consoleError = vi.spyOn(console, "error");
 		const { snapshot } = createWorkspaceSnapshot({ "/src/App.tsx": "old" });
