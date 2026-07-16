@@ -10,7 +10,7 @@ export const workspaceSnapshotFileSchema = z.object({
 
 export const workspaceSnapshotV1Schema = z.object({
 	revision: contentHashSchema,
-	files: z.record(workspaceSnapshotFileSchema),
+	files: z.record(z.string(), workspaceSnapshotFileSchema),
 });
 export const workspaceSnapshotSchema = workspaceSnapshotV1Schema;
 
@@ -46,7 +46,7 @@ export const changeSelectionV1Schema = z
 	.object({
 		changeIndices: z.array(z.number().int().nonnegative()).optional(),
 		hunkIndicesByChange: z
-			.record(z.array(z.number().int().nonnegative()))
+			.record(z.string(), z.array(z.number().int().nonnegative()))
 			.optional(),
 	})
 	.refine(
@@ -67,7 +67,7 @@ export const workspaceConflictV1Schema = z.object({
 });
 
 export const preparedWorkspaceTransactionV1Schema = z.object({
-	files: z.record(z.string()),
+	files: z.record(z.string(), z.string()),
 	previousRevision: contentHashSchema,
 	revision: contentHashSchema,
 	affectedPaths: z.array(z.string()),

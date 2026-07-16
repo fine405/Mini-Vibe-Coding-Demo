@@ -8,6 +8,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { AgentChatMessage, ChatPane } from "@/modules/chat/ChatPane";
+import {
+	GENERATIVE_UI_SUGGESTIONS,
+	STARTER_SUGGESTIONS,
+} from "@/modules/chat/suggestion-prompts";
 import { EditorPane } from "@/modules/editor/EditorPane";
 import { useEditor } from "@/modules/editor/store";
 import { useFs } from "@/modules/fs/store";
@@ -47,6 +51,14 @@ vi.mock("@/modules/editor/EditorDiffView", () => ({
 vi.mock("@/modules/editor/MonacoEditor", () => ({
 	MonacoEditorWrapper: ({ value }: { value: string }) => (
 		<output data-testid="streamed-code-editor">{value}</output>
+	),
+}));
+
+vi.mock("@/modules/generative-ui/GenerativeUIMessage", () => ({
+	GenerativeUIMessage: ({ parts }: { parts: Array<{ type: string }> }) => (
+		<output data-testid="generated-interface">
+			{parts.filter((part) => part.type === "data-spec").length} spec parts
+		</output>
 	),
 }));
 
@@ -92,6 +104,34 @@ function configuredProviderCatalogResponse() {
 }
 
 describe("AgentChatMessage", () => {
+	it("covers the approved Catalog in the first Generative UI batch", () => {
+		const firstBatch = GENERATIVE_UI_SUGGESTIONS.slice(0, 3)
+			.map(({ prompt }) => prompt)
+			.join("\n");
+
+		expect(STARTER_SUGGESTIONS).toHaveLength(6);
+		expect(GENERATIVE_UI_SUGGESTIONS).toHaveLength(6);
+		for (const component of [
+			"Stack",
+			"Grid",
+			"Card",
+			"Text",
+			"Metric",
+			"DataTable",
+			"Chart",
+			"Button",
+			"Timeline",
+			"MermaidDiagram",
+		]) {
+			expect(firstBatch).toContain(component);
+		}
+		expect(
+			GENERATIVE_UI_SUGGESTIONS.every(({ prompt }) =>
+				prompt.includes("Do not modify the workspace"),
+			),
+		).toBe(true);
+	});
+
 	it("exposes the chat pane as the first tour target", () => {
 		vi.stubGlobal(
 			"fetch",
@@ -107,7 +147,83 @@ describe("AgentChatMessage", () => {
 				name: "Build with a real coding agent",
 			}),
 		).toBeVisible();
-		expect(screen.getByText("Try a starter")).toBeVisible();
+		expect(screen.getByText("Try a prompt")).toBeVisible();
+		expect(screen.getByRole("tab", { name: "Starter" })).toHaveAttribute(
+			"data-state",
+			"active",
+		);
+		expect(screen.getByRole("tab", { name: "Generative UI" })).toBeVisible();
+	});
+
+	it("fills suggestions at the caret without sending and rotates each tab", async () => {
+		const user = userEvent.setup();
+		const fetchMock = vi.fn((input: string | URL | Request) => {
+			const url =
+				typeof input === "string"
+					? input
+					: input instanceof URL
+						? input.href
+						: input.url;
+			if (url.endsWith("/api/providers")) {
+				return Promise.resolve(configuredProviderCatalogResponse());
+			}
+			return Promise.reject(new Error(`Unexpected request: ${url}`));
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		render(<ChatPane />);
+		const input = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await waitFor(() => expect(input).toBeEnabled());
+
+		await user.click(screen.getByRole("tab", { name: "Generative UI" }));
+		expect(screen.getAllByTestId("chat-suggestion")).toHaveLength(3);
+		await user.click(
+			screen.getByRole("button", { name: /Project health dashboard/ }),
+		);
+
+		const prompt = GENERATIVE_UI_SUGGESTIONS[0].prompt;
+		expect(input).toHaveValue(prompt);
+		expect(input).toHaveFocus();
+		expect((input as HTMLTextAreaElement).selectionStart).toBe(prompt.length);
+		expect((input as HTMLTextAreaElement).selectionEnd).toBe(prompt.length);
+		expect(
+			fetchMock.mock.calls.some(([request]) => {
+				const url =
+					typeof request === "string"
+						? request
+						: request instanceof URL
+							? request.href
+							: request.url;
+				return url.endsWith("/api/chat");
+			}),
+		).toBe(false);
+
+		await user.click(
+			screen.getByRole("button", {
+				name: "Refresh Generative UI suggestions",
+			}),
+		);
+		expect(
+			screen.getByRole("button", { name: /Product comparison board/ }),
+		).toBeVisible();
+		expect(
+			screen.queryByRole("button", { name: /Project health dashboard/ }),
+		).not.toBeInTheDocument();
+		expect(input).toHaveValue(prompt);
+
+		await user.click(screen.getByRole("tab", { name: "Starter" }));
+		expect(
+			screen.getByRole("button", { name: /Review the current app/ }),
+		).toBeVisible();
+		await user.click(
+			screen.getByRole("button", { name: "Refresh Starter suggestions" }),
+		);
+		expect(
+			screen.getByRole("button", { name: /Improve accessibility/ }),
+		).toBeVisible();
+		expect(input).toHaveValue(prompt);
 	});
 
 	it("renders streamed model text and reasoning with AI Elements", async () => {
@@ -127,6 +243,127 @@ describe("AgentChatMessage", () => {
 		expect(
 			screen.queryByRole("button", { name: /sources?$/ }),
 		).not.toBeInTheDocument();
+	});
+
+	it("collapses completed reasoning and tool calls", async () => {
+		const user = userEvent.setup();
+		const reasoningMessage = {
+			id: "assistant-collapsible-trace",
+			role: "assistant",
+			parts: [{ type: "reasoning", text: "Checking the request." }],
+		} as UIMessage;
+		const { rerender } = render(
+			<AgentChatMessage isStreaming={true} message={reasoningMessage} />,
+		);
+
+		const reasoningTrigger = screen.getByRole("button", {
+			name: /Thinking/,
+		});
+		expect(reasoningTrigger).toHaveAttribute("aria-expanded", "true");
+
+		const runningToolMessage = {
+			...reasoningMessage,
+			parts: [
+				...reasoningMessage.parts,
+				{
+					type: "dynamic-tool",
+					toolName: "web_search",
+					toolCallId: "call-collapsible-search",
+					state: "input-available",
+					input: { query: "current information" },
+				},
+			],
+		} as UIMessage;
+		rerender(
+			<AgentChatMessage isStreaming={true} message={runningToolMessage} />,
+		);
+
+		await waitFor(() =>
+			expect(reasoningTrigger).toHaveAttribute("aria-expanded", "false"),
+		);
+		const toolTrigger = screen.getByRole("button", {
+			name: "web searchRunning",
+		});
+		expect(toolTrigger).toHaveAttribute("aria-expanded", "true");
+
+		const completedToolMessage = {
+			...runningToolMessage,
+			parts: [
+				runningToolMessage.parts[0],
+				{
+					...runningToolMessage.parts[1],
+					state: "output-available",
+					output: { query: "current information", sources: [] },
+				},
+			],
+		} as UIMessage;
+		rerender(
+			<AgentChatMessage isStreaming={false} message={completedToolMessage} />,
+		);
+
+		await waitFor(() =>
+			expect(toolTrigger).toHaveAttribute("aria-expanded", "false"),
+		);
+		await user.click(toolTrigger);
+		expect(toolTrigger).toHaveAttribute("aria-expanded", "true");
+	});
+
+	it("renders one generated interface at the first spec part position", async () => {
+		const message = {
+			id: "assistant-generative-ui",
+			role: "assistant",
+			parts: [
+				{ type: "text", text: "Before interface" },
+				{
+					type: "data-spec",
+					data: {
+						type: "patch",
+						patch: { op: "add", path: "/root", value: "root" },
+					},
+				},
+				{
+					type: "dynamic-tool",
+					toolName: "read_file",
+					toolCallId: "call-after-spec",
+					state: "output-available",
+					input: { path: "/src/App.tsx" },
+					output: { path: "/src/App.tsx" },
+				},
+				{
+					type: "data-spec",
+					data: {
+						type: "patch",
+						patch: {
+							op: "add",
+							path: "/elements/root",
+							value: { type: "Text", props: { content: "UI" }, children: [] },
+						},
+					},
+				},
+				{ type: "text", text: "After interface" },
+			],
+		} as unknown as UIMessage;
+
+		render(<AgentChatMessage isStreaming={false} message={message} />);
+
+		const before = await screen.findByText("Before interface");
+		const generated = await screen.findByTestId("generated-interface");
+		const tool = screen.getByText("read file");
+		const after = await screen.findByText("After interface");
+
+		expect(generated).toHaveTextContent("2 spec parts");
+		expect(screen.getAllByTestId("generated-interface")).toHaveLength(1);
+		expect(
+			before.compareDocumentPosition(generated) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+		expect(
+			generated.compareDocumentPosition(tool) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+		expect(
+			tool.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
 	});
 
 	it("shows web sources in the tool timeline and aggregates them after the answer", async () => {
@@ -164,6 +401,11 @@ describe("AgentChatMessage", () => {
 		} as UIMessage;
 
 		render(<AgentChatMessage isStreaming={false} message={message} />);
+		const toolTrigger = screen.getByRole("button", {
+			name: "web searchCompleted",
+		});
+		expect(toolTrigger).toHaveAttribute("aria-expanded", "false");
+		await user.click(toolTrigger);
 
 		const timelineSource = screen.getByRole("link", {
 			name: "Sources component",
@@ -231,7 +473,8 @@ describe("AgentChatMessage", () => {
 		);
 	});
 
-	it("renders a compact weather result with its attribution", () => {
+	it("renders a compact weather result with its attribution", async () => {
+		const user = userEvent.setup();
 		const message = {
 			id: "assistant-weather",
 			role: "assistant",
@@ -283,6 +526,11 @@ describe("AgentChatMessage", () => {
 		} as UIMessage;
 
 		render(<AgentChatMessage isStreaming={false} message={message} />);
+		const toolTrigger = screen.getByRole("button", {
+			name: "weather searchCompleted",
+		});
+		expect(toolTrigger).toHaveAttribute("aria-expanded", "false");
+		await user.click(toolTrigger);
 
 		expect(screen.getByText("Shanghai")).toBeVisible();
 		expect(screen.getByText("30 °C")).toBeVisible();
@@ -293,7 +541,8 @@ describe("AgentChatMessage", () => {
 		expect(screen.getByRole("button", { name: "1 source" })).toBeVisible();
 	});
 
-	it("does not create citations when web search returns no verified sources", () => {
+	it("does not create citations when web search returns no verified sources", async () => {
+		const user = userEvent.setup();
 		const message = {
 			id: "assistant-empty-research",
 			role: "assistant",
@@ -310,6 +559,9 @@ describe("AgentChatMessage", () => {
 		} as UIMessage;
 
 		render(<AgentChatMessage isStreaming={false} message={message} />);
+		await user.click(
+			screen.getByRole("button", { name: "web searchCompleted" }),
+		);
 
 		expect(screen.getByRole("status")).toHaveTextContent(
 			"No verified sources found.",
@@ -342,7 +594,8 @@ describe("AgentChatMessage", () => {
 		expect(screen.getByText(/current web information/)).toBeVisible();
 	});
 
-	it("shows a sanitized weather error without creating citations", () => {
+	it("shows a sanitized weather error without creating citations", async () => {
+		const user = userEvent.setup();
 		const message = {
 			id: "assistant-weather-error",
 			role: "assistant",
@@ -360,9 +613,11 @@ describe("AgentChatMessage", () => {
 
 		render(<AgentChatMessage isStreaming={false} message={message} />);
 
-		expect(
-			screen.getByRole("button", { name: "weather searchError" }),
-		).toHaveAttribute("aria-expanded", "true");
+		const toolTrigger = screen.getByRole("button", {
+			name: "weather searchError",
+		});
+		expect(toolTrigger).toHaveAttribute("aria-expanded", "false");
+		await user.click(toolTrigger);
 		expect(
 			screen.getByText("Weather service is unavailable. Try again later."),
 		).toBeVisible();
@@ -371,7 +626,8 @@ describe("AgentChatMessage", () => {
 		).not.toBeInTheDocument();
 	});
 
-	it("renders typed tool errors with AI Elements", () => {
+	it("renders typed tool errors with AI Elements", async () => {
+		const user = userEvent.setup();
 		const message = {
 			id: "assistant-tool-error",
 			role: "assistant",
@@ -390,6 +646,9 @@ describe("AgentChatMessage", () => {
 		render(<AgentChatMessage isStreaming={false} message={message} />);
 
 		expect(screen.getByText("read file")).toBeVisible();
+		const toolTrigger = screen.getByRole("button", { name: "read fileError" });
+		expect(toolTrigger).toHaveAttribute("aria-expanded", "false");
+		await user.click(toolTrigger);
 		expect(screen.getByText("File not found")).toBeVisible();
 	});
 

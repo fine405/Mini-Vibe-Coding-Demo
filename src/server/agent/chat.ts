@@ -1,4 +1,5 @@
 import "@tanstack/react-start/server-only";
+import { pipeJsonRender } from "@json-render/core";
 import { handleChatStream } from "@mastra/ai-sdk";
 import type { MastraModelConfig } from "@mastra/core/llm";
 import { RequestContext } from "@mastra/core/request-context";
@@ -220,7 +221,7 @@ export async function createChatResponse(
 
 		return createUIMessageStreamResponse({
 			stream: withIncompleteRunState(
-				toCurrentAiStream(stream),
+				pipeJsonRender(toCurrentAiStream(stream)),
 				() => incompleteRun,
 			),
 		});

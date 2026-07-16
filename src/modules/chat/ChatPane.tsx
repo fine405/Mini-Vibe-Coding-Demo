@@ -10,15 +10,19 @@ import {
 import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import {
 	AlertTriangleIcon,
-	ArrowRightIcon,
 	BotIcon,
 	KeyRoundIcon,
-	PlusIcon,
 	RefreshCwIcon,
-	SearchIcon,
-	WrenchIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	lazy,
+	Suspense,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import {
 	Conversation,
 	ConversationContent,
@@ -65,6 +69,7 @@ import { collectResearchSources } from "@/modules/agent-chat/research";
 import { useAgentChatSessionStore } from "@/modules/agent-chat/session-store";
 import { projectCompletedAgentTools } from "@/modules/agent-chat/tool-projection";
 import { useProviderCatalog } from "@/modules/agent-chat/use-provider-catalog";
+import { ChatSuggestions } from "@/modules/chat/ChatSuggestions";
 import {
 	ResearchCitationFooter,
 	ResearchToolResult,
@@ -85,6 +90,12 @@ const COMPOSER_TRANSITION = {
 	ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
 };
 const REDUCED_MOTION_TRANSITION = { duration: 0 };
+const SPEC_DATA_PART_TYPE = "data-spec";
+const GenerativeUIMessage = lazy(() =>
+	import("@/modules/generative-ui/GenerativeUIMessage").then((module) => ({
+		default: module.GenerativeUIMessage,
+	})),
+);
 
 class AgentRunToken {
 	#value: string | null = null;
@@ -97,21 +108,6 @@ class AgentRunToken {
 		return this.#value;
 	}
 }
-
-const starterPrompts = [
-	{
-		icon: SearchIcon,
-		prompt: "Review the current app and improve its UX",
-	},
-	{
-		icon: PlusIcon,
-		prompt: "Add a useful feature to this project",
-	},
-	{
-		icon: WrenchIcon,
-		prompt: "Find and fix problems in the codebase",
-	},
-] as const;
 
 const omissionReasonLabels: Record<SnapshotOmissionReason, string> = {
 	secret: "credential or secret path",
@@ -222,11 +218,19 @@ function ToolCall({
 	const output = part.state === "output-available" ? part.output : undefined;
 	const errorText = part.state === "output-error" ? part.errorText : undefined;
 	const isResearchTool = name === "web_search" || name === "weather_search";
-	const defaultOpen =
-		name === "finalize_changes" || isResearchTool || Boolean(errorText);
+	const isComplete =
+		part.state === "output-available" ||
+		part.state === "output-error" ||
+		part.state === "output-denied";
+	const shouldOpen = !isComplete || Boolean(changeSet);
+	const [isOpen, setIsOpen] = useState(shouldOpen);
+
+	useEffect(() => {
+		setIsOpen(shouldOpen);
+	}, [shouldOpen]);
 
 	return (
-		<Tool defaultOpen={defaultOpen}>
+		<Tool onOpenChange={setIsOpen} open={isOpen}>
 			{part.type === "dynamic-tool" ? (
 				<ToolHeader
 					state={part.state}
@@ -272,11 +276,32 @@ export function AgentChatMessage({
 }) {
 	const sources =
 		message.role === "assistant" ? collectResearchSources(message.parts) : [];
+	const firstSpecPartIndex = message.parts.findIndex(
+		(part) => part.type === SPEC_DATA_PART_TYPE,
+	);
 
 	return (
 		<Message from={message.role}>
 			<MessageContent>
 				{message.parts.map((part, index) => {
+					if (part.type === SPEC_DATA_PART_TYPE) {
+						if (index !== firstSpecPartIndex) return null;
+						return (
+							<Suspense
+								fallback={
+									<div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+										Loading generated interface…
+									</div>
+								}
+								key={`${message.id}:spec`}
+							>
+								<GenerativeUIMessage
+									isStreaming={isStreaming}
+									parts={message.parts}
+								/>
+							</Suspense>
+						);
+					}
 					if (part.type === "text") {
 						return message.role === "assistant" ? (
 							<MessageResponse
@@ -297,7 +322,7 @@ export function AgentChatMessage({
 					if (part.type === "reasoning") {
 						return (
 							<Reasoning
-								isStreaming={isStreaming}
+								isStreaming={isStreaming && index === message.parts.length - 1}
 								key={`${message.id}:reasoning:${index}`}
 							>
 								<ReasoningTrigger />
@@ -324,6 +349,7 @@ export function AgentChatMessage({
 
 function AgentChatPane({ sessionId }: { sessionId: string }) {
 	const reduceMotion = useReducedMotion();
+	const composerRef = useRef<HTMLTextAreaElement>(null);
 	const processedToolCallIdsRef = useRef(new Set<string>());
 	const [activeRunToken] = useState(() => new AgentRunToken());
 	const {
@@ -471,10 +497,16 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 		clearError();
 		await sendMessage({ text: prompt, files });
 	};
-	const sendStarter = (prompt: string) => {
-		if (!canSend || generating) return;
-		void sendMessage({ text: prompt });
-	};
+	const fillComposer = useCallback(
+		(prompt: string) => {
+			const composer = composerRef.current;
+			if (!composer || !canSend || generating) return;
+			composer.value = prompt;
+			composer.focus();
+			composer.setSelectionRange(prompt.length, prompt.length);
+		},
+		[canSend, generating],
+	);
 	const clearConversation = async () => {
 		if (generating) await stopRun();
 		else useAgentChangeSessionStore.getState().clear();
@@ -547,6 +579,7 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 								? "Describe what you want to build…"
 								: "Configure a provider key to start"
 						}
+						ref={composerRef}
 					/>
 				</PromptInputBody>
 				<PromptInputFooter className={prominent ? "px-3 pb-3" : undefined}>
@@ -632,26 +665,15 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 										<div className="mt-6 flex items-center gap-3">
 											<div className="h-px flex-1 bg-border" />
 											<p className="shrink-0 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-												Try a starter
+												Try a prompt
 											</p>
 											<div className="h-px flex-1 bg-border" />
 										</div>
 
-										<div className="mt-3 flex flex-col gap-2">
-											{starterPrompts.map(({ icon: StarterIcon, prompt }) => (
-												<Button
-													className="group h-auto min-h-11 w-full justify-start gap-3 whitespace-normal rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 text-left text-xs font-normal text-foreground shadow-none hover:border-border hover:bg-muted/50"
-													disabled={!canSend}
-													key={prompt}
-													onClick={() => sendStarter(prompt)}
-													variant="ghost"
-												>
-													<StarterIcon className="size-4 shrink-0 text-blue-500" />
-													<span className="min-w-0 flex-1">{prompt}</span>
-													<ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-												</Button>
-											))}
-										</div>
+										<ChatSuggestions
+											disabled={!canSend || generating}
+											onSelect={fillComposer}
+										/>
 									</div>
 								</div>
 							</ConversationEmptyState>

@@ -1,6 +1,9 @@
 import type { UIMessage } from "ai";
 import { describe, expect, it } from "vitest";
-import { collectResearchSources } from "@/modules/agent-chat/research";
+import {
+	collectResearchSources,
+	weatherSearchInputSchema,
+} from "@/modules/agent-chat/research";
 
 const weatherOutput = {
 	location: {
@@ -38,6 +41,16 @@ const weatherOutput = {
 		},
 	],
 };
+
+describe("weatherSearchInputSchema", () => {
+	it("normalizes a bare location string with defaults", () => {
+		expect(weatherSearchInputSchema.parse("深圳")).toEqual({
+			location: "深圳",
+			forecastDays: 5,
+			units: "metric",
+		});
+	});
+});
 
 describe("collectResearchSources", () => {
 	it("collects validated web and weather sources in first-seen order", () => {

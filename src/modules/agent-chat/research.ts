@@ -41,13 +41,18 @@ export const webSearchOutputSchema = z
 
 export type WebSearchOutput = z.infer<typeof webSearchOutputSchema>;
 
-export const weatherSearchInputSchema = z
+const weatherSearchInputObjectSchema = z
 	.object({
 		location: z.string().trim().min(1).max(120),
 		forecastDays: z.number().int().min(1).max(7).default(5),
 		units: z.enum(["metric", "imperial"]).default("metric"),
 	})
 	.strict();
+
+export const weatherSearchInputSchema = z.preprocess(
+	(input) => (typeof input === "string" ? { location: input } : input),
+	weatherSearchInputObjectSchema,
+);
 
 export type WeatherSearchInput = z.infer<typeof weatherSearchInputSchema>;
 

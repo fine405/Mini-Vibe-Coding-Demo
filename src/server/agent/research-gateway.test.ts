@@ -236,18 +236,19 @@ describe("HttpResearchGateway", () => {
 		).rejects.toThrow("Web search returned an invalid response.");
 	});
 
-	it("resolves a location and returns attributed current weather and forecast", async () => {
+	it("resolves a Chinese location and returns attributed current weather and forecast", async () => {
 		const fetchMock = vi.fn<typeof fetch>(async (input) => {
 			const url = new URL(String(input));
 			if (url.hostname === "geocoding-api.open-meteo.com") {
-				expect(url.searchParams.get("name")).toBe("Shanghai");
+				expect(url.searchParams.get("name")).toBe("深圳");
+				expect(url.searchParams.get("language")).toBe("zh");
 				return Response.json({
 					results: [
 						{
-							name: "Shanghai",
+							name: "深圳",
 							country: "China",
-							latitude: 31.2222,
-							longitude: 121.4581,
+							latitude: 22.5455,
+							longitude: 114.0683,
 							timezone: "Asia/Shanghai",
 						},
 					],
@@ -286,15 +287,15 @@ describe("HttpResearchGateway", () => {
 
 		await expect(
 			gateway.searchWeather({
-				location: "Shanghai",
+				location: "深圳",
 				forecastDays: 3,
 				units: "metric",
 			}),
 		).resolves.toEqual({
 			location: {
-				name: "Shanghai, China",
-				latitude: 31.2222,
-				longitude: 121.4581,
+				name: "深圳, China",
+				latitude: 22.5455,
+				longitude: 114.0683,
 				timezone: "Asia/Shanghai",
 			},
 			units: {

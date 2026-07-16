@@ -180,6 +180,13 @@ function weatherCondition(code: number): string {
 	return "Unknown conditions";
 }
 
+function geocodingLanguage(location: string): string {
+	if (/\p{Script=Hiragana}|\p{Script=Katakana}/u.test(location)) return "ja";
+	if (/\p{Script=Hangul}/u.test(location)) return "ko";
+	if (/\p{Script=Han}/u.test(location)) return "zh";
+	return "en";
+}
+
 export class HttpResearchGateway implements ResearchGateway {
 	readonly #fetch: typeof fetch;
 	readonly #tavilyApiKey: string | undefined;
@@ -300,7 +307,10 @@ export class HttpResearchGateway implements ResearchGateway {
 				const geocodingUrl = new URL(OPEN_METEO_GEOCODING_URL);
 				geocodingUrl.searchParams.set("name", parsedInput.location);
 				geocodingUrl.searchParams.set("count", "1");
-				geocodingUrl.searchParams.set("language", "en");
+				geocodingUrl.searchParams.set(
+					"language",
+					geocodingLanguage(parsedInput.location),
+				);
 				geocodingUrl.searchParams.set("format", "json");
 				const geocodingResponse = await fetchUpstream(
 					this.#fetch,

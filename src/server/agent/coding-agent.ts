@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 import { Agent } from "@mastra/core/agent";
 import type { MastraModelConfig } from "@mastra/core/llm";
 import { hasToolCall } from "ai";
+import { createGenerativeUiInstructions } from "@/modules/generative-ui/catalog";
 import { CODING_AGENT_INSTRUCTIONS } from "@/server/agent/instructions";
 import type { ResearchGateway } from "@/server/agent/research-gateway";
 import type { RunWorkspace } from "@/server/agent/run-workspace";
@@ -14,7 +15,7 @@ export interface CodingRequestContext {
 	requestId: string;
 }
 
-export const AGENT_MAX_STEPS = 12;
+export const AGENT_MAX_STEPS = 20;
 export const stopAfterFinalize = hasToolCall("finalize_changes");
 
 export const codingAgent = new Agent<
@@ -27,7 +28,7 @@ export const codingAgent = new Agent<
 	name: "Mini Lovable Coding Agent",
 	description:
 		"Inspects and edits an isolated browser workspace or performs bounded read-only research with cited sources.",
-	instructions: CODING_AGENT_INSTRUCTIONS,
+	instructions: `${CODING_AGENT_INSTRUCTIONS}\n\n${createGenerativeUiInstructions()}`,
 	model: ({ requestContext }) => requestContext.get("model"),
 	tools: codingTools,
 	maxRetries: 1,

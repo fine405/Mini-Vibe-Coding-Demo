@@ -99,6 +99,29 @@ function waitFor<T>(promise: Promise<T>, timeoutMs = 2_000): Promise<T> {
 	]);
 }
 
+interface UiStreamEvent {
+	type?: string;
+	delta?: string;
+	[key: string]: unknown;
+}
+
+function parseUiStreamEvents(streamText: string): UiStreamEvent[] {
+	return streamText
+		.split("\n")
+		.filter((line) => line.startsWith("data: ") && line !== "data: [DONE]")
+		.map((line) => JSON.parse(line.slice(6)) as UiStreamEvent);
+}
+
+function collectTextDeltas(events: UiStreamEvent[]): string {
+	return events
+		.filter(
+			(event): event is UiStreamEvent & { delta: string } =>
+				event.type === "text-delta" && typeof event.delta === "string",
+		)
+		.map((event) => event.delta)
+		.join("");
+}
+
 describe("POST /api/chat", () => {
 	it("streams web research sources before a research-only answer without finalizing", async () => {
 		const { snapshot } = createWorkspaceSnapshot({ "/src/App.tsx": "old" });
@@ -182,12 +205,19 @@ describe("POST /api/chat", () => {
 			}),
 		});
 		const streamText = await response.text();
+		const events = parseUiStreamEvents(streamText);
+		const sourceIndex = events.findIndex((event) =>
+			JSON.stringify(event).includes("React versions"),
+		);
+		const answerIndex = events.findIndex(
+			(event, index) => index > sourceIndex && event.type === "text-start",
+		);
 
 		expect(response.status).toBe(200);
 		expect(streamText).toContain("web_search");
-		expect(streamText.indexOf("React versions")).toBeLessThan(
-			streamText.indexOf("React release details"),
-		);
+		expect(sourceIndex).toBeGreaterThanOrEqual(0);
+		expect(answerIndex).toBeGreaterThan(sourceIndex);
+		expect(collectTextDeltas(events)).toContain("React release details");
 		expect(streamText).not.toContain("finalize_changes");
 		expect(researchGateway.searchWeb).toHaveBeenCalledWith(
 			expect.objectContaining({ query: "latest React release" }),
@@ -283,8 +313,8 @@ describe("POST /api/chat", () => {
 		const streamText = await response.text();
 
 		expect(response.status).toBe(200);
-		expect(doStream).toHaveBeenCalledTimes(12);
-		expect(streamText).toContain("Agent stopped after 12 steps");
+		expect(doStream).toHaveBeenCalledTimes(20);
+		expect(streamText).toContain("Agent stopped after 20 steps");
 		expect(streamText).toContain("Retry");
 	});
 
@@ -414,11 +444,12 @@ describe("POST /api/chat", () => {
 			}),
 		});
 		const streamText = await response.text();
+		const events = parseUiStreamEvents(streamText);
 
 		expect(response.status).toBe(200);
 		expect(streamText).toContain("write_file");
 		expect(streamText).toContain("output-error");
-		expect(streamText).toContain("inspected before editing");
+		expect(collectTextDeltas(events)).toContain("inspected before editing");
 		expect(snapshot.files["/src/App.tsx"].content).toBe("old");
 	});
 });
