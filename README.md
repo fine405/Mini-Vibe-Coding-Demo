@@ -2,6 +2,26 @@
 
 一个浏览器内的 AI 编程工作台：文件树、Monaco 编辑器、Sandpack 实时预览与真实 coding agent 共享同一个 TanStack Start 应用。Agent 会在请求级隔离工作区中调用工具，最终提交结构化 ChangeSet；只有用户审核并接受后，变更才会原子写入浏览器工作区。
 
+## Demo
+
+### Web search
+
+Agent 通过受限的 `web_search` 工具查询外部资料，工具调用状态与来源会按实际时序出现在消息中。
+
+![Mini Lovable web search 工具时间线](./docs/demo-web-search.gif)
+
+### Generative UI
+
+研究结果可组合为受 Catalog 约束的 Metric、DataTable 和 MermaidDiagram，应用只渲染预先注册的安全组件。
+
+![Mini Lovable 受限 Generative UI](./docs/demo-generative-ui.gif)
+
+### Agent code diff
+
+Agent 变更会先进入逐 hunk diff 审核，并在用户接受前通过 Agent Draft Preview 预览结果。
+
+![Mini Lovable Agent code diff 与 ChangeSet 审核](./docs/demo-agent-diff.gif)
+
 ## 技术栈
 
 - TanStack Start（SPA/客户端 IDE 路由与同源 Server Routes）
