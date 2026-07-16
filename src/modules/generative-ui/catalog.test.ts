@@ -36,6 +36,15 @@ describe("generative UI catalog", () => {
 		expect(generativeUiInstructions).toContain(
 			"Only use setState or toggleState",
 		);
+		expect(generativeUiInstructions).toContain(
+			"Prefer Generative UI over Markdown",
+		);
+		expect(generativeUiInstructions).toContain(
+			"Use Timeline for chronological events",
+		);
+		expect(generativeUiInstructions).toContain(
+			"when no catalog component or composition is semantically suitable",
+		);
 	});
 
 	it("rejects model-controlled styling and bounded data overflow", () => {

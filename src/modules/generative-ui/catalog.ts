@@ -250,12 +250,15 @@ export function createGenerativeUiInstructions(): string {
 	return generativeUiCatalog.prompt({
 		mode: "inline",
 		customRules: [
-			"Generate a UI spec only when structured visual presentation materially improves a read-only explanation or research result.",
+			"Prefer Generative UI over Markdown for a read-only explanation or research result whenever a catalog component or composition is semantically suitable and materially improves the presentation.",
 			"Do not generate a UI spec for workspace mutation tasks; use the existing tools, finalize_changes review, and Sandpack preview instead.",
+			"Choose the most specific semantic catalog component instead of a generic diagram.",
+			"Use Timeline for chronological events, milestones, schedules, and ordered process steps; use Chart for bar or line data; use DataTable for tabular data.",
+			"Use MermaidDiagram only for flow, sequence, state, class, or ER relationships that are not better represented by another catalog component. Do not substitute MermaidDiagram for Timeline.",
+			"Fall back to Markdown, including Mermaid code blocks, when no catalog component or composition is semantically suitable or Generative UI would not materially improve the presentation.",
 			"Use only facts and data supplied by the user or returned by tools. Never invent research data to fill a component.",
 			"Only use setState or toggleState for Button on.press actions. Never use pushState, removeState, validateForm, watch, navigation, fetch, or external actions.",
 			"Do not use className, style, raw HTML, JavaScript, formatter functions, remote images, or external links.",
-			"Use Chart only for bar or line data. Use MermaidDiagram for flow, sequence, state, class, and ER diagrams.",
 			"Keep generated interfaces compact enough to fit inside a chat message.",
 		],
 	});
