@@ -226,6 +226,77 @@ describe("AgentChatMessage", () => {
 		expect(input).toHaveValue(prompt);
 	});
 
+	it("scrolls to the bottom when the user sends while reading older messages", async () => {
+		const user = userEvent.setup();
+		let responseIndex = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((input: string | URL | Request) => {
+				const url =
+					typeof input === "string"
+						? input
+						: input instanceof URL
+							? input.href
+							: input.url;
+				if (url.endsWith("/api/providers")) {
+					return Promise.resolve(configuredProviderCatalogResponse());
+				}
+
+				responseIndex += 1;
+				const stream = new ReadableStream<UIMessageChunk>({
+					start(controller) {
+						controller.enqueue({
+							type: "start",
+							messageId: `assistant-${responseIndex}`,
+						});
+						controller.enqueue({ type: "start-step" });
+						controller.enqueue({ type: "finish-step" });
+						controller.enqueue({ type: "finish", finishReason: "stop" });
+						controller.close();
+					},
+				});
+				return Promise.resolve(createUIMessageStreamResponse({ stream }));
+			}),
+		);
+
+		render(<ChatPane />);
+		const input = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await user.type(input, "First message");
+		await user.click(screen.getByRole("button", { name: "Submit" }));
+		await screen.findByText("First message");
+		await waitFor(() =>
+			expect(
+				screen.getByPlaceholderText("Describe what you want to build…"),
+			).toBeEnabled(),
+		);
+
+		const conversation = screen.getByRole("log");
+		const scrollElement = conversation.firstElementChild as HTMLElement;
+		scrollElement.style.overflow = "auto";
+		Object.defineProperties(scrollElement, {
+			clientHeight: { configurable: true, value: 200 },
+			scrollHeight: { configurable: true, value: 1_000 },
+		});
+		act(() => {
+			scrollElement.dispatchEvent(
+				new WheelEvent("wheel", { bubbles: true, deltaY: -100 }),
+			);
+		});
+		expect(within(conversation).getByRole("button")).toBeVisible();
+
+		const nextInput = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await user.type(nextInput, "Second message");
+		await user.click(screen.getByRole("button", { name: "Submit" }));
+
+		await waitFor(() =>
+			expect(within(conversation).queryByRole("button")).toBeNull(),
+		);
+	});
+
 	it("renders streamed model text and reasoning with AI Elements", async () => {
 		const message = {
 			id: "assistant-1",

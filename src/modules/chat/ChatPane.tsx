@@ -23,6 +23,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type { StickToBottomContext } from "use-stick-to-bottom";
 import {
 	Conversation,
 	ConversationContent,
@@ -350,6 +351,7 @@ export function AgentChatMessage({
 function AgentChatPane({ sessionId }: { sessionId: string }) {
 	const reduceMotion = useReducedMotion();
 	const composerRef = useRef<HTMLTextAreaElement>(null);
+	const conversationRef = useRef<StickToBottomContext>(null);
 	const processedToolCallIdsRef = useRef(new Set<string>());
 	const [activeRunToken] = useState(() => new AgentRunToken());
 	const {
@@ -495,6 +497,7 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 		const prompt = text.trim();
 		if ((!prompt && files.length === 0) || !canSend || generating) return;
 		clearError();
+		void conversationRef.current?.scrollToBottom();
 		await sendMessage({ text: prompt, files });
 	};
 	const fillComposer = useCallback(
@@ -637,7 +640,7 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 			</header>
 
 			<LayoutGroup id={`agent-chat-${sessionId}`}>
-				<Conversation>
+				<Conversation contextRef={conversationRef}>
 					<ConversationContent
 						className={messages.length === 0 ? "min-h-full p-0" : undefined}
 					>
