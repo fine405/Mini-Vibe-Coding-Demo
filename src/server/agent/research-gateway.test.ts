@@ -16,7 +16,8 @@ describe("HttpResearchGateway", () => {
 		const fetchMock = vi.fn<typeof fetch>(async (_input, init) => {
 			const headers = new Headers(init?.headers);
 			expect(headers.get("authorization")).toBe("Bearer test-tavily-key");
-			expect(JSON.parse(String(init?.body))).toMatchObject({
+			const requestBody = JSON.parse(String(init?.body));
+			expect(requestBody).toMatchObject({
 				query: "latest React release",
 				search_depth: "basic",
 				max_results: 5,
@@ -24,8 +25,8 @@ describe("HttpResearchGateway", () => {
 				include_raw_content: false,
 				include_images: false,
 				include_favicon: true,
-				safe_search: true,
 			});
+			expect(requestBody).not.toHaveProperty("safe_search");
 			return Response.json({
 				query: "latest React release",
 				results: [
@@ -88,6 +89,10 @@ describe("HttpResearchGateway", () => {
 
 	it.each([
 		[401, "Web search authentication failed. Check TAVILY_API_KEY."],
+		[
+			403,
+			"Web search permission denied. Check the Tavily key permissions or plan.",
+		],
 		[432, "Web search usage limit reached. Check the Tavily plan or quota."],
 		[433, "Web search billing limit reached. Check the Tavily account."],
 		[500, "Web search service is unavailable. Try again later."],

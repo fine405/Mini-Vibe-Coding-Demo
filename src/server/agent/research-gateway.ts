@@ -220,7 +220,6 @@ export class HttpResearchGateway implements ResearchGateway {
 						include_raw_content: false,
 						include_images: false,
 						include_favicon: true,
-						safe_search: true,
 					}),
 					signal,
 				},
@@ -235,6 +234,11 @@ export class HttpResearchGateway implements ResearchGateway {
 				if (response.status === 401) {
 					throw new Error(
 						"Web search authentication failed. Check TAVILY_API_KEY.",
+					);
+				}
+				if (response.status === 403) {
+					throw new Error(
+						"Web search permission denied. Check the Tavily key permissions or plan.",
 					);
 				}
 				if (response.status === 429) {
