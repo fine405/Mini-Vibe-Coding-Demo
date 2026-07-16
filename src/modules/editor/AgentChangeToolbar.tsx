@@ -1,9 +1,12 @@
 import {
+	CheckCircle2Icon,
 	ChevronDownIcon,
 	ChevronUpIcon,
 	RotateCcwIcon,
 	Undo2Icon,
+	XCircleIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { useEditor } from "@/modules/editor/store";
@@ -17,9 +20,18 @@ export function AgentChangeToolbar({
 	activePath,
 	paths,
 }: AgentChangeToolbarProps) {
+	const phase = useAgentChangeSessionStore((state) => state.phase);
+	const changeSetId = useAgentChangeSessionStore(
+		(state) => state.changeSet?.id ?? null,
+	);
+	const reviewStatus = useAgentChangeSessionStore(
+		(state) => state.reviewStatus,
+	);
 	const activeIndex = paths.indexOf(activePath);
 	if (activeIndex < 0) return null;
 	const fileName = activePath.split("/").pop() ?? activePath;
+	const finalized = phase === "finalized" && changeSetId !== null;
+	const applying = reviewStatus === "applying";
 
 	const openPath = (path: string) => {
 		if (!useAgentChangeSessionStore.getState().setActivePath(path)) return;
@@ -34,6 +46,24 @@ export function AgentChangeToolbar({
 		}
 		if (nextPath) openPath(nextPath);
 	};
+	const applySelected = async () => {
+		if (!changeSetId) return;
+		try {
+			const result = await useAgentChangeSessionStore
+				.getState()
+				.applyReviewSelection(changeSetId);
+			if (result?.ok) {
+				toast.success(`Applied ${result.affectedPaths.length} file change(s)`);
+			} else if (result) {
+				toast.error(`${result.code}: ${result.message}`);
+			}
+		} catch {
+			toast.error(
+				useAgentChangeSessionStore.getState().reviewError ??
+					"The selected changes could not be applied",
+			);
+		}
+	};
 
 	return (
 		<div
@@ -43,6 +73,7 @@ export function AgentChangeToolbar({
 		>
 			<Button
 				aria-label={`Discard changes in ${activePath}`}
+				disabled={applying}
 				onClick={discardPath}
 				size="sm"
 				title={`Discard changes in ${activePath}`}
@@ -54,7 +85,7 @@ export function AgentChangeToolbar({
 			<div className="agent-change-divider mx-1 h-5 w-px shrink-0 bg-border-primary" />
 			<Button
 				aria-label="Previous modified file"
-				disabled={activeIndex === 0}
+				disabled={applying || activeIndex === 0}
 				onClick={() => openPath(paths[activeIndex - 1])}
 				size="icon-sm"
 				variant="ghost"
@@ -64,6 +95,7 @@ export function AgentChangeToolbar({
 			<Button
 				aria-label={`Open modified file ${activePath}`}
 				className="agent-change-current min-w-24 gap-1.5 px-2"
+				disabled={applying}
 				onClick={() => openPath(activePath)}
 				size="sm"
 				title={activePath}
@@ -78,7 +110,7 @@ export function AgentChangeToolbar({
 			</Button>
 			<Button
 				aria-label="Next modified file"
-				disabled={activeIndex === paths.length - 1}
+				disabled={applying || activeIndex === paths.length - 1}
 				onClick={() => openPath(paths[activeIndex + 1])}
 				size="icon-sm"
 				variant="ghost"
@@ -86,18 +118,48 @@ export function AgentChangeToolbar({
 				<ChevronDownIcon />
 			</Button>
 			<div className="agent-change-divider mx-1 h-5 w-px shrink-0 bg-border-primary" />
-			<Button
-				aria-label="Discard all Agent changes"
-				onClick={() =>
-					useAgentChangeSessionStore.getState().requestDiscardAll()
-				}
-				size="sm"
-				title="Discard all Agent changes"
-				variant="ghost"
-			>
-				<RotateCcwIcon data-icon="inline-start" />
-				<span className="agent-change-action-label">Discard all</span>
-			</Button>
+			{finalized ? (
+				<>
+					<Button
+						aria-label="Reject all Agent changes"
+						disabled={applying}
+						onClick={() =>
+							useAgentChangeSessionStore.getState().rejectReview(changeSetId)
+						}
+						size="sm"
+						title="Reject all Agent changes"
+						variant="ghost"
+					>
+						<XCircleIcon data-icon="inline-start" />
+						<span className="agent-change-action-label">Reject all</span>
+					</Button>
+					<Button
+						aria-label="Apply selected Agent changes"
+						disabled={applying}
+						onClick={() => void applySelected()}
+						size="sm"
+						title="Apply selected Agent changes"
+					>
+						<CheckCircle2Icon data-icon="inline-start" />
+						<span className="agent-change-action-label">
+							{applying ? "Applying…" : "Apply selected"}
+						</span>
+					</Button>
+				</>
+			) : (
+				<Button
+					aria-label="Discard all Agent changes"
+					onClick={() =>
+						useAgentChangeSessionStore.getState().requestDiscardAll()
+					}
+					size="sm"
+					title="Discard all Agent changes"
+					variant="ghost"
+				>
+					<RotateCcwIcon data-icon="inline-start" />
+					<span className="agent-change-action-label">Discard all</span>
+				</Button>
+			)}
 		</div>
 	);
 }

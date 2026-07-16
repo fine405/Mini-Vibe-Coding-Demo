@@ -1,7 +1,9 @@
 import { create } from "zustand";
+import { browserWorkspace } from "@/modules/workspace/browser";
 import { hashText, normalizeWorkspacePath } from "@/modules/workspace/domain";
 import { workspaceChangeSetSchema } from "@/modules/workspace/schema";
 import type {
+	ApplyResult,
 	WorkspaceChange,
 	WorkspaceChangeSet,
 	WorkspaceSnapshot,
@@ -26,6 +28,7 @@ export interface ToolProjectionResult {
 }
 
 export type AgentChangeSessionPhase = "idle" | "running" | "finalized";
+export type AgentReviewStatus = "pending" | "applying" | "applied" | "rejected";
 export type AgentReviewSelections = Record<number, number[]>;
 
 export interface AgentChangeSessionState {
@@ -41,6 +44,10 @@ export interface AgentChangeSessionState {
 	discardAllRequested: boolean;
 	changeSet: WorkspaceChangeSet | null;
 	reviewSelections: AgentReviewSelections | null;
+	reviewStatus: AgentReviewStatus;
+	reviewTransactionId: string | null;
+	reviewError: string | null;
+	reviewHasConflict: boolean;
 	begin(snapshot: WorkspaceSnapshot): void;
 	projectToolResult(result: CompletedAgentToolResult): ToolProjectionResult;
 	setActivePath(path: string): boolean;
@@ -54,6 +61,8 @@ export interface AgentChangeSessionState {
 		changeSetId: string,
 		selections: AgentReviewSelections,
 	): boolean;
+	applyReviewSelection(changeSetId: string): Promise<ApplyResult | null>;
+	rejectReview(changeSetId: string): boolean;
 	clear(): void;
 }
 
@@ -70,6 +79,10 @@ const emptySession = {
 	discardAllRequested: false,
 	changeSet: null,
 	reviewSelections: null,
+	reviewStatus: "pending" as const,
+	reviewTransactionId: null,
+	reviewError: null,
+	reviewHasConflict: false,
 };
 
 export const useAgentChangeSessionStore = create<AgentChangeSessionState>(
@@ -305,7 +318,13 @@ export const useAgentChangeSessionStore = create<AgentChangeSessionState>(
 		},
 		initializeReviewSelections(changeSetId, inputSelections) {
 			const state = get();
-			if (state.changeSet?.id !== changeSetId) return false;
+			if (
+				state.phase !== "finalized" ||
+				state.changeSet?.id !== changeSetId ||
+				state.reviewStatus !== "pending"
+			) {
+				return false;
+			}
 			const reviewSelections = normalizeReviewSelections(
 				inputSelections,
 				state.changeSet.changes.length,
@@ -332,7 +351,13 @@ export const useAgentChangeSessionStore = create<AgentChangeSessionState>(
 		},
 		setReviewSelections(changeSetId, inputSelections) {
 			const state = get();
-			if (state.changeSet?.id !== changeSetId) return false;
+			if (
+				state.phase !== "finalized" ||
+				state.changeSet?.id !== changeSetId ||
+				state.reviewStatus !== "pending"
+			) {
+				return false;
+			}
 			const reviewSelections = normalizeReviewSelections(
 				inputSelections,
 				state.changeSet.changes.length,
@@ -352,6 +377,87 @@ export const useAgentChangeSessionStore = create<AgentChangeSessionState>(
 					state.activePath && visiblePaths.includes(state.activePath)
 						? state.activePath
 						: (visiblePaths[0] ?? null),
+			});
+			return true;
+		},
+		async applyReviewSelection(changeSetId) {
+			const state = get();
+			if (
+				state.phase !== "finalized" ||
+				state.changeSet?.id !== changeSetId ||
+				state.reviewStatus !== "pending"
+			) {
+				return null;
+			}
+			const selectedChangeIndices = state.changeSet.changes
+				.map((_change, index) => index)
+				.filter((index) =>
+					state.reviewSelections
+						? state.reviewSelections[index]?.length > 0
+						: !state.discardedPaths.includes(
+								state.changeSet?.changes[index].path ?? "",
+							),
+				);
+			if (selectedChangeIndices.length === 0) return null;
+
+			set({
+				reviewStatus: "applying",
+				reviewError: null,
+				reviewHasConflict: false,
+			});
+			try {
+				const result = await browserWorkspace.apply(
+					state.changeSet,
+					state.reviewSelections
+						? { hunkIndicesByChange: state.reviewSelections }
+						: { changeIndices: selectedChangeIndices },
+				);
+				if (get().changeSet?.id !== changeSetId) return result;
+				if (!result.ok) {
+					set({
+						reviewStatus: "pending",
+						reviewError: `${result.code}: ${result.message}`,
+						reviewHasConflict:
+							result.code === "HASH_CONFLICT" ||
+							result.code === "PATH_CONFLICT" ||
+							result.code === "STALE_REVISION",
+					});
+					return result;
+				}
+				set({
+					...emptySession,
+					changeSet: state.changeSet,
+					reviewStatus: "applied",
+					reviewTransactionId: result.transactionId,
+				});
+				return result;
+			} catch (error) {
+				if (get().changeSet?.id === changeSetId) {
+					set({
+						reviewStatus: "pending",
+						reviewError:
+							error instanceof Error
+								? error.message
+								: "The selected changes could not be applied",
+						reviewHasConflict: false,
+					});
+				}
+				throw error;
+			}
+		},
+		rejectReview(changeSetId) {
+			const state = get();
+			if (
+				state.phase !== "finalized" ||
+				state.changeSet?.id !== changeSetId ||
+				state.reviewStatus !== "pending"
+			) {
+				return false;
+			}
+			set({
+				...emptySession,
+				changeSet: state.changeSet,
+				reviewStatus: "rejected",
 			});
 			return true;
 		},

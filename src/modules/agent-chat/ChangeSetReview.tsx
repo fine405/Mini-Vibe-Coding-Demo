@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
 	type AgentReviewSelections,
+	type AgentReviewStatus,
 	useAgentChangeSessionStore,
 } from "@/modules/agent-chat/change-session";
 import {
@@ -55,8 +56,6 @@ interface ChangeSetReviewProps {
 	changeSet: WorkspaceChangeSet;
 	onRegenerate?(): void;
 }
-
-type ReviewStatus = "pending" | "applying" | "applied" | "rejected";
 
 function countHunkLines(
 	hunks: ParsedHunks["hunks"],
@@ -99,6 +98,17 @@ function fromAgentReviewSelections(
 			new Set(selected),
 		]),
 	);
+}
+
+function readSessionReviewState(changeSetId: string) {
+	const state = useAgentChangeSessionStore.getState();
+	if (state.changeSet?.id !== changeSetId) return null;
+	return {
+		status: state.reviewStatus,
+		transactionId: state.reviewTransactionId,
+		error: state.reviewError,
+		hasConflict: state.reviewHasConflict,
+	};
 }
 
 function FileChangeReview({
@@ -216,11 +226,22 @@ export function ChangeSetReview({
 	onRegenerate,
 }: ChangeSetReviewProps) {
 	const [sourceFiles] = useState(readBrowserWorkspaceFiles);
+	const [initialSessionReview] = useState(() =>
+		readSessionReviewState(changeSet.id),
+	);
 	const [review, setReview] = useState<ReviewData | null>(null);
-	const [status, setStatus] = useState<ReviewStatus>("pending");
-	const [transactionId, setTransactionId] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const [hasConflict, setHasConflict] = useState(false);
+	const [status, setStatus] = useState<AgentReviewStatus>(
+		initialSessionReview?.status ?? "pending",
+	);
+	const [transactionId, setTransactionId] = useState<string | null>(
+		initialSessionReview?.transactionId ?? null,
+	);
+	const [error, setError] = useState<string | null>(
+		initialSessionReview?.error ?? null,
+	);
+	const [hasConflict, setHasConflict] = useState(
+		initialSessionReview?.hasConflict ?? false,
+	);
 	const [detailIndex, setDetailIndex] = useState<number | null>(null);
 	const currentChangeSetId = useAgentChangeSessionStore(
 		(state) => state.changeSet?.id ?? null,
@@ -228,6 +249,16 @@ export function ChangeSetReview({
 	const sessionSelections = useAgentChangeSessionStore((state) =>
 		state.changeSet?.id === changeSet.id ? state.reviewSelections : null,
 	);
+
+	useEffect(() => {
+		return useAgentChangeSessionStore.subscribe((state) => {
+			if (state.changeSet?.id !== changeSet.id) return;
+			setStatus(state.reviewStatus);
+			setTransactionId(state.reviewTransactionId);
+			setError(state.reviewError);
+			setHasConflict(state.reviewHasConflict);
+		});
+	}, [changeSet.id]);
 
 	useEffect(() => {
 		let active = true;
@@ -337,27 +368,33 @@ export function ChangeSetReview({
 		setError(null);
 		setHasConflict(false);
 		try {
-			const result = await browserWorkspace.apply(
-				changeSet,
-				toWorkspaceChangeSelection(selections),
-			);
-			if (!result.ok) {
+			const session = useAgentChangeSessionStore.getState();
+			const linkedToSession =
+				session.phase === "finalized" && session.changeSet?.id === changeSet.id;
+			const result = linkedToSession
+				? await session.applyReviewSelection(changeSet.id)
+				: await browserWorkspace.apply(
+						changeSet,
+						toWorkspaceChangeSelection(selections),
+					);
+			if (!result) {
 				setStatus("pending");
-				setError(`${result.code}: ${result.message}`);
-				setHasConflict(
-					result.code === "HASH_CONFLICT" ||
-						result.code === "PATH_CONFLICT" ||
-						result.code === "STALE_REVISION",
-				);
+				return;
+			}
+			if (!result.ok) {
+				if (!linkedToSession) {
+					setStatus("pending");
+					setError(`${result.code}: ${result.message}`);
+					setHasConflict(
+						result.code === "HASH_CONFLICT" ||
+							result.code === "PATH_CONFLICT" ||
+							result.code === "STALE_REVISION",
+					);
+				}
 				return;
 			}
 			setTransactionId(result.transactionId);
 			setStatus("applied");
-			if (
-				useAgentChangeSessionStore.getState().changeSet?.id === changeSet.id
-			) {
-				useAgentChangeSessionStore.getState().clear();
-			}
 			toast.success(`Applied ${result.affectedPaths.length} file change(s)`);
 		} catch (applyError) {
 			setStatus("pending");
@@ -371,10 +408,8 @@ export function ChangeSetReview({
 	const reject = () => {
 		setError(null);
 		setHasConflict(false);
-		setStatus("rejected");
-		if (useAgentChangeSessionStore.getState().changeSet?.id === changeSet.id) {
-			useAgentChangeSessionStore.getState().clear();
-		}
+		const session = useAgentChangeSessionStore.getState();
+		if (!session.rejectReview(changeSet.id)) setStatus("rejected");
 	};
 	const undo = async () => {
 		if (!transactionId) return;
@@ -386,6 +421,9 @@ export function ChangeSetReview({
 		setTransactionId(null);
 		setStatus("pending");
 		setHasConflict(false);
+		if (useAgentChangeSessionStore.getState().changeSet?.id === changeSet.id) {
+			useAgentChangeSessionStore.getState().clear();
+		}
 		toast.success("Agent changes were undone");
 	};
 
@@ -453,7 +491,7 @@ export function ChangeSetReview({
 					{hasConflict && onRegenerate && (
 						<Button
 							onClick={() => {
-								setStatus("rejected");
+								reject();
 								onRegenerate();
 							}}
 							size="xs"

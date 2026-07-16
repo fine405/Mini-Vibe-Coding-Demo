@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChangeSetReview } from "@/modules/agent-chat/ChangeSetReview";
 import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
+import { EditorPane } from "@/modules/editor/EditorPane";
+import { useEditor } from "@/modules/editor/store";
 import { useFs } from "@/modules/fs/store";
 import { browserWorkspace } from "@/modules/workspace/browser";
 import type {
@@ -20,6 +22,7 @@ vi.mock("@/modules/fs/persistence", () => ({
 describe("ChangeSetReview", () => {
 	beforeEach(async () => {
 		await useFs.getState().resetFs();
+		useEditor.getState().closeAllFiles();
 		useAgentChangeSessionStore.getState().clear();
 	});
 
@@ -55,16 +58,28 @@ describe("ChangeSetReview", () => {
 			],
 		} satisfies WorkspaceChangeSet;
 		finalizeSession(snapshot, changeSet);
-		render(<ChangeSetReview changeSet={changeSet} />);
+		useEditor.getState().openFile("/src/App.js");
+		render(
+			<>
+				<ChangeSetReview changeSet={changeSet} />
+				<EditorPane />
+			</>,
+		);
 
 		expect(await screen.findByText("Workspace change proposal")).toBeVisible();
 		await user.click(
-			await screen.findByRole("button", { name: "Apply selected" }),
+			await screen.findByRole("button", {
+				name: "Apply selected Agent changes",
+			}),
 		);
 		await waitFor(() => {
 			expect(useFs.getState().filesByPath["/src/App.js"].content).toBe(after);
 		});
 		expect(useAgentChangeSessionStore.getState().phase).toBe("idle");
+		expect(screen.getByText("Applied")).toBeVisible();
+		expect(
+			screen.queryByRole("toolbar", { name: "Agent change controls" }),
+		).toBeNull();
 
 		await user.click(await screen.findByRole("button", { name: "Undo" }));
 		await waitFor(() => {
@@ -91,7 +106,13 @@ describe("ChangeSetReview", () => {
 			],
 		} satisfies WorkspaceChangeSet;
 		finalizeSession(snapshot, changeSet);
-		render(<ChangeSetReview changeSet={changeSet} />);
+		useEditor.getState().openFile(path);
+		render(
+			<>
+				<ChangeSetReview changeSet={changeSet} />
+				<EditorPane />
+			</>,
+		);
 
 		await user.click(await screen.findByRole("button", { name: "Reject" }));
 
@@ -102,6 +123,50 @@ describe("ChangeSetReview", () => {
 		expect(screen.queryByRole("button", { name: "Apply selected" })).toBeNull();
 		expect(useFs.getState().filesByPath[path].content).toBe(before);
 		expect(useAgentChangeSessionStore.getState().phase).toBe("idle");
+		expect(
+			screen.queryByRole("toolbar", { name: "Agent change controls" }),
+		).toBeNull();
+	});
+
+	it("marks the chat proposal rejected from the editor toolbar", async () => {
+		const user = userEvent.setup();
+		const path = "/src/App.js";
+		const before = useFs.getState().filesByPath[path].content;
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		const changeSet = {
+			id: "agent:toolbar-reject",
+			baseRevision: snapshot.revision,
+			summary: "Reject from the editor",
+			changes: [
+				{
+					op: "update" as const,
+					path,
+					beforeHash: snapshot.files[path].hash,
+					content: "toolbar rejected content",
+				},
+			],
+		} satisfies WorkspaceChangeSet;
+		finalizeSession(snapshot, changeSet);
+		useEditor.getState().openFile(path);
+		render(
+			<>
+				<ChangeSetReview changeSet={changeSet} />
+				<EditorPane />
+			</>,
+		);
+
+		await user.click(
+			await screen.findByRole("button", { name: "Reject all Agent changes" }),
+		);
+
+		expect(
+			await screen.findByText("Proposal discarded; no files changed."),
+		).toBeVisible();
+		expect(useFs.getState().filesByPath[path].content).toBe(before);
+		expect(useAgentChangeSessionStore.getState().reviewStatus).toBe("rejected");
+		expect(
+			screen.queryByRole("toolbar", { name: "Agent change controls" }),
+		).toBeNull();
 	});
 
 	it("shares file selections with the current editor change session", async () => {
