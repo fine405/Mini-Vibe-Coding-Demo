@@ -1,5 +1,11 @@
 import type { Spec } from "@json-render/react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { GenerativeUIRenderer } from "@/modules/generative-ui/GenerativeUIRenderer";
@@ -252,7 +258,7 @@ describe("GenerativeUIRenderer", () => {
 		);
 	});
 
-	it("submits Mermaid downloads through the attachment endpoint", () => {
+	it("submits Mermaid downloads through the attachment endpoint", async () => {
 		const code = "flowchart LR\nA --> B";
 		const spec: Spec = {
 			root: "diagram",
@@ -281,5 +287,31 @@ describe("GenerativeUIRenderer", () => {
 					"",
 			),
 		).toBe(code);
+
+		fireEvent.submit(form as HTMLFormElement);
+		expect(form).toBeInTheDocument();
+		await waitFor(() => expect(form).not.toBeInTheDocument());
+	});
+
+	it("aligns the download button with the other Mermaid controls", () => {
+		const spec: Spec = {
+			root: "diagram",
+			elements: {
+				diagram: {
+					type: "MermaidDiagram",
+					props: { code: "flowchart LR\nA --> B" },
+					children: [],
+				},
+			},
+		};
+
+		render(<GenerativeUIRenderer spec={spec} />);
+
+		const downloadButton = screen.getByRole("button", {
+			name: "Download diagram",
+		});
+		expect(downloadButton.parentElement).toHaveClass("top-1");
+		expect(downloadButton.querySelector("svg")).toHaveAttribute("width", "16");
+		expect(downloadButton.querySelector("svg")).toHaveAttribute("height", "16");
 	});
 });

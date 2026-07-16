@@ -85,6 +85,9 @@ export function MermaidDownloadMenu({ code }: { code: string }) {
 	const renderId = useId().replace(/[^A-Za-z0-9_-]/g, "");
 	const mmd = useMemo(() => encodeBase64(code), [code]);
 	const currentDownloads = prepared.code === code ? prepared : {};
+	const closeMenuAfterSubmit = () => {
+		window.setTimeout(() => setOpen(false), 0);
+	};
 
 	useEffect(() => {
 		let cancelled = false;
@@ -114,7 +117,7 @@ export function MermaidDownloadMenu({ code }: { code: string }) {
 	}, [open]);
 
 	return (
-		<div className="absolute top-6 right-[4.5rem] z-20" ref={menuRef}>
+		<div className="absolute top-1 right-[4.5rem] z-20" ref={menuRef}>
 			<button
 				aria-expanded={open}
 				aria-haspopup="true"
@@ -123,24 +126,24 @@ export function MermaidDownloadMenu({ code }: { code: string }) {
 				title="Download diagram"
 				type="button"
 			>
-				<Download size={14} />
+				<Download size={16} />
 			</button>
 			{open ? (
 				<div className="absolute top-full right-0 mt-1 min-w-[120px] overflow-hidden rounded-md border border-border bg-background shadow-lg">
 					<DownloadForm
 						data={currentDownloads.svg}
 						format="SVG"
-						onSubmit={() => setOpen(false)}
+						onSubmit={closeMenuAfterSubmit}
 					/>
 					<DownloadForm
 						data={currentDownloads.png}
 						format="PNG"
-						onSubmit={() => setOpen(false)}
+						onSubmit={closeMenuAfterSubmit}
 					/>
 					<DownloadForm
 						data={mmd}
 						format="MMD"
-						onSubmit={() => setOpen(false)}
+						onSubmit={closeMenuAfterSubmit}
 					/>
 					{currentDownloads.failed ? (
 						<p className="px-3 py-2 text-xs text-destructive" role="alert">
