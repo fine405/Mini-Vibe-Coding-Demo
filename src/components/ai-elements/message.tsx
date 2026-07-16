@@ -324,7 +324,7 @@ export const MessageResponse = memo(
 	({ className, ...props }: MessageResponseProps) => (
 		<Streamdown
 			className={cn(
-				"size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+				"size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_[data-streamdown='table-wrapper']>div:first-child]:relative [&_[data-streamdown='table-wrapper']>div:first-child>div]:static [&_[data-streamdown='table-wrapper']>div:first-child>div>div]:-right-2",
 				className,
 			)}
 			plugins={streamdownPlugins}
