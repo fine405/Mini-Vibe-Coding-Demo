@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
 	createUIMessageStreamResponse,
@@ -124,6 +124,251 @@ describe("AgentChatMessage", () => {
 
 		expect(await screen.findByText("Ready")).toBeVisible();
 		expect(screen.getByText("Thought for a few seconds")).toBeVisible();
+		expect(
+			screen.queryByRole("button", { name: /sources?$/ }),
+		).not.toBeInTheDocument();
+	});
+
+	it("shows web sources in the tool timeline and aggregates them after the answer", async () => {
+		const user = userEvent.setup();
+		const message = {
+			id: "assistant-web-research",
+			role: "assistant",
+			parts: [
+				{
+					type: "dynamic-tool",
+					toolName: "web_search",
+					toolCallId: "call-web-search",
+					state: "output-available",
+					input: { query: "AI Elements citations" },
+					output: {
+						query: "AI Elements citations",
+						sources: [
+							{
+								title: "Sources component",
+								url: "https://elements.ai-sdk.dev/components/sources",
+								snippet: "A source list for AI responses.",
+							},
+							{
+								title: "Tavily search API",
+								url: "https://docs.tavily.com/api-reference/endpoint/search",
+							},
+						],
+					},
+				},
+				{
+					type: "text",
+					text: "The research is complete.",
+				},
+			],
+		} as UIMessage;
+
+		render(<AgentChatMessage isStreaming={false} message={message} />);
+
+		const timelineSource = screen.getByRole("link", {
+			name: "Sources component",
+		});
+		expect(timelineSource).toBeVisible();
+		expect(timelineSource).toHaveAttribute("target", "_blank");
+		expect(timelineSource).toHaveAttribute(
+			"rel",
+			expect.stringContaining("noreferrer"),
+		);
+		expect(timelineSource).toHaveAttribute(
+			"rel",
+			expect.stringContaining("noopener"),
+		);
+		expect(screen.getByText("elements.ai-sdk.dev")).toBeVisible();
+
+		const answer = await screen.findByText("The research is complete.");
+		const trigger = screen.getByRole("button", { name: "2 sources" });
+		expect(
+			answer.compareDocumentPosition(trigger) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+
+		await user.hover(trigger);
+		const sourceList = await screen.findByRole("list", { name: "Sources" });
+		const aggregatedSource = within(sourceList).getByRole("link", {
+			name: "Sources component",
+		});
+		expect(aggregatedSource).toHaveAttribute(
+			"href",
+			"https://elements.ai-sdk.dev/components/sources",
+		);
+		expect(aggregatedSource.tabIndex).toBe(0);
+		expect(screen.getByRole("dialog", { name: "Sources" })).toHaveClass(
+			"max-h-80",
+			"overflow-y-auto",
+		);
+		expect(
+			within(sourceList).getByRole("link", { name: "Tavily search API" }),
+		).toBeVisible();
+
+		await user.unhover(trigger);
+		await waitFor(() =>
+			expect(
+				screen.queryByRole("list", { name: "Sources" }),
+			).not.toBeInTheDocument(),
+		);
+		await user.click(trigger);
+		expect(trigger).toHaveAttribute("aria-expanded", "true");
+		expect(await screen.findByRole("list", { name: "Sources" })).toBeVisible();
+
+		await user.unhover(trigger);
+		act(() => trigger.blur());
+		await waitFor(() =>
+			expect(trigger).toHaveAttribute("aria-expanded", "false"),
+		);
+		act(() => trigger.focus());
+		const focusedList = await screen.findByRole("list", { name: "Sources" });
+		expect(focusedList).toBeVisible();
+		await user.keyboard("{ArrowDown}");
+		await waitFor(() =>
+			expect(
+				within(focusedList).getByRole("link", { name: "Sources component" }),
+			).toHaveFocus(),
+		);
+	});
+
+	it("renders a compact weather result with its attribution", () => {
+		const message = {
+			id: "assistant-weather",
+			role: "assistant",
+			parts: [
+				{
+					type: "dynamic-tool",
+					toolName: "weather_search",
+					toolCallId: "call-weather",
+					state: "output-available",
+					input: { location: "Shanghai" },
+					output: {
+						location: {
+							name: "Shanghai",
+							latitude: 31.23,
+							longitude: 121.47,
+							timezone: "Asia/Shanghai",
+						},
+						units: {
+							temperature: "°C",
+							windSpeed: "km/h",
+							precipitation: "mm",
+						},
+						current: {
+							time: "2026-07-16T10:00",
+							temperature: 30,
+							apparentTemperature: 34,
+							condition: "Partly cloudy",
+							windSpeed: 12,
+							precipitation: 0,
+						},
+						forecast: [
+							{
+								date: "2026-07-16",
+								condition: "Partly cloudy",
+								temperatureMax: 34,
+								temperatureMin: 27,
+								precipitationProbability: 20,
+							},
+						],
+						sources: [
+							{
+								title: "Weather data by Open-Meteo.com",
+								url: "https://open-meteo.com/",
+							},
+						],
+					},
+				},
+			],
+		} as UIMessage;
+
+		render(<AgentChatMessage isStreaming={false} message={message} />);
+
+		expect(screen.getByText("Shanghai")).toBeVisible();
+		expect(screen.getByText("30 °C")).toBeVisible();
+		expect(screen.getByText("Partly cloudy")).toBeVisible();
+		expect(
+			screen.getByRole("link", { name: "Weather data by Open-Meteo.com" }),
+		).toHaveAttribute("href", "https://open-meteo.com/");
+		expect(screen.getByRole("button", { name: "1 source" })).toBeVisible();
+	});
+
+	it("does not create citations when web search returns no verified sources", () => {
+		const message = {
+			id: "assistant-empty-research",
+			role: "assistant",
+			parts: [
+				{
+					type: "dynamic-tool",
+					toolName: "web_search",
+					toolCallId: "call-empty-search",
+					state: "output-available",
+					input: { query: "no results" },
+					output: { query: "no results", sources: [] },
+				},
+			],
+		} as UIMessage;
+
+		render(<AgentChatMessage isStreaming={false} message={message} />);
+
+		expect(screen.getByRole("status")).toHaveTextContent(
+			"No verified sources found.",
+		);
+		expect(
+			screen.queryByRole("button", { name: /sources?$/ }),
+		).not.toBeInTheDocument();
+	});
+
+	it("keeps a running web search trace open with its query visible", () => {
+		const message = {
+			id: "assistant-running-search",
+			role: "assistant",
+			parts: [
+				{
+					type: "dynamic-tool",
+					toolName: "web_search",
+					toolCallId: "call-running-search",
+					state: "input-available",
+					input: { query: "current web information" },
+				},
+			],
+		} as UIMessage;
+
+		render(<AgentChatMessage isStreaming={true} message={message} />);
+
+		expect(
+			screen.getByRole("button", { name: "web searchRunning" }),
+		).toHaveAttribute("aria-expanded", "true");
+		expect(screen.getByText(/current web information/)).toBeVisible();
+	});
+
+	it("shows a sanitized weather error without creating citations", () => {
+		const message = {
+			id: "assistant-weather-error",
+			role: "assistant",
+			parts: [
+				{
+					type: "dynamic-tool",
+					toolName: "weather_search",
+					toolCallId: "call-weather-error",
+					state: "output-error",
+					input: { location: "Shanghai" },
+					errorText: "Weather service is unavailable. Try again later.",
+				},
+			],
+		} as UIMessage;
+
+		render(<AgentChatMessage isStreaming={false} message={message} />);
+
+		expect(
+			screen.getByRole("button", { name: "weather searchError" }),
+		).toHaveAttribute("aria-expanded", "true");
+		expect(
+			screen.getByText("Weather service is unavailable. Try again later."),
+		).toBeVisible();
+		expect(
+			screen.queryByRole("button", { name: /sources?$/ }),
+		).not.toBeInTheDocument();
 	});
 
 	it("renders typed tool errors with AI Elements", () => {

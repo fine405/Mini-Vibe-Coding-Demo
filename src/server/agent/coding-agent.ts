@@ -3,12 +3,14 @@ import { Agent } from "@mastra/core/agent";
 import type { MastraModelConfig } from "@mastra/core/llm";
 import { hasToolCall } from "ai";
 import { CODING_AGENT_INSTRUCTIONS } from "@/server/agent/instructions";
+import type { ResearchGateway } from "@/server/agent/research-gateway";
 import type { RunWorkspace } from "@/server/agent/run-workspace";
 import { codingTools } from "@/server/agent/tools";
 
 export interface CodingRequestContext {
 	model: MastraModelConfig;
 	runWorkspace: RunWorkspace;
+	researchGateway: ResearchGateway;
 	requestId: string;
 }
 
@@ -24,7 +26,7 @@ export const codingAgent = new Agent<
 	id: "codingAgent",
 	name: "Mini Lovable Coding Agent",
 	description:
-		"Inspects and edits an isolated browser workspace, then proposes a reviewable ChangeSet.",
+		"Inspects and edits an isolated browser workspace or performs bounded read-only research with cited sources.",
 	instructions: CODING_AGENT_INSTRUCTIONS,
 	model: ({ requestContext }) => requestContext.get("model"),
 	tools: codingTools,

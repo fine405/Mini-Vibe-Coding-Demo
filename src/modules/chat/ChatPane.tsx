@@ -61,9 +61,14 @@ import { ChangeSetReview } from "@/modules/agent-chat/ChangeSetReview";
 import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { ProviderModelSelector } from "@/modules/agent-chat/ProviderModelSelector";
 import { resolveProviderSelection } from "@/modules/agent-chat/provider-selection";
+import { collectResearchSources } from "@/modules/agent-chat/research";
 import { useAgentChatSessionStore } from "@/modules/agent-chat/session-store";
 import { projectCompletedAgentTools } from "@/modules/agent-chat/tool-projection";
 import { useProviderCatalog } from "@/modules/agent-chat/use-provider-catalog";
+import {
+	ResearchCitationFooter,
+	ResearchToolResult,
+} from "@/modules/chat/ResearchToolResult";
 import { useEditor } from "@/modules/editor/store";
 import type { ModelSelection } from "@/modules/providers/types";
 import { TOUR_STEP_IDS } from "@/modules/tour/constants";
@@ -216,7 +221,9 @@ function ToolCall({
 			: null;
 	const output = part.state === "output-available" ? part.output : undefined;
 	const errorText = part.state === "output-error" ? part.errorText : undefined;
-	const defaultOpen = name === "finalize_changes" || Boolean(errorText);
+	const isResearchTool = name === "web_search" || name === "weather_search";
+	const defaultOpen =
+		name === "finalize_changes" || isResearchTool || Boolean(errorText);
 
 	return (
 		<Tool defaultOpen={defaultOpen}>
@@ -235,13 +242,17 @@ function ToolCall({
 				/>
 			)}
 			<ToolContent>
-				<ToolInput input={part.input} />
+				{!isResearchTool || output === undefined ? (
+					<ToolInput input={part.input} />
+				) : null}
 				{changeSet ? (
 					<ChangeSetReview
 						changeSet={changeSet}
 						key={changeSet.id}
 						onRegenerate={onRegenerate}
 					/>
+				) : isResearchTool && output !== undefined ? (
+					<ResearchToolResult output={output} toolName={name} />
 				) : (
 					<ToolOutput errorText={errorText} output={output} />
 				)}
@@ -259,6 +270,9 @@ export function AgentChatMessage({
 	isStreaming: boolean;
 	onRegenerate?(): void;
 }) {
+	const sources =
+		message.role === "assistant" ? collectResearchSources(message.parts) : [];
+
 	return (
 		<Message from={message.role}>
 			<MessageContent>
@@ -302,6 +316,7 @@ export function AgentChatMessage({
 					}
 					return null;
 				})}
+				<ResearchCitationFooter sources={sources} />
 			</MessageContent>
 		</Message>
 	);

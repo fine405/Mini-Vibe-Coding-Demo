@@ -11,6 +11,7 @@ import {
 	stopAfterFinalize,
 } from "@/server/agent/coding-agent";
 import { mastra } from "@/server/agent/mastra";
+import type { ResearchGateway } from "@/server/agent/research-gateway";
 import { RunWorkspace, RunWorkspaceError } from "@/server/agent/run-workspace";
 import type {
 	ProviderCatalog,
@@ -42,6 +43,7 @@ export type ChatModelResolver = (
 export interface ChatDependencies {
 	providerCatalog: ProviderCatalog;
 	modelResolver?: ChatModelResolver;
+	researchGateway: ResearchGateway;
 }
 
 type MastraV6ChatOptions = Parameters<typeof handleChatStream>[0];
@@ -138,6 +140,7 @@ export async function createChatResponse(
 			dependencies.modelResolver?.(resolved) ?? resolved.mastraModel,
 		);
 		requestContext.set("runWorkspace", runWorkspace);
+		requestContext.set("researchGateway", dependencies.researchGateway);
 		requestContext.set("requestId", requestId);
 		const abortSignal = AbortSignal.any([
 			request.signal,

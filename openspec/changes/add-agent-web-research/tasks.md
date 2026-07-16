@@ -1,45 +1,35 @@
 ## 0. Approval
 
-- [ ] 0.1 Approve Tavily as the default web search provider and Jina Reader as the fixed webpage reader.
-- [ ] 0.2 Confirm that phase 1 weather usage is local/controlled and non-commercial, or select a commercial-compatible weather provider before implementation.
-- [ ] 0.3 Confirm that GitHub access is public-only and that `GITHUB_TOKEN` is optional for rate limits/public code search.
-- [ ] 0.4 Do not begin implementation until this proposal, design and delta spec are explicitly approved.
+- [x] 0.1 User approved the phase-one scope of `web_search` and `weather_search` on 2026-07-16.
+- [x] 0.2 Use Tavily basic search with a server-only `TAVILY_API_KEY`.
+- [x] 0.3 Treat phase-one Open-Meteo usage as local/controlled and non-commercial with visible attribution.
 
-## 1. Server Domain and Clients
+## 1. Research Domain and Tools
 
-- [ ] 1.1 Define shared `WebSource` and bounded tool output schemas with URL/title/snippet/content limits.
-- [ ] 1.2 Implement abort-aware Tavily Search client with fixed basic depth, no automatic retries and sanitized errors.
-- [ ] 1.3 Implement Jina Reader client plus public HTTP(S) target validation and bounded content parsing.
-- [ ] 1.4 Implement Open-Meteo geocoding/forecast client with current weather, at most 7 forecast days and source attribution.
-- [ ] 1.5 Implement GitHub REST search client for public repository, issue/PR and optionally authenticated public code results.
-- [ ] 1.6 Add fixed-upstream allowlists, timeouts, rate-limit error mapping and output truncation shared only where behavior is identical.
+- [x] 1.1 Define shared bounded source, web search and weather output schemas plus a small `ResearchGateway` interface.
+- [x] 1.2 Implement an abort-aware Tavily HTTP adapter with fixed basic depth, no automatic retries and sanitized errors.
+- [x] 1.3 Implement Open-Meteo geocoding/forecast with current weather, at most 7 forecast days and source attribution.
+- [x] 1.4 Create and register typed read-only `web_search` and `weather_search` Mastra tools through request context.
+- [x] 1.5 Update Agent instructions for tool selection, citation fidelity, prompt-injection resistance, data egress and research-only completion.
 
-## 2. Agent Tools and Instructions
+## 2. Tool Trace and Citation UI
 
-- [ ] 2.1 Create typed read-only `web_search`, `read_webpage`, `get_weather` and `search_github` Mastra tools.
-- [ ] 2.2 Register the tools with the existing Coding Agent without exposing arbitrary fetch, shell or write-capable network APIs.
-- [ ] 2.3 Update Agent instructions for when tools are required, citation fidelity, prompt-injection resistance and external-data egress.
-- [ ] 2.4 Allow research-only requests to finish with text and citations without calling `finalize_changes`; retain terminal finalization after workspace mutations.
+- [x] 2.1 Keep Research Tool calls in real message-part order and default `web_search` open while running and after sources arrive.
+- [x] 2.2 Parse only Zod-valid completed Research Tool sources, normalize/dedupe URLs and cap citations per Assistant message.
+- [x] 2.3 Render web search sources immediately in the Tool card while the final answer may still be streaming.
+- [x] 2.4 Add an answer-end `N sources` trigger whose hover, focus and click states expose an accessible bounded source list.
+- [x] 2.5 Preserve existing generic Tool output, reasoning and `finalize_changes` review rendering unchanged.
 
-## 3. Tool Trace and Citation UI
+## 3. Testing
 
-- [ ] 3.1 Keep Web Tool calls visible in message-part order and default their cards open while input/output is streaming.
-- [ ] 3.2 Parse only Zod-valid `output.sources`, normalize/dedupe URLs and cap citations per Assistant message.
-- [ ] 3.3 Add an accessible citation footer with favicon/link-icon fallback, title, hostname and safe clickable original URL.
-- [ ] 3.4 Preserve existing generic Tool output and `finalize_changes` review rendering unchanged.
+- [x] 3.1 Add gateway tests with mocked fetch for web/weather success, missing config/location, malformed or oversized data, 429, timeout and abort.
+- [x] 3.2 Add an Agent stream integration test proving Research Tool output precedes the sourced answer and a research-only run does not finalize.
+- [x] 3.3 Add pure citation tests for schema validation, URL normalization, dedupe, stable order and limits.
+- [x] 3.4 Add React tests for running/completed/error traces, immediate source display, answer-end count, hover/focus access, safe links and no-source behavior.
 
-## 4. Testing
+## 4. Documentation and Verification
 
-- [ ] 4.1 Add deterministic client/tool tests with mocked fetch for success, malformed data, missing config, 429, timeout, abort and size bounds.
-- [ ] 4.2 Add security tests for unsupported schemes, URL credentials, localhost and private/reserved address targets.
-- [ ] 4.3 Add Agent stream integration tests proving Web Tool input/output parts appear before the answer and research-only runs do not finalize.
-- [ ] 4.4 Add React tests for running/completed/error Tool traces, citation dedupe, safe links, icon fallback and no-source answers.
-- [ ] 4.5 Add opt-in smoke commands for configured Tavily/Jina/Open-Meteo/GitHub services without running them in CI.
-
-## 5. Documentation and Verification
-
-- [ ] 5.1 Document `TAVILY_API_KEY`, optional `JINA_API_KEY`/`GITHUB_TOKEN`, setup steps and server-only secret handling in `.env.example` and README.
-- [ ] 5.2 Document current free quotas, Open-Meteo CC-BY attribution/non-commercial restriction and GitHub public-only behavior.
-- [ ] 5.3 Run browser verification for weather, webpage, GitHub and general search prompts, including visible Tool input/output and clickable citations.
-- [ ] 5.4 Run `pnpm check` and inspect the client bundle to confirm external-service clients and keys remain server-only.
-- [ ] 5.5 Mark every task complete only after its behavior and verification actually pass.
+- [x] 4.1 Document `TAVILY_API_KEY`, Research Tool behavior, server-only secrets and Open-Meteo attribution/non-commercial restriction.
+- [x] 4.2 Run the relevant tests and typecheck throughout implementation.
+- [x] 4.3 Run `pnpm check`, inspect the client build for server-only research code/key names, and perform browser interaction verification.
+- [x] 4.4 Review the final diff and mark every task complete only after its behavior actually passes.

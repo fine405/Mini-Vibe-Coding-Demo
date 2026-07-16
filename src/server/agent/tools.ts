@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { workspaceChangeSetSchema } from "@/modules/workspace/schema";
+import { researchTools } from "@/server/agent/research-tools";
 import { RunWorkspace } from "@/server/agent/run-workspace";
 
 function getRunWorkspace(context: {
@@ -161,4 +162,5 @@ export const codingTools = {
 	write_file: writeFileTool,
 	delete_file: deleteFileTool,
 	finalize_changes: finalizeChangesTool,
+	...researchTools,
 };

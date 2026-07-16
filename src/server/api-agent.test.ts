@@ -2,6 +2,7 @@ import { simulateReadableStream } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkspaceSnapshot } from "@/modules/workspace/domain";
+import type { ResearchGateway } from "@/server/agent/research-gateway";
 import { createApi } from "@/server/api";
 import {
 	ObjectProviderConfigSource,
@@ -99,6 +100,101 @@ function waitFor<T>(promise: Promise<T>, timeoutMs = 2_000): Promise<T> {
 }
 
 describe("POST /api/chat", () => {
+	it("streams web research sources before a research-only answer without finalizing", async () => {
+		const { snapshot } = createWorkspaceSnapshot({ "/src/App.tsx": "old" });
+		const responses: MockStreamChunk[][] = [
+			[
+				{
+					type: "tool-call",
+					toolCallId: "call-web-search",
+					toolName: "web_search",
+					input: JSON.stringify({
+						query: "latest React release",
+						maxResults: 5,
+						topic: "general",
+					}),
+				},
+				{
+					type: "finish",
+					finishReason: { unified: "tool-calls", raw: undefined },
+					usage,
+				},
+			],
+			[
+				{ type: "text-start", id: "research-answer" },
+				{
+					type: "text-delta",
+					id: "research-answer",
+					delta:
+						"React release details are available in the [official versions page](https://react.dev/versions).",
+				},
+				{ type: "text-end", id: "research-answer" },
+				{
+					type: "finish",
+					finishReason: { unified: "stop", raw: undefined },
+					usage,
+				},
+			],
+		];
+		let responseIndex = 0;
+		const model = new MockLanguageModelV3({
+			doStream: async () => ({
+				stream: simulateReadableStream({ chunks: responses[responseIndex++] }),
+			}),
+		});
+		const researchGateway: ResearchGateway = {
+			searchWeb: vi.fn(async () => ({
+				query: "latest React release",
+				sources: [
+					{
+						title: "React versions",
+						url: "https://react.dev/versions",
+						snippet: "Current React release information.",
+					},
+				],
+			})),
+			searchWeather: vi.fn(),
+		};
+		const api = createApi({
+			providerCatalog: new ProviderCatalog(
+				new ObjectProviderConfigSource({ OPENAI_API_KEY: "test-only" }),
+			),
+			modelResolver: () => model,
+			researchGateway,
+		});
+
+		const response = await api.request("/api/chat", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				messages: [
+					{
+						id: "user-research",
+						role: "user",
+						parts: [
+							{ type: "text", text: "What is the latest React release?" },
+						],
+					},
+				],
+				providerId: "openai",
+				modelId: "openai/gpt-5.4",
+				workspace: snapshot,
+			}),
+		});
+		const streamText = await response.text();
+
+		expect(response.status).toBe(200);
+		expect(streamText).toContain("web_search");
+		expect(streamText.indexOf("React versions")).toBeLessThan(
+			streamText.indexOf("React release details"),
+		);
+		expect(streamText).not.toContain("finalize_changes");
+		expect(researchGateway.searchWeb).toHaveBeenCalledWith(
+			expect.objectContaining({ query: "latest React release" }),
+			expect.any(AbortSignal),
+		);
+	});
+
 	it("streams a real Mastra tool loop and a finalized ChangeSet without a provider key", async () => {
 		const { snapshot } = createWorkspaceSnapshot({
 			"/src/App.tsx": "export default () => null;",

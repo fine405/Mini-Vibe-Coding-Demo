@@ -4,6 +4,10 @@ import { bodyLimit } from "hono/body-limit";
 import type { ChatModelResolver } from "@/server/agent/chat";
 import { createChatResponse } from "@/server/agent/chat";
 import {
+	HttpResearchGateway,
+	type ResearchGateway,
+} from "@/server/agent/research-gateway";
+import {
 	EnvironmentProviderConfigSource,
 	ProviderCatalog,
 } from "@/server/providers/catalog";
@@ -11,6 +15,7 @@ import {
 export interface ApiDependencies {
 	providerCatalog?: ProviderCatalog;
 	modelResolver?: ChatModelResolver;
+	researchGateway?: ResearchGateway;
 }
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -18,6 +23,9 @@ export function createApi(dependencies: ApiDependencies = {}) {
 	const providerCatalog =
 		dependencies.providerCatalog ??
 		new ProviderCatalog(new EnvironmentProviderConfigSource());
+	const researchGateway =
+		dependencies.researchGateway ??
+		new HttpResearchGateway({ tavilyApiKey: process.env.TAVILY_API_KEY });
 
 	api.use("*", async (context, next) => {
 		const requestId =
@@ -70,6 +78,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
 		createChatResponse(context.req.raw, context.get("requestId"), {
 			providerCatalog,
 			modelResolver: dependencies.modelResolver,
+			researchGateway,
 		}),
 	);
 
