@@ -12,6 +12,12 @@ dist
 dist-ssr
 .output
 .tanstack
+
+# Local environment variables
+.env
+.env.*
+!.env.example
+
 *.local
 
 # Editor directories and files
