@@ -10,6 +10,12 @@ vi.mock("@/components/ai-elements/message", () => ({
 	),
 }));
 
+vi.mock("@streamdown/mermaid", () => ({
+	mermaid: {
+		getMermaid: () => ({ render: () => new Promise(() => {}) }),
+	},
+}));
+
 vi.mock("recharts", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("recharts")>();
 	const { cloneElement } = await import("react");
@@ -219,5 +225,61 @@ describe("GenerativeUIRenderer", () => {
 			"Mermaid callbacks are not allowed.",
 		);
 		expect(screen.queryByTestId("mermaid-source")).not.toBeInTheDocument();
+	});
+
+	it("renders Mermaid after removing presentation-only syntax", () => {
+		const spec: Spec = {
+			root: "diagram",
+			elements: {
+				diagram: {
+					type: "MermaidDiagram",
+					props: {
+						code: 'flowchart LR\nA["User Request<br/>Initial prompt"] --> B["Mastra Agent"]\nstyle A fill:#4A90D9',
+					},
+					children: [],
+				},
+			},
+		};
+
+		render(<GenerativeUIRenderer spec={spec} />);
+
+		expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+		expect(screen.getByTestId("mermaid-source")).toHaveTextContent(
+			"User Request Initial prompt",
+		);
+		expect(screen.getByTestId("mermaid-source")).not.toHaveTextContent(
+			"style A",
+		);
+	});
+
+	it("submits Mermaid downloads through the attachment endpoint", () => {
+		const code = "flowchart LR\nA --> B";
+		const spec: Spec = {
+			root: "diagram",
+			elements: {
+				diagram: {
+					type: "MermaidDiagram",
+					props: { code },
+					children: [],
+				},
+			},
+		};
+
+		render(<GenerativeUIRenderer spec={spec} />);
+		fireEvent.click(screen.getByRole("button", { name: "Download diagram" }));
+
+		const mmdButton = screen.getByRole("button", { name: "MMD" });
+		const form = mmdButton.closest("form");
+		expect(form).toHaveAttribute("action", "/api/download");
+		expect(form).toHaveAttribute("method", "post");
+		expect(
+			form?.querySelector<HTMLInputElement>('input[name="filename"]')?.value,
+		).toBe("diagram.mmd");
+		expect(
+			atob(
+				form?.querySelector<HTMLInputElement>('input[name="data"]')?.value ??
+					"",
+			),
+		).toBe(code);
 	});
 });

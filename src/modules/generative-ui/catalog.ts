@@ -233,7 +233,7 @@ export const generativeUiCatalog = defineCatalog(schema, {
 			props: mermaidDiagramPropsSchema,
 			slots: [],
 			description:
-				"A strict Mermaid flowchart, sequence, state, class or ER diagram.",
+				"A strict Mermaid flowchart, sequence, state, class or ER diagram. Use plain-text labels and omit style, classDef, linkStyle, HTML, links, and callbacks.",
 			example: { code: "flowchart LR\n  A[Request] --> B[Response]" },
 		},
 	},

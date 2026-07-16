@@ -39,6 +39,7 @@ import {
 	textPropsSchema,
 	timelinePropsSchema,
 } from "@/modules/generative-ui/catalog";
+import { MermaidDownloadMenu } from "@/modules/generative-ui/MermaidDownloadMenu";
 import { validateMermaidSource } from "@/modules/generative-ui/mermaid-policy";
 
 const gapClasses = {
@@ -114,7 +115,12 @@ function MermaidDiagram({ code, title }: { code: string; title?: string }) {
 	return (
 		<div className="min-w-0 overflow-hidden rounded-md border border-border bg-background p-3">
 			{title ? <p className="mb-2 text-sm font-medium">{title}</p> : null}
-			<MessageResponse>{`\`\`\`mermaid\n${validation.source}\n\`\`\``}</MessageResponse>
+			<div className="relative">
+				<MermaidDownloadMenu code={validation.source} />
+				<MessageResponse controls={{ mermaid: { download: false } }}>
+					{`\`\`\`mermaid\n${validation.source}\n\`\`\``}
+				</MessageResponse>
+			</div>
 		</div>
 	);
 }

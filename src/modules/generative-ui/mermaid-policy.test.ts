@@ -16,12 +16,23 @@ describe("validateMermaidSource", () => {
 		["unsupported type", "gantt\ntitle Roadmap"],
 		["init directive", "%%{init: { 'theme': 'dark' }}%%\nflowchart LR\nA-->B"],
 		["click handler", "flowchart LR\nA-->B\nclick A callback"],
-		["style directive", "flowchart LR\nA-->B\nstyle A fill:red"],
 		["external URL", "flowchart LR\nA[https://example.com]"],
 		["HTML label", "flowchart LR\nA[<b>Unsafe</b>]"],
 		["nested code fence", "flowchart LR\n```\nA --> B"],
 	])("rejects %s", (_name, source) => {
 		expect(validateMermaidSource(source).ok).toBe(false);
+	});
+
+	it("removes presentation-only syntax before validation", () => {
+		expect(
+			validateMermaidSource(
+				'flowchart LR\nA["User Request<br/>Initial prompt"] --> B["Mastra Agent"]\nstyle A fill:#4A90D9,stroke:#2C5F8A,color:#fff',
+			),
+		).toEqual({
+			ok: true,
+			source:
+				'flowchart LR\nA["User Request Initial prompt"] --> B["Mastra Agent"]',
+		});
 	});
 
 	it("rejects source over 20 KiB", () => {

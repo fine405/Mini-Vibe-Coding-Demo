@@ -100,7 +100,7 @@ export const GENERATIVE_UI_SUGGESTIONS: ChatSuggestion[] = [
 		prompt: [
 			"This is a read-only explanation. Do not modify the workspace.",
 			"Create a Generative UI architecture explanation for exactly this flow: User Request -> Mastra Agent -> AI SDK UIMessage Stream -> pipeJsonRender -> data-spec parts -> Safe React Registry.",
-			"Use MermaidDiagram as the primary flowchart, with a Card and concise Text legend. Do not add systems, links, callbacks, HTML, or facts that were not supplied.",
+			"Use MermaidDiagram as the primary flowchart, with a Card and concise Text legend. Use plain-text Mermaid labels. Do not add systems, links, callbacks, style directives, HTML, or facts that were not supplied.",
 		].join("\n"),
 		icon: WorkflowIcon,
 	},

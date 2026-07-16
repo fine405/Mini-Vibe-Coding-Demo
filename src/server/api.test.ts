@@ -45,6 +45,42 @@ describe("Hono API", () => {
 		expect(JSON.stringify(body)).not.toContain("server-secret");
 	});
 
+	it("returns same-origin downloads as sanitized attachments", async () => {
+		const response = await createApi().request("/api/download", {
+			method: "POST",
+			headers: { "content-type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				filename: "../../diagram.mmd",
+				data: btoa("flowchart LR\nA --> B"),
+			}).toString(),
+		});
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get("content-disposition")).toBe(
+			'attachment; filename="diagram.mmd"',
+		);
+		expect(response.headers.get("content-type")).toBe(
+			"application/octet-stream",
+		);
+		expect(await response.text()).toBe("flowchart LR\nA --> B");
+	});
+
+	it("rejects malformed download payloads", async () => {
+		const response = await createApi().request("/api/download", {
+			method: "POST",
+			headers: { "content-type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				filename: "diagram.mmd",
+				data: "not base64!",
+			}).toString(),
+		});
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({
+			error: { code: "INVALID_DOWNLOAD" },
+		});
+	});
+
 	it("rejects malformed and cross-site chat requests before model execution", async () => {
 		const api = createApi();
 		const malformed = await api.request("/api/chat", {

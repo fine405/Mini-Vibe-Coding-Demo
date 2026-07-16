@@ -67,6 +67,22 @@ export function createApi(dependencies: ApiDependencies = {}) {
 				),
 		}),
 	);
+	api.use(
+		"/download",
+		bodyLimit({
+			maxSize: 16 * 1024 * 1024,
+			onError: (context) =>
+				context.json(
+					{
+						error: {
+							code: "REQUEST_TOO_LARGE",
+							message: "Download request exceeds 16 MiB",
+						},
+					},
+					413,
+				),
+		}),
+	);
 
 	api.get("/health", (context) =>
 		context.json({ ok: true, service: "mini-lovable-agent" }),
@@ -74,6 +90,63 @@ export function createApi(dependencies: ApiDependencies = {}) {
 	api.get("/providers", (context) =>
 		context.json({ providers: providerCatalog.listPublic() }),
 	);
+	api.post("/download", async (context) => {
+		const invalidDownload = () =>
+			context.json(
+				{
+					error: {
+						code: "INVALID_DOWNLOAD",
+						message: "Download payload is invalid",
+					},
+				},
+				400,
+			);
+		let body: Awaited<ReturnType<typeof context.req.parseBody>>;
+		try {
+			body = await context.req.parseBody();
+		} catch {
+			return invalidDownload();
+		}
+
+		const rawFilename = body.filename;
+		const data = body.data;
+		const filename =
+			typeof rawFilename === "string"
+				? rawFilename
+						.split(/[\\/]/)
+						.at(-1)
+						?.replace(/[^A-Za-z0-9._-]/g, "_")
+						.slice(0, 120)
+				: undefined;
+		if (
+			!filename ||
+			filename === "." ||
+			filename === ".." ||
+			typeof data !== "string" ||
+			!/^[A-Za-z0-9+/]*={0,2}$/.test(data)
+		) {
+			return invalidDownload();
+		}
+
+		let bytes: Uint8Array;
+		try {
+			bytes = Uint8Array.from(atob(data), (character) =>
+				character.charCodeAt(0),
+			);
+		} catch {
+			return invalidDownload();
+		}
+		const buffer = new ArrayBuffer(bytes.byteLength);
+		new Uint8Array(buffer).set(bytes);
+
+		return new Response(buffer, {
+			headers: {
+				"Cache-Control": "no-store",
+				"Content-Disposition": `attachment; filename="${filename}"`,
+				"Content-Type": "application/octet-stream",
+			},
+		});
+	});
 	api.post("/chat", (context) =>
 		createChatResponse(context.req.raw, context.get("requestId"), {
 			providerCatalog,
