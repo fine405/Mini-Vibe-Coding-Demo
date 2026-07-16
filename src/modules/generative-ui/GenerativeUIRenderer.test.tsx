@@ -7,18 +7,28 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GenerativeUIRenderer } from "@/modules/generative-ui/GenerativeUIRenderer";
+
+const { renderMermaidMock } = vi.hoisted(() => ({
+	renderMermaidMock: vi.fn(),
+}));
 
 vi.mock("@/components/ai-elements/message", () => ({
 	MessageResponse: ({ children }: { children: string }) => (
-		<pre data-testid="mermaid-source">{children}</pre>
+		<div>
+			<div
+				data-streamdown="mermaid-block-actions"
+				data-testid="mermaid-actions"
+			/>
+			<pre data-testid="mermaid-source">{children}</pre>
+		</div>
 	),
 }));
 
 vi.mock("@streamdown/mermaid", () => ({
 	mermaid: {
-		getMermaid: () => ({ render: () => new Promise(() => {}) }),
+		getMermaid: () => ({ render: renderMermaidMock }),
 	},
 }));
 
@@ -122,6 +132,16 @@ const dashboardSpec: Spec = {
 };
 
 describe("GenerativeUIRenderer", () => {
+	beforeEach(() => {
+		renderMermaidMock.mockReset();
+		renderMermaidMock.mockImplementation(() => new Promise(() => {}));
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	});
+
 	it("renders the approved data and layout components", () => {
 		render(<GenerativeUIRenderer spec={dashboardSpec} />);
 
@@ -293,7 +313,7 @@ describe("GenerativeUIRenderer", () => {
 		await waitFor(() => expect(form).not.toBeInTheDocument());
 	});
 
-	it("aligns the download button with the other Mermaid controls", () => {
+	it("places the download button inside the native Mermaid action bar", async () => {
 		const spec: Spec = {
 			root: "diagram",
 			elements: {
@@ -307,11 +327,90 @@ describe("GenerativeUIRenderer", () => {
 
 		render(<GenerativeUIRenderer spec={spec} />);
 
-		const downloadButton = screen.getByRole("button", {
+		const downloadButton = await screen.findByRole("button", {
 			name: "Download diagram",
 		});
-		expect(downloadButton.parentElement).toHaveClass("top-1");
+		expect(screen.getByTestId("mermaid-actions")).toContainElement(
+			downloadButton,
+		);
+		expect(downloadButton.parentElement).toHaveClass(
+			"relative",
+			"order-first",
+			"flex",
+		);
 		expect(downloadButton.querySelector("svg")).toHaveAttribute("width", "16");
 		expect(downloadButton.querySelector("svg")).toHaveAttribute("height", "16");
+	});
+
+	it("renders PNG downloads from the full diagram at 4K resolution", async () => {
+		renderMermaidMock.mockResolvedValueOnce({
+			svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600"><text>Diagram</text></svg>',
+		});
+		let rasterizedSvg = "";
+		class MockImage {
+			height = 150;
+			naturalHeight = 150;
+			naturalWidth = 300;
+			onerror: (() => void) | null = null;
+			onload: (() => void) | null = null;
+			width = 300;
+
+			set src(value: string) {
+				const encoded = value.split(",")[1] ?? "";
+				rasterizedSvg = new TextDecoder().decode(
+					Uint8Array.from(atob(encoded), (character) =>
+						character.charCodeAt(0),
+					),
+				);
+				queueMicrotask(() => this.onload?.());
+			}
+		}
+		vi.stubGlobal("Image", MockImage);
+
+		let canvasHeight = 0;
+		let canvasWidth = 0;
+		vi.spyOn(HTMLCanvasElement.prototype, "height", "set").mockImplementation(
+			(value) => {
+				canvasHeight = value;
+			},
+		);
+		vi.spyOn(HTMLCanvasElement.prototype, "width", "set").mockImplementation(
+			(value) => {
+				canvasWidth = value;
+			},
+		);
+		vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+			drawImage: vi.fn(),
+		} as unknown as CanvasRenderingContext2D);
+		vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
+			"data:image/png;base64,cG5n",
+		);
+
+		const spec: Spec = {
+			root: "diagram",
+			elements: {
+				diagram: {
+					type: "MermaidDiagram",
+					props: { code: "flowchart LR\nA --> B" },
+					children: [],
+				},
+			},
+		};
+
+		render(<GenerativeUIRenderer spec={spec} />);
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Download diagram" }),
+		);
+		const pngButton = screen.getByRole("button", { name: "PNG" });
+		await waitFor(() => expect(pngButton).toBeEnabled());
+
+		expect(canvasWidth).toBe(4096);
+		expect(canvasHeight).toBe(2048);
+		const rasterizedRoot = new DOMParser().parseFromString(
+			rasterizedSvg,
+			"image/svg+xml",
+		).documentElement;
+		expect(rasterizedRoot.getAttribute("width")).toBe("4096");
+		expect(rasterizedRoot.getAttribute("height")).toBe("2048");
 	});
 });
