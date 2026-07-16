@@ -331,6 +331,100 @@ describe("HttpResearchGateway", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
+	it("recovers from one transient Open-Meteo outage", async () => {
+		let geocodingAttempts = 0;
+		const fetchMock = vi.fn<typeof fetch>(async (input) => {
+			const url = new URL(String(input));
+			if (url.hostname === "geocoding-api.open-meteo.com") {
+				geocodingAttempts += 1;
+				if (geocodingAttempts === 1) {
+					return new Response("temporary outage", { status: 503 });
+				}
+				return Response.json({
+					results: [
+						{
+							name: "深圳",
+							country: "中国",
+							latitude: 22.5455,
+							longitude: 114.0683,
+							timezone: "Asia/Shanghai",
+						},
+					],
+				});
+			}
+
+			return Response.json({
+				timezone: "Asia/Shanghai",
+				current: {
+					time: "2026-07-16T10:00",
+					temperature_2m: 31.5,
+					apparent_temperature: 36.2,
+					weather_code: 2,
+					wind_speed_10m: 12.4,
+					precipitation: 0,
+				},
+				current_units: {
+					temperature_2m: "°C",
+					apparent_temperature: "°C",
+					wind_speed_10m: "km/h",
+					precipitation: "mm",
+				},
+				daily: {
+					time: ["2026-07-16"],
+					weather_code: [2],
+					temperature_2m_max: [34.1],
+					temperature_2m_min: [27.4],
+					precipitation_probability_max: [30],
+				},
+			});
+		});
+		const gateway = new HttpResearchGateway({ fetch: fetchMock });
+
+		await expect(
+			gateway.searchWeather({
+				location: "深圳",
+				forecastDays: 1,
+				units: "metric",
+			}),
+		).resolves.toMatchObject({
+			location: { name: "深圳, 中国" },
+			current: { temperature: 31.5 },
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+	});
+
+	it("retries one timed-out weather attempt", async () => {
+		vi.useFakeTimers();
+		let attempt = 0;
+		const fetchMock = vi.fn<typeof fetch>(async (_input, init) => {
+			attempt += 1;
+			if (attempt === 1) {
+				return new Promise<Response>((_resolve, reject) => {
+					init?.signal?.addEventListener(
+						"abort",
+						() => reject(init.signal?.reason),
+						{ once: true },
+					);
+				});
+			}
+			return Response.json({ results: [] });
+		});
+		const gateway = new HttpResearchGateway({ fetch: fetchMock });
+		const pending = gateway.searchWeather({
+			location: "深圳",
+			forecastDays: 1,
+			units: "metric",
+		});
+		const rejection = expect(pending).rejects.toThrow(
+			'No weather location found for "深圳"',
+		);
+
+		await vi.advanceTimersByTimeAsync(10_001);
+		await rejection;
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		vi.useRealTimers();
+	});
+
 	it("maps malformed Open-Meteo data to a stable error", async () => {
 		const fetchMock = vi.fn<typeof fetch>(async () =>
 			Response.json({ results: [{ name: "Missing coordinates" }] }),
@@ -375,7 +469,7 @@ describe("HttpResearchGateway", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
-	it("maps Open-Meteo outages to an actionable error", async () => {
+	it("maps a persistent Open-Meteo outage after one retry", async () => {
 		const fetchMock = vi.fn<typeof fetch>(async (input) => {
 			const url = new URL(String(input));
 			if (url.hostname === "geocoding-api.open-meteo.com") {
@@ -401,7 +495,7 @@ describe("HttpResearchGateway", () => {
 				units: "metric",
 			}),
 		).rejects.toThrow("Weather service is unavailable. Try again later.");
-		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(fetchMock).toHaveBeenCalledTimes(4);
 	});
 
 	it("returns an actionable error when Open-Meteo cannot resolve a location", async () => {

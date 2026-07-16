@@ -381,6 +381,7 @@ describe("POST /api/chat", () => {
 	});
 
 	it("streams bounded tool errors without mutating the submitted workspace", async () => {
+		const consoleError = vi.spyOn(console, "error");
 		const { snapshot } = createWorkspaceSnapshot({ "/src/App.tsx": "old" });
 		const responses: MockStreamChunk[][] = [
 			[
@@ -451,5 +452,11 @@ describe("POST /api/chat", () => {
 		expect(streamText).toContain("output-error");
 		expect(collectTextDeltas(events)).toContain("inspected before editing");
 		expect(snapshot.files["/src/App.tsx"].content).toBe("old");
+		expect(
+			consoleError.mock.calls
+				.map(([entry]) => JSON.parse(String(entry)) as { event?: string })
+				.some((entry) => entry.event === "agent.run.stream_error"),
+		).toBe(true);
+		consoleError.mockRestore();
 	});
 });

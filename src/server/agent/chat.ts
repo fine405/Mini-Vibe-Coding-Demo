@@ -203,15 +203,16 @@ export async function createChatResponse(
 				},
 			},
 			sendReasoning: true,
-			onError: () => {
+			onError: (error) => {
 				console.error(
 					JSON.stringify({
-						event: "agent.run.failed",
+						event: "agent.run.stream_error",
 						requestId,
 						providerId: resolved.providerId,
 						modelId: resolved.modelId,
 						durationMs: Math.round(performance.now() - startedAt),
 						errorCategory: "AGENT_STREAM_ERROR",
+						errorName: error instanceof Error ? error.name : typeof error,
 					}),
 				);
 				return "Agent execution failed. Check server logs with the request ID.";

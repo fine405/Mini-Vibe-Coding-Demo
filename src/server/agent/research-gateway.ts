@@ -18,6 +18,11 @@ const OPEN_METEO_GEOCODING_URL =
 const OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const MAX_UPSTREAM_RESPONSE_BYTES = 256 * 1024;
 const UPSTREAM_TIMEOUT_MS = 10_000;
+const WEATHER_MAX_ATTEMPTS = 2;
+
+class RetryableUpstreamError extends Error {}
+
+class UpstreamTimeoutError extends Error {}
 
 const tavilyResponseSchema = z.object({
 	query: z.string(),
@@ -140,7 +145,7 @@ async function withUpstreamTimeout<T>(
 		return await operation(signal);
 	} catch (error) {
 		if (timeoutController.signal.aborted && !abortSignal?.aborted) {
-			throw new Error(`${label} timed out. Try again.`);
+			throw new UpstreamTimeoutError(`${label} timed out. Try again.`);
 		}
 		if (abortSignal?.aborted) {
 			throw new DOMException(`${label} was cancelled.`, "AbortError");
@@ -161,7 +166,20 @@ async function fetchUpstream(
 		return await fetcher(input, init);
 	} catch (error) {
 		if (init.signal?.aborted) throw error;
-		throw new Error(failureMessage);
+		throw new RetryableUpstreamError(failureMessage);
+	}
+}
+
+async function withWeatherRetry<T>(operation: () => Promise<T>): Promise<T> {
+	for (let attempt = 1; ; attempt += 1) {
+		try {
+			return await operation();
+		} catch (error) {
+			const retryable =
+				error instanceof RetryableUpstreamError ||
+				error instanceof UpstreamTimeoutError;
+			if (attempt === WEATHER_MAX_ATTEMPTS || !retryable) throw error;
+		}
 	}
 }
 
@@ -300,10 +318,8 @@ export class HttpResearchGateway implements ResearchGateway {
 		abortSignal?: AbortSignal,
 	): Promise<WeatherSearchOutput> {
 		const parsedInput = weatherSearchInputSchema.parse(input);
-		return withUpstreamTimeout(
-			"Weather search",
-			abortSignal,
-			async (signal) => {
+		return withWeatherRetry(() =>
+			withUpstreamTimeout("Weather search", abortSignal, async (signal) => {
 				const geocodingUrl = new URL(OPEN_METEO_GEOCODING_URL);
 				geocodingUrl.searchParams.set("name", parsedInput.location);
 				geocodingUrl.searchParams.set("count", "1");
@@ -325,7 +341,9 @@ export class HttpResearchGateway implements ResearchGateway {
 						);
 					}
 					if (geocodingResponse.status >= 500) {
-						throw new Error("Weather service is unavailable. Try again later.");
+						throw new RetryableUpstreamError(
+							"Weather service is unavailable. Try again later.",
+						);
 					}
 					throw new Error(
 						"Weather location lookup failed. Try a more specific location.",
@@ -386,7 +404,9 @@ export class HttpResearchGateway implements ResearchGateway {
 						);
 					}
 					if (forecastResponse.status >= 500) {
-						throw new Error("Weather service is unavailable. Try again later.");
+						throw new RetryableUpstreamError(
+							"Weather service is unavailable. Try again later.",
+						);
 					}
 					throw new Error("Weather forecast request failed. Try again.");
 				}
@@ -439,7 +459,7 @@ export class HttpResearchGateway implements ResearchGateway {
 					throw new Error("Weather search returned an invalid response.");
 				}
 				return output.data;
-			},
+			}),
 		);
 	}
 }
