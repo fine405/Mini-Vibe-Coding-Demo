@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SummerThemeMedia } from "@/modules/theme/SummerThemeMedia";
 import { useThemeStore } from "@/modules/theme/store";
+import { ThemeNoiseTexture } from "@/modules/theme/ThemeNoiseTexture";
 import type { ThemeMode } from "@/modules/theme/types";
 
 const THEME_OPTIONS: Array<{
@@ -97,6 +98,7 @@ export function ThemeMenu() {
 
 	return (
 		<>
+			<ThemeNoiseTexture />
 			<SummerThemeMedia />
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>

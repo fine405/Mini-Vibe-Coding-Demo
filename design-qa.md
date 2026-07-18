@@ -1,4 +1,6 @@
-# Design QA
+# Archived Design QA Reports
+
++# Design QA
 
 - Source visual truth: `/Users/boqingyun/.codex/generated_images/019f667a-b678-7663-ad86-f246daba37da/exec-66c9e74c-5e0f-4881-b813-92abcb717d6a.png`
 - Implementation screenshot: unavailable; no in-app browser or Chrome instance is available in this session.
@@ -115,5 +117,65 @@ final result: blocked
 ### Follow-up polish
 
 - [P3] 参考图和产品现有 Monaco dark theme 的背景与 diff 饱和度略有差异；为保持项目主题一致，本次不覆盖 Monaco 全局配色。
+
+final result: passed
+
+---
+
+# Design QA: Lab01-style Day/Night Texture
+
+## Evidence
+
+- Source visual truth: `/var/folders/nn/272k0ds16mq_7vpy9jn7xrp80000gn/T/codex-clipboard-e9a59cbf-cd0a-4c89-a701-32e42049a4b8.png`
+- Source implementation: `https://lab01.dev/experiments/01/` (`feTurbulence` base frequency `0.8`, grayscale filter, screen blend, Night 10% opacity, Light 15% opacity)
+- Night implementation screenshot: `/tmp/mini-lovable-design-qa/night-editor-noise.png`
+- Day implementation screenshot: `/tmp/mini-lovable-design-qa/day-editor-noise.png`
+- Theme menu screenshot: `/tmp/mini-lovable-design-qa/night-theme-menu.png`
+- Full-view comparison: `/tmp/mini-lovable-design-qa/theme-full-comparison.png`
+- Focused texture comparison: `/tmp/mini-lovable-design-qa/theme-focused-comparison.png`
+- Implementation viewport: 1280 × 720
+- States: Day and Night, Code workspace with `App.js` open; Night theme menu open for layer verification
+
+The source is a 974 × 976 standalone appearance modal, while the implementation is the existing desktop workbench. Layout, copy, and component styling are intentionally not matched; the comparison target is the full-surface noise treatment and the requested Day base color.
+
+## Findings
+
+- No actionable P0, P1, or P2 mismatch.
+- Fonts and typography: the workbench keeps its existing Geist/Geist Mono hierarchy. The texture does not blur or reduce the legibility of small UI text or Monaco code.
+- Spacing and layout rhythm: unchanged from the existing product, as requested. The fixed texture layer introduces no overflow or displacement.
+- Colors and visual tokens: Night retains the existing black layered palette. Day uses the requested warm white `#F3F2F1` for both `--app-bg-primary` and `--background`; secondary and tertiary surfaces remain unchanged.
+- Image quality and asset fidelity: the texture is generated live with the same `feTurbulence(0.8)`, grayscale filter, and screen blend as the source, so it has no raster tiling, compression, or seam artifacts.
+- Copy and content: unchanged. Theme names, shortcuts, and existing workbench content remain intact.
+- Interaction and layering: the overlay is `pointer-events: none` at z-index 30. The theme menu renders at z-index 50 and remains crisp and interactive. Day/Night switching was tested through the menu.
+- Accessibility: foreground contrast and Monaco syntax legibility remain clear in both themes. The decorative texture is `aria-hidden`.
+- Browser console: no errors in either theme during the verified flow.
+
+## Full-view Comparison
+
+The combined full-view evidence shows the source, Night workbench, and Day workbench in one comparison image. Night preserves the source's fine, non-directional grain without changing the product's black hierarchy. Day keeps the same restrained material treatment while shifting the base away from cold gray to warm white.
+
+## Focused Region Comparison
+
+The focused comparison enlarges a low-detail source panel region and matching low-detail workbench/editor regions. Grain remains fine and irregular, with no visible tile boundary. Monaco glyph edges stay sharp in both themes.
+
+## Comparison History
+
+### Pass 1
+
+- Earlier findings: none at P0/P1/P2.
+- Fixes made after comparison: none required.
+- Post-fix evidence: not applicable; the first normalized full-view and focused comparison passed.
+
+## Implementation Checklist
+
+- [x] Match Lab01's SVG turbulence parameters and screen blend.
+- [x] Use 10% opacity for Night and 15% for Day.
+- [x] Set the Day base to warm white `#F3F2F1`.
+- [x] Keep the overlay decorative, non-interactive, and below menus.
+- [x] Verify editor readability, theme switching, and browser console.
+
+## Follow-up Polish
+
+- No blocking follow-up. Day grain is intentionally very subtle on the warm white base.
 
 final result: passed

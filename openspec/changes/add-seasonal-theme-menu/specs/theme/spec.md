@@ -64,6 +64,25 @@ The system SHALL expose Drizzle and Breeze as selectable and persistable theme m
 - **AND** the application uses the Day color scheme without a falling-leaf effect
 - **AND** the menu identifies the effect as coming later
 
+### Requirement: Day and Night Noise Texture
+
+The Day and Night themes SHALL display a subtle non-interactive grayscale noise texture adapted to their respective light and dark color schemes.
+
+#### Scenario: Night displays Lab01-style light grain
+- **WHEN** Night is active
+- **THEN** a fixed grayscale `feTurbulence` texture is visible using a screen blend at 10% opacity
+- **AND** the texture does not intercept pointer input
+
+#### Scenario: Day displays grain on a warm white base
+- **WHEN** Day is active
+- **THEN** the page base is warm white `#F3F2F1`
+- **AND** the same grayscale `feTurbulence` texture uses a screen blend at 15% opacity
+- **AND** the texture does not intercept pointer input
+
+#### Scenario: Seasonal theme is active
+- **WHEN** Summer, Drizzle, or Breeze is active
+- **THEN** the Day/Night noise texture is hidden
+
 ## MODIFIED Requirements
 
 ### Requirement: Theme Mode Selection

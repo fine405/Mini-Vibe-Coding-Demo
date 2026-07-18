@@ -13,6 +13,7 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 - 用一个 Header 一级菜单承载五个稳定的主题 ID、名称和快捷键。
 - 把用户选择的 Theme 与组件实际消费的 light/dark color scheme 分开。
 - 让 Summer 在现有 UI 之上产生不阻断操作的全屏叶影与森林环境声。
+- 让 Day/Night 获得细密但不影响文字清晰度的实时噪声质感。
 - 让 Drizzle 与 Breeze 的后续效果无需再次迁移持久化状态或菜单契约。
 - 保持现有 Day/Night token、Monaco theme 与 Preview theme 行为不变。
 
@@ -23,6 +24,7 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 - 不复制 dany.works 的 Rain/Midnight/Chaos 模式或移动端 Logo 手势。
 - 不引入 Three.js、Canvas、GSAP、新状态框架或远程视频流。
 - 不把主题动作重复放入 More 菜单或 Command Palette。
+- 不在 Summer、Drizzle 或 Breeze 上叠加 Day/Night 噪声层。
 
 ## Decisions
 
@@ -84,6 +86,12 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 
 两个资源随应用本地托管，避免依赖原站在线状态。资源旁记录来源 URL、下载日期、文件元数据与校验值。dany.works 没有为这两个文件声明可复用许可，因此它们被明确视为本地 Demo 临时资产；任何公开部署、分发或商业使用都必须先取得原作者许可，或换成自有/已授权素材。
 
+### 6. Day/Night 使用 lab01.dev 的 SVG 噪声方式
+
+参考站的颗粒由固定覆盖层中的 SVG `feTurbulence(baseFrequency="0.8")` 实时生成，覆盖层使用 `filter: url(#theme-noise-filter) grayscale(100%)` 与 `mix-blend-mode: screen`。实现保留这套核心参数，不另外生成或平铺位图纹理。
+
+`ThemeNoiseTexture` 固定覆盖工作台、pointer-events none，层级为 z-30，低于 Summer 视频 z-40 和 Radix 菜单 z-50。Night 采用参考站的 10% opacity；Day 采用参考站的 15% opacity，但将应用的页面基底从中性灰改为浅暖白 `#F3F2F1`。Summer、Drizzle、Breeze 中 opacity 为 0，避免尚未设计的季节主题意外继承颗粒效果。
+
 ## Risks / Trade-offs
 
 - multiply overlay 会降低局部对比度，尤其是 Monaco 代码区 → Summer 是 Demo 氛围主题，保留 dany 的覆盖式效果；菜单层级高于视频，始终可切回。
@@ -93,6 +101,7 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 - 原视频和音频没有公开复用许可 → 仅作为本地 Demo 临时资产，公开部署前设置明确替换门槛。
 - 全局字母键可能与应用交互冲突 → 严格排除 editable target 和 Meta/Ctrl/Alt 组合，并用测试覆盖输入框、contenteditable 与普通页面三类场景。
 - Zustand 旧存储包含 `light/dark/auto` → hydration 统一归一，避免旧值进入新 union 或产生错误闪烁。
+- 实时 SVG 噪声可能增加渲染成本或降低代码和小字清晰度 → 保留单一覆盖层和参考站的单 octave 默认设置，且放在 Summer/菜单层以下；实际桌面验收同时检查 Monaco 与浅色 Preview。
 
 ## Migration Plan
 
