@@ -4,17 +4,9 @@
 
 ## Demo
 
-工作台内置 6 种主题，可从右上角主题菜单切换，也可使用 `D` / `N` / `S` / `R` / `W` / `B` 快捷键。点击带 🔊 的封面可播放包含主题环境音的视频。
+工作台内置 6 种主题，可从右上角主题菜单切换，也可使用 `D` / `N` / `S` / `R` / `W` / `B` 快捷键。
 
-| Day | Night |
-|---|---|
-| ![Day 主题](./docs/themes/day.jpg) | ![Night 主题](./docs/themes/night.jpg) |
-| Summer 🔊 | Drizzle 🔊 |
-| [![Summer 主题视频封面](./docs/themes/summer.jpg)](./docs/themes/summer.mp4) | [![Drizzle 主题视频封面](./docs/themes/drizzle.jpg)](./docs/themes/drizzle.mp4) |
-| [播放 Summer 主题视频（含环境音）](./docs/themes/summer.mp4) | [播放 Drizzle 主题视频（含雨声）](./docs/themes/drizzle.mp4) |
-| Snow 🔊 | Breeze |
-| [![Snow 主题视频封面](./docs/themes/snow.jpg)](./docs/themes/snow.mp4) | ![Breeze 主题](./docs/themes/breeze.jpg) |
-| [播放 Snow 主题视频（含环境音）](./docs/themes/snow.mp4) |  |
+![Mini Lovable Day、Night、Summer、Drizzle、Snow 与 Breeze 主题演示](./docs/themes/themes.gif)
 
 Summer 主题 fork from https://dany.works/
 
