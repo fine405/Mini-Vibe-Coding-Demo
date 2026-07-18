@@ -59,9 +59,14 @@ const isEditableTarget = (target: EventTarget | null) =>
 	target instanceof Element &&
 	Boolean(
 		target.closest(
-			'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
+			'input, textarea, select, .monaco-editor, [contenteditable]:not([contenteditable="false"])',
 		),
 	);
+
+const isEditing = (target: EventTarget | null) =>
+	isEditableTarget(target) ||
+	isEditableTarget(document.activeElement) ||
+	Boolean(document.querySelector(".monaco-editor.focused"));
 
 export function ThemeMenu() {
 	const { mode, setMode } = useThemeStore();
@@ -75,7 +80,7 @@ export function ThemeMenu() {
 				event.metaKey ||
 				event.ctrlKey ||
 				event.altKey ||
-				isEditableTarget(event.target)
+				isEditing(event.target)
 			) {
 				return;
 			}

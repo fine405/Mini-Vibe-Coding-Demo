@@ -182,4 +182,27 @@ describe("WorkbenchHeader", () => {
 		editable.remove();
 		monaco.remove();
 	});
+
+	it("ignores theme shortcuts while Monaco reports editor focus", () => {
+		render(<WorkbenchHeader />);
+		const monaco = document.createElement("div");
+		const editorFocusTarget = document.createElement("div");
+		editorFocusTarget.tabIndex = 0;
+		monaco.append(editorFocusTarget);
+		monaco.className = "monaco-editor focused";
+		document.body.append(monaco);
+
+		fireEvent.keyDown(window, { key: "d" });
+		expect(useThemeStore.getState().mode).toBe("night");
+
+		monaco.classList.remove("focused");
+		editorFocusTarget.focus();
+		fireEvent.keyDown(window, { key: "d" });
+		expect(useThemeStore.getState().mode).toBe("night");
+
+		editorFocusTarget.blur();
+		fireEvent.keyDown(window, { key: "d" });
+		expect(useThemeStore.getState().mode).toBe("day");
+		monaco.remove();
+	});
 });
