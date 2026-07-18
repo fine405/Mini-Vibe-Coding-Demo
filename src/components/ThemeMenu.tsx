@@ -42,17 +42,17 @@ const THEME_OPTIONS: Array<{
 		icon: CloudRain,
 	},
 	{
+		mode: "snow",
+		label: "Snow",
+		shortcut: "W",
+		icon: Snowflake,
+	},
+	{
 		mode: "breeze",
 		label: "Breeze",
 		shortcut: "B",
 		icon: Wind,
 		pending: true,
-	},
-	{
-		mode: "snow",
-		label: "Snow",
-		shortcut: "W",
-		icon: Snowflake,
 	},
 ];
 

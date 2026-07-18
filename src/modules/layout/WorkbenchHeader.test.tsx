@@ -123,6 +123,7 @@ describe("WorkbenchHeader", () => {
 		expect(snowItem).toHaveTextContent("W");
 		expect(snowItem).not.toHaveTextContent("Soon");
 		expect(snowItem.querySelector(".lucide-snowflake")).toBeInTheDocument();
+		expect(screen.getAllByRole("menuitemradio").at(-1)).toBe(breezeItem);
 		expect(nightItem).toHaveAttribute("aria-checked", "true");
 
 		await user.click(snowItem);
