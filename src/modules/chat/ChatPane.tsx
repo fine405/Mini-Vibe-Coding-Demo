@@ -696,7 +696,7 @@ function AgentChatPane({
 					<PromptInputSubmit
 						className={
 							submitReady
-								? "rounded-lg bg-blue-600 text-white hover:bg-blue-500"
+								? "rounded-lg bg-[#090a0f] text-white ring-1 ring-white/10 hover:bg-[#171923]"
 								: "rounded-lg"
 						}
 						disabled={!generating && !submitReady}

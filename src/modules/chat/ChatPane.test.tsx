@@ -203,6 +203,9 @@ describe("AgentChatMessage", () => {
 			"active",
 		);
 		expect(screen.getByRole("tab", { name: "Generative UI" })).toBeVisible();
+		for (const suggestion of screen.getAllByTestId("chat-suggestion")) {
+			expect(suggestion.querySelector("svg")).toHaveClass("text-violet-500");
+		}
 	});
 
 	it("only enables submit when the composer contains non-whitespace text", async () => {
@@ -304,9 +307,11 @@ describe("AgentChatMessage", () => {
 		expect(deepseekInput).toHaveAttribute("autocomplete", "off");
 		await user.type(deepseekInput, "page-deepseek-secret");
 		await user.type(tavilyInput, "page-tavily-secret");
-		await user.click(
-			screen.getByRole("button", { name: "Save for this page" }),
-		);
+		const saveButton = screen.getByRole("button", {
+			name: "Save for this page",
+		});
+		expect(saveButton).toHaveClass("from-blue-600", "to-violet-600");
+		await user.click(saveButton);
 		expect(chatBodies).toHaveLength(0);
 
 		await user.click(settingsButton);
@@ -1315,7 +1320,7 @@ describe("AgentChatMessage", () => {
 		).toHaveLength(1);
 		await user.type(input, "Update the app");
 		expect(screen.getByRole("button", { name: "Submit" })).toHaveClass(
-			"bg-blue-600",
+			"bg-[#090a0f]",
 		);
 		await user.click(screen.getByRole("button", { name: "Submit" }));
 		expect(

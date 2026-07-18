@@ -243,9 +243,11 @@ describe("ChangeSetReview", () => {
 			<ChangeSetReview changeSet={changeSet} onRegenerate={onRegenerate} />,
 		);
 
-		await user.click(
-			await screen.findByRole("button", { name: "Apply selected" }),
-		);
+		const applyButton = await screen.findByRole("button", {
+			name: "Apply selected",
+		});
+		expect(applyButton).toHaveClass("from-blue-600", "to-violet-600");
+		await user.click(applyButton);
 		const regenerate = await screen.findByRole("button", {
 			name: "Regenerate from current workspace",
 		});

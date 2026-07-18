@@ -206,6 +206,7 @@ export function DemoCredentialSettings({
 							Cancel
 						</Button>
 						<Button
+							className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white hover:from-blue-500 hover:via-indigo-500 hover:to-violet-500"
 							disabled={!deploymentEnabled || !hasDraft || clearing}
 							onClick={handleSave}
 						>

@@ -45,7 +45,7 @@ function SuggestionList({
 						title={prompt}
 						variant="ghost"
 					>
-						<SuggestionIcon className="size-4 shrink-0 text-blue-500" />
+						<SuggestionIcon className="size-4 shrink-0 text-violet-500" />
 						<span className="min-w-0 flex-1">
 							<span className="block text-xs font-medium">{label}</span>
 							<span className="mt-0.5 block text-[11px] text-muted-foreground">
