@@ -105,6 +105,7 @@ describe("WorkbenchHeader", () => {
 			name: /drizzle/i,
 		});
 		const breezeItem = screen.getByRole("menuitemradio", { name: /breeze/i });
+		const snowItem = screen.getByRole("menuitemradio", { name: /snow/i });
 
 		expect(dayItem).toHaveTextContent("D");
 		expect(dayItem.querySelector(".lucide-sun")).toBeInTheDocument();
@@ -113,17 +114,19 @@ describe("WorkbenchHeader", () => {
 		expect(summerItem.querySelector(".lucide-leaf")).toBeInTheDocument();
 		expect(drizzleItem).toHaveTextContent("SoonR");
 		expect(breezeItem).toHaveTextContent("SoonB");
+		expect(snowItem).toHaveTextContent("SoonW");
+		expect(snowItem.querySelector(".lucide-snowflake")).toBeInTheDocument();
 		expect(nightItem).toHaveAttribute("aria-checked", "true");
 
-		await user.click(summerItem);
+		await user.click(snowItem);
 		expect(useThemeStore.getState()).toMatchObject({
-			mode: "summer",
+			mode: "snow",
 			resolvedTheme: "light",
 		});
 		expect(
 			screen
-				.getByRole("button", { name: "Theme: Summer" })
-				.querySelector(".lucide-leaf"),
+				.getByRole("button", { name: "Theme: Snow" })
+				.querySelector(".lucide-snowflake"),
 		).toBeInTheDocument();
 
 		await user.click(moreTrigger);
@@ -141,6 +144,7 @@ describe("WorkbenchHeader", () => {
 			["s", "summer"],
 			["r", "drizzle"],
 			["B", "breeze"],
+			["w", "snow"],
 		] as const) {
 			fireEvent.keyDown(window, { key, shiftKey: key === "B" });
 			expect(useThemeStore.getState().mode).toBe(mode);

@@ -2,11 +2,11 @@
 
 ### Requirement: Theme Keyboard Shortcuts
 
-The system SHALL provide unmodified single-letter shortcuts `D`, `N`, `S`, `R`, and `B` for selecting Day, Night, Summer, Drizzle, and Breeze respectively.
+The system SHALL provide unmodified single-letter shortcuts `D`, `N`, `S`, `R`, `B`, and `W` for selecting Day, Night, Summer, Drizzle, Breeze, and Snow respectively.
 
 #### Scenario: User selects a theme from a non-editable surface
 - **WHEN** focus is outside an input, textarea, select, Monaco input surface, or contenteditable element
-- **AND** the user presses one of `D`, `N`, `S`, `R`, or `B` without Meta, Ctrl, or Alt
+- **AND** the user presses one of `D`, `N`, `S`, `R`, `B`, or `W` without Meta, Ctrl, or Alt
 - **THEN** the corresponding theme is selected
 - **AND** the browser default for that matched key is prevented
 
@@ -50,7 +50,7 @@ The Summer theme SHALL apply the Day color scheme, display a non-interactive ful
 
 ### Requirement: Placeholder Seasonal Themes
 
-The system SHALL expose Drizzle and Breeze as selectable and persistable theme modes while their dedicated visual effects are pending.
+The system SHALL expose Drizzle, Breeze, and Snow as selectable and persistable theme modes while their dedicated visual effects are pending.
 
 #### Scenario: User selects Drizzle placeholder
 - **WHEN** the user selects Drizzle from the menu or presses `R` on a non-editable surface
@@ -62,6 +62,12 @@ The system SHALL expose Drizzle and Breeze as selectable and persistable theme m
 - **WHEN** the user selects Breeze from the menu or presses `B` on a non-editable surface
 - **THEN** Breeze becomes the active persisted theme
 - **AND** the application uses the Day color scheme without a falling-leaf effect
+- **AND** the menu identifies the effect as coming later
+
+#### Scenario: User selects Snow placeholder
+- **WHEN** the user selects Snow from the menu or presses `W` on a non-editable surface
+- **THEN** Snow becomes the active persisted theme
+- **AND** the application uses the Day color scheme without a snow effect
 - **AND** the menu identifies the effect as coming later
 
 ### Requirement: Day and Night Noise Texture
@@ -80,14 +86,14 @@ The Day and Night themes SHALL display a subtle non-interactive grayscale noise 
 - **AND** the texture does not intercept pointer input
 
 #### Scenario: Seasonal theme is active
-- **WHEN** Summer, Drizzle, or Breeze is active
+- **WHEN** Summer, Drizzle, Breeze, or Snow is active
 - **THEN** the Day/Night noise texture is hidden
 
 ## MODIFIED Requirements
 
 ### Requirement: Theme Mode Selection
 
-The system SHALL support five explicit theme modes: `day`, `night`, `summer`, `drizzle`, and `breeze`, and SHALL resolve each mode to either a light or dark component color scheme.
+The system SHALL support six explicit theme modes: `day`, `night`, `summer`, `drizzle`, `breeze`, and `snow`, and SHALL resolve each mode to either a light or dark component color scheme.
 
 #### Scenario: User selects Day
 - **WHEN** the user selects Day
@@ -100,7 +106,7 @@ The system SHALL support five explicit theme modes: `day`, `night`, `summer`, `d
 - **AND** Night is persisted as the theme preference
 
 #### Scenario: User selects a light seasonal theme
-- **WHEN** the user selects Summer, Drizzle, or Breeze
+- **WHEN** the user selects Summer, Drizzle, Breeze, or Snow
 - **THEN** the UI applies the light component color scheme
 - **AND** the selected seasonal mode remains distinguishable in theme state
 - **AND** the selected mode is persisted as the theme preference
@@ -110,14 +116,14 @@ The system SHALL support five explicit theme modes: `day`, `night`, `summer`, `d
 The system SHALL persist a selected or randomly initialized explicit ThemeMode to localStorage and restore a valid mode on page load.
 
 #### Scenario: Theme restored on page reload
-- **GIVEN** the user previously selected any of the five supported themes
+- **GIVEN** the user previously selected any of the six supported themes
 - **WHEN** the user reloads the page
 - **THEN** the same ThemeMode and its resolved color scheme are restored
 
 #### Scenario: First-time visitor receives a random theme
 - **GIVEN** no theme preference exists in localStorage
 - **WHEN** the user visits the application
-- **THEN** the application randomly selects one of the five supported ThemeModes
+- **THEN** the application randomly selects one of the six supported ThemeModes
 - **AND** the selected mode and its resolved color scheme are applied and persisted
 
 #### Scenario: Legacy explicit preference is migrated
@@ -143,7 +149,7 @@ The system SHALL provide a dedicated Theme menu in the Header, separate from the
 
 #### Scenario: Theme menu lists available modes
 - **WHEN** the user opens the Theme menu
-- **THEN** Day, Night, Summer, Drizzle, and Breeze are visible as separate items
+- **THEN** Day, Night, Summer, Drizzle, Breeze, and Snow are visible as separate items
 - **AND** the active item is visually identified
 - **AND** each item displays its single-letter shortcut in a subtle trailing style
 
@@ -160,7 +166,7 @@ The system SHALL synchronize Monaco editor theme with the ResolvedTheme derived 
 - **THEN** Monaco editor uses the existing dark editor theme
 
 #### Scenario: Editor uses light theme for a light mode
-- **WHEN** Day, Summer, Drizzle, or Breeze is active
+- **WHEN** Day, Summer, Drizzle, Breeze, or Snow is active
 - **THEN** Monaco editor uses the existing light editor theme
 
 #### Scenario: Resolved theme updates on switch

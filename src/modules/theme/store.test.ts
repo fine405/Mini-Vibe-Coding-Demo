@@ -43,17 +43,17 @@ describe("theme store", () => {
 	afterEach(() => vi.restoreAllMocks());
 
 	it("chooses and persists a random theme when no preference exists", async () => {
-		vi.spyOn(Math, "random").mockReturnValue(0.45);
+		vi.spyOn(Math, "random").mockReturnValue(0.99);
 
 		await useThemeStore.persist.rehydrate();
 
 		expect(useThemeStore.getState()).toMatchObject({
-			mode: "summer",
+			mode: "snow",
 			resolvedTheme: "light",
 		});
 		expect(
 			JSON.parse(localStorage.getItem("mini-lovable-theme") ?? "null"),
-		).toMatchObject({ state: { mode: "summer" } });
+		).toMatchObject({ state: { mode: "snow" } });
 	});
 
 	it("restores an existing theme preference without choosing a random one", async () => {
@@ -78,6 +78,7 @@ describe("theme store", () => {
 		["summer", "light"],
 		["drizzle", "light"],
 		["breeze", "light"],
+		["snow", "light"],
 	])(
 		"selecting %s preserves the mode and applies %s",
 		(mode, resolvedTheme) => {

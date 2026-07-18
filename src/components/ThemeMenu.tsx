@@ -3,6 +3,7 @@ import {
 	CloudRain,
 	Leaf,
 	Moon,
+	Snowflake,
 	Sun,
 	SunMedium,
 	Wind,
@@ -46,6 +47,13 @@ const THEME_OPTIONS: Array<{
 		icon: Wind,
 		pending: true,
 	},
+	{
+		mode: "snow",
+		label: "Snow",
+		shortcut: "W",
+		icon: Snowflake,
+		pending: true,
+	},
 ];
 
 const SHORTCUT_MODES: Record<string, ThemeMode> = {
@@ -54,6 +62,7 @@ const SHORTCUT_MODES: Record<string, ThemeMode> = {
 	s: "summer",
 	r: "drizzle",
 	b: "breeze",
+	w: "snow",
 };
 
 const isEditableTarget = (target: EventTarget | null) =>

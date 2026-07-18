@@ -22,6 +22,7 @@
 - **S** - Summer (leaf shadows and forest ambience)
 - **R** - Drizzle (effect coming soon)
 - **B** - Breeze (effect coming soon)
+- **W** - Snow (effect coming soon)
 
 Theme shortcuts only work outside inputs, textareas, selects, editable content,
 and the Monaco editor. Meta/Ctrl/Alt combinations do not switch themes.

@@ -1,4 +1,10 @@
-export type ThemeMode = "day" | "night" | "summer" | "drizzle" | "breeze";
+export type ThemeMode =
+	| "day"
+	| "night"
+	| "summer"
+	| "drizzle"
+	| "breeze"
+	| "snow";
 export type ResolvedTheme = "dark" | "light";
 
 export interface ThemeState {

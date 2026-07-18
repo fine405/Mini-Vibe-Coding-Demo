@@ -7,13 +7,13 @@
 ## What Changes
 
 - 将 Header 中现有单按钮 Theme Toggle 替换为独立的仅图标 `Theme` 下拉菜单，保持在 Header 一级，与 `More` 菜单分离。
-- 菜单提供 `Day`、`Night`、`Summer`、`Drizzle`、`Breeze` 五项，并在每项右侧以弱化样式显示 `D`、`N`、`S`、`R`、`B` 快捷键。
+- 菜单提供 `Day`、`Night`、`Summer`、`Drizzle`、`Breeze`、`Snow` 六项，并在每项右侧以弱化样式显示 `D`、`N`、`S`、`R`、`B`、`W` 快捷键。
 - 仅当焦点不在 `input`、`textarea`、`select`、Monaco 隐藏输入区或 `contenteditable` 元素中，且没有按下 Meta/Ctrl/Alt 时，单字母快捷键才切换主题。
 - 保留现有浅色/深色结构，并将面向用户的名称统一为 Day/Night；Day 的页面基底改为浅暖白 `#F3F2F1`；Day/Night 参考 lab01.dev 叠加不阻断交互的静态灰度噪声平铺纹理，共用 screen blend；Monaco 与 Preview 继续只消费解析后的 light/dark color scheme。
 - Summer 复用 dany.works 的完整氛围方式：在 Day 配色上叠加全屏循环叶影视频，并同步循环播放森林环境声；视频使用 `object-fit: cover`、`mix-blend-mode: multiply`、pointer-events none 与淡入淡出。
 - Summer 暂时直接使用 [dany.works/leaves.mp4](https://dany.works/leaves.mp4) 与 [dany.works/forest.mp3](https://dany.works/forest.mp3)：视频为 12 秒纯叶影循环，音频为约 196 秒森林环境声；实现时复制为本地 Demo 资源，不热链也不二次转码。
-- `Drizzle` 和 `Breeze` 本阶段作为可选择、可持久化的入口，暂时解析为 Day 配色并显示弱化的 `Soon` 状态，不增加雨滴、黄色枫叶或风场效果。
-- 当本地没有主题偏好时，从五个主题中随机选择并持久化一个初始主题；已有偏好继续稳定恢复。
+- `Drizzle`、`Breeze` 和 `Snow` 本阶段作为可选择、可持久化的入口，暂时解析为 Day 配色并显示弱化的 `Soon` 状态，不增加雨滴、黄色枫叶、风场或下雪效果。
+- 当本地没有主题偏好时，从六个主题中随机选择并持久化一个初始主题；已有偏好继续稳定恢复。
 - 更新主题与快捷键文档，并为状态迁移、菜单位置、快捷键输入保护和 Summer 视频/音频生命周期增加测试。
 
 ## Impact
@@ -28,3 +28,5 @@
 ## Approval
 
 用户已于 2026-07-18 指定 Summer 暂时直接使用 dany.works 的叶影视频，并补充要求保留原站森林环境声；随后明确批准开始实现本 proposal。同日用户要求为 Day/Night 增加 subtle noise texture，并追加 [lab01.dev](https://lab01.dev/) 为具体实现参考：Night 可保持一致，Day 改用浅暖白基底；之后又将 Theme trigger 改为仅图标，并要求首次无偏好时随机初始化主题。实际体验实时 SVG 噪声后，用户进一步明确批准直接改用预渲染的平铺纹理，以减少 Day/Night 切换时的渲染负担。
+
+同日用户要求先为“下雪天”增加主题入口，暂不实现视觉效果；因此在同一已批准的占位主题模型中增加 `Snow`、雪花图标和未冲突的 `W` 快捷键。

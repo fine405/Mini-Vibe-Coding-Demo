@@ -10,21 +10,22 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 
 ### Goals
 
-- 用一个 Header 一级菜单承载五个稳定的主题 ID、名称和快捷键。
+- 用一个 Header 一级菜单承载六个稳定的主题 ID、名称和快捷键。
 - 把用户选择的 Theme 与组件实际消费的 light/dark color scheme 分开。
 - 让 Summer 在现有 UI 之上产生不阻断操作的全屏叶影与森林环境声。
 - 让 Day/Night 获得细密但不影响文字清晰度的噪声质感。
-- 让 Drizzle 与 Breeze 的后续效果无需再次迁移持久化状态或菜单契约。
+- 让 Drizzle、Breeze 与 Snow 的后续效果无需再次迁移持久化状态或菜单契约。
 - 保持现有 Day/Night token、Monaco theme 与 Preview theme 行为不变。
 
 ### Non-Goals
 
 - 本阶段不实现 Drizzle 的雨滴、雾面、声音或颜色动画。
 - 本阶段不实现 Breeze 的黄色枫叶粒子、风场或物理系统。
+- 本阶段不实现 Snow 的雪花、积雪、声音或颜色动画。
 - 不复制 dany.works 的 Rain/Midnight/Chaos 模式或移动端 Logo 手势。
 - 不引入 Three.js、Canvas、GSAP、新状态框架或远程视频流。
 - 不把主题动作重复放入 More 菜单或 Command Palette。
-- 不在 Summer、Drizzle 或 Breeze 上叠加 Day/Night 噪声层。
+- 不在 Summer、Drizzle、Breeze 或 Snow 上叠加 Day/Night 噪声层。
 
 ## Decisions
 
@@ -37,26 +38,27 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 | `summer` | Summer | `S` | `light` | 全屏叶影视频 + 森林环境声 |
 | `drizzle` | Drizzle | `R` | `light` | Day 基线，菜单显示 `Soon` |
 | `breeze` | Breeze | `B` | `light` | Day 基线，菜单显示 `Soon` |
+| `snow` | Snow | `W` | `light` | Day 基线，菜单显示 `Soon` |
 
 `resolveTheme(mode)` 是唯一映射点。Editor、Diff 和 Preview 不感知季节 ThemeMode，继续通过 `ResolvedTheme` 获得 light/dark，避免把视频效果耦合进编辑器主题。
 
-本地没有主题偏好时，首次 hydration 通过 `Math.random` 从五个 `ThemeMode` 中等概率选择一个，并立即持久化该 `mode`，因此后续刷新保持稳定。已有偏好不调用随机逻辑。读取旧存储时，`light → day`、`dark → night`；legacy `auto` 根据当前系统配色一次性归一为 `day` 或 `night`，之后不继续监听系统变化。
+本地没有主题偏好时，首次 hydration 通过 `Math.random` 从六个 `ThemeMode` 中等概率选择一个，并立即持久化该 `mode`，因此后续刷新保持稳定。已有偏好不调用随机逻辑。读取旧存储时，`light → day`、`dark → night`；legacy `auto` 根据当前系统配色一次性归一为 `day` 或 `night`，之后不继续监听系统变化。
 
 ### 2. Theme 是 Header 一级菜单
 
 `WorkbenchHeader` 的右侧顺序保持为：Command Palette → Theme → More。Theme trigger 仅显示当前主题图标与下拉箭头，并通过 aria-label 暴露当前主题；More 菜单不出现 Theme 子项。
 
-菜单使用现有 Radix Dropdown primitives。每行左侧显示主题图标/选中标记，中间显示 label；Drizzle 与 Breeze 带弱化 `Soon`；最右侧用现有 `DropdownMenuShortcut` 显示单字母。选择任意项后立即更新 store 并关闭菜单。
+菜单使用现有 Radix Dropdown primitives。每行左侧显示主题图标/选中标记，中间显示 label；Drizzle、Breeze 与 Snow 带弱化 `Soon`；最右侧用现有 `DropdownMenuShortcut` 显示单字母。选择任意项后立即更新 store 并关闭菜单。
 
-不使用 disabled placeholder：Drizzle 与 Breeze 是真实、可持久化的 ThemeMode，只是当前视觉与 Day 相同。这保证菜单、快捷键和后续效果接入使用同一状态契约。
+不使用 disabled placeholder：Drizzle、Breeze 与 Snow 是真实、可持久化的 ThemeMode，只是当前视觉与 Day 相同。这保证菜单、快捷键和后续效果接入使用同一状态契约。
 
 ### 3. 单字母快捷键只在非编辑上下文生效
 
-Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射 `d/n/s/r/b`。处理前执行三层保护：
+Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射 `d/n/s/r/b/w`。处理前执行三层保护：
 
 1. Meta、Ctrl 或 Alt 任一按下时忽略，避免覆盖浏览器和现有应用快捷键；Shift 仅用于允许大写字母。
 2. event target 位于 `input`、`textarea`、`select` 或有效 `contenteditable` 内时忽略；这也覆盖 Monaco 的隐藏 textarea。
-3. 不匹配五个字母时不调用 `preventDefault`。
+3. 不匹配六个字母时不调用 `preventDefault`。
 
 命中后调用同一个 `setMode`，菜单点击与键盘不存在两套主题逻辑。
 
@@ -90,12 +92,12 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 
 参考站的颗粒最初通过固定覆盖层中的 SVG `feTurbulence(baseFrequency="0.8")` 实时生成。实际体验发现，全屏 SVG filter 与 Day/Night 颜色、噪声透明度过渡叠加时会增加合成负担，因此改为项目本地预渲染的 256×256 灰度 PNG，并以 128×128 CSS 像素重复平铺。覆盖层保留 `mix-blend-mode: screen`，不再使用运行时 SVG filter。
 
-`ThemeNoiseTexture` 固定覆盖工作台、pointer-events none，层级为 z-30，低于 Summer 视频 z-40 和 Radix 菜单 z-50。Night 采用参考站的 10% opacity；Day 采用参考站的 15% opacity，但将应用的页面基底从中性灰改为浅暖白 `#F3F2F1`。Summer、Drizzle、Breeze 中 opacity 为 0，避免尚未设计的季节主题意外继承颗粒效果。
+`ThemeNoiseTexture` 固定覆盖工作台、pointer-events none，层级为 z-30，低于 Summer 视频 z-40 和 Radix 菜单 z-50。Night 采用参考站的 10% opacity；Day 采用参考站的 15% opacity，但将应用的页面基底从中性灰改为浅暖白 `#F3F2F1`。Summer、Drizzle、Breeze、Snow 中 opacity 为 0，避免尚未设计的季节主题意外继承颗粒效果。
 
 ## Risks / Trade-offs
 
 - multiply overlay 会降低局部对比度，尤其是 Monaco 代码区 → Summer 是 Demo 氛围主题，保留 dany 的覆盖式效果；菜单层级高于视频，始终可切回。
-- Drizzle/Breeze 选择后与 Day 视觉相同，可能被误解为失效 → 菜单明确显示弱化 `Soon`，但仍保存真实 mode，为下一阶段保留稳定入口。
+- Drizzle/Breeze/Snow 选择后与 Day 视觉相同，可能被误解为失效 → 菜单明确显示弱化 `Soon`，但仍保存真实 mode，为下一阶段保留稳定入口。
 - 原视频只有 720×1280，桌面 `cover` 会放大并裁掉大量竖向内容 → 先忠实复刻原站 Demo，通过实际桌面验收确认模糊程度；不做无信息增益的放大转码。
 - 有声自动播放在页面恢复时可能被浏览器拦截 → 显式主题切换直接播放；恢复场景保持视觉并在下一次用户交互重试音频。
 - 原视频和音频没有公开复用许可 → 仅作为本地 Demo 临时资产，公开部署前设置明确替换门槛。
@@ -105,7 +107,7 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 
 ## Migration Plan
 
-1. 先扩展 store 类型、解析函数和 legacy mode 迁移，并用单元测试锁定五种映射。
+1. 先扩展 store 类型、解析函数和 legacy mode 迁移，并用单元测试锁定六种映射。
 2. 将 ThemeToggle 替换为 Theme menu，接入点击与受保护的单字母快捷键。
 3. 下载并校验 dany.works Summer 视频与森林环境声，作为本地 Demo 资源记录来源与临时使用限制。
 4. 挂载 Summer overlay 与 audio，验证成对播放/暂停、自动播放降级、层级、淡入和 pointer 行为。
@@ -116,4 +118,4 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 
 ## Open Questions
 
-无。Drizzle 与 Breeze 的具体视觉将在独立后续 proposal 中确定。
+无。Drizzle、Breeze 与 Snow 的具体视觉将在独立后续 proposal 中确定。

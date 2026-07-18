@@ -14,6 +14,7 @@ const THEME_MODES: ThemeMode[] = [
 	"summer",
 	"drizzle",
 	"breeze",
+	"snow",
 ];
 
 // Helper to get system theme, used to migrate legacy "auto" preferences

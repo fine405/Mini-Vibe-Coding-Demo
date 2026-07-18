@@ -25,7 +25,7 @@ describe("ThemeNoiseTexture", () => {
 		expect(texture).not.toHaveClass("opacity-10");
 	});
 
-	it.each(["summer", "drizzle", "breeze"] as const)(
+	it.each(["summer", "drizzle", "breeze", "snow"] as const)(
 		"stays hidden for %s",
 		(mode) => {
 			useThemeStore.setState({ mode, resolvedTheme: "light" });
