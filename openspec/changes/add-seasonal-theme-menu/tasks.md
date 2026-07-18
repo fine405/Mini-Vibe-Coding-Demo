@@ -29,3 +29,9 @@
 - [x] 4.3 运行完整 `pnpm check`。
 - [x] 4.4 在桌面宽屏实际检查 Day/Night 无视觉回归、Summer 清晰度/视频循环/环境声启停/菜单可读性，以及 Drizzle/Breeze 的 `Soon` 状态。
 - [x] 4.5 对照 proposal/design/spec 完成范围 review，只在所有验证通过后勾选任务。
+
+## 6. Random Initial Theme
+
+- [x] 6.1 先增加 store 行为测试，覆盖无偏好时随机选择并持久化，以及已有偏好不调用随机逻辑。
+- [x] 6.2 在 hydration 中仅对缺失存储键的首次访问随机选择五个 ThemeMode 之一，并复用现有 `setMode` 应用和保存主题。
+- [x] 6.3 运行相关测试、typecheck、完整 `pnpm check` 和 OpenSpec strict validation。
