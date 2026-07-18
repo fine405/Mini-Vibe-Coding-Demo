@@ -4,23 +4,19 @@
 
 ## Demo
 
-### Web search
+工作台内置 6 种主题，可从右上角主题菜单切换，也可使用 `D` / `N` / `S` / `R` / `W` / `B` 快捷键。点击带 🔊 的封面可播放包含主题环境音的视频。
 
-Agent 通过受限的 `web_search` 工具查询外部资料，工具调用状态与来源会按实际时序出现在消息中。
+| Day | Night |
+|---|---|
+| ![Day 主题](./docs/themes/day.jpg) | ![Night 主题](./docs/themes/night.jpg) |
+| Summer 🔊 | Drizzle 🔊 |
+| [![Summer 主题视频封面](./docs/themes/summer.jpg)](./docs/themes/summer.mp4) | [![Drizzle 主题视频封面](./docs/themes/drizzle.jpg)](./docs/themes/drizzle.mp4) |
+| [播放 Summer 主题视频（含环境音）](./docs/themes/summer.mp4) | [播放 Drizzle 主题视频（含雨声）](./docs/themes/drizzle.mp4) |
+| Snow 🔊 | Breeze |
+| [![Snow 主题视频封面](./docs/themes/snow.jpg)](./docs/themes/snow.mp4) | ![Breeze 主题](./docs/themes/breeze.jpg) |
+| [播放 Snow 主题视频（含环境音）](./docs/themes/snow.mp4) |  |
 
-![Mini Lovable web search 工具时间线](./docs/demo-web-search.gif)
-
-### Generative UI
-
-研究结果可组合为受 Catalog 约束的 Metric、DataTable 和 MermaidDiagram，应用只渲染预先注册的安全组件。
-
-![Mini Lovable 受限 Generative UI](./docs/demo-generative-ui.gif)
-
-### Agent code diff
-
-Agent 变更会先进入逐 hunk diff 审核，并在用户接受前通过 Agent Draft Preview 预览结果。
-
-![Mini Lovable Agent code diff 与 ChangeSet 审核](./docs/demo-agent-diff.gif)
+Summer 主题 fork from https://dany.works/
 
 ## 技术栈
 
