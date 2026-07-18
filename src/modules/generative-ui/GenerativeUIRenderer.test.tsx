@@ -157,6 +157,38 @@ describe("GenerativeUIRenderer", () => {
 		);
 	});
 
+	it("renders numeric metric values from literal and state props", () => {
+		const spec = {
+			root: "metrics",
+			state: { tests: 87 },
+			elements: {
+				metrics: {
+					type: "Grid",
+					props: { columns: 2 },
+					children: ["build", "tests"],
+				},
+				build: {
+					type: "Metric",
+					props: { label: "Build", value: 92 },
+					children: [],
+				},
+				tests: {
+					type: "Metric",
+					props: { label: "Tests", value: { $state: "/tests" } },
+					children: [],
+				},
+			},
+		} as unknown as Spec;
+
+		render(<GenerativeUIRenderer spec={spec} />);
+
+		expect(screen.getByText("92")).toBeInTheDocument();
+		expect(screen.getByText("87")).toBeInTheDocument();
+		expect(
+			screen.queryByText("Metric could not be rendered."),
+		).not.toBeInTheDocument();
+	});
+
 	it("keeps button actions inside renderer state", async () => {
 		const spec: Spec = {
 			root: "root",

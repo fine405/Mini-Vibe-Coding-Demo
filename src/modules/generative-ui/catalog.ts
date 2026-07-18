@@ -3,7 +3,7 @@ import { schema } from "@json-render/react/schema";
 import { z } from "zod";
 
 const shortText = z.string().max(200);
-const primitiveCell = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const primitiveCell = z.union([z.string(), z.number(), z.boolean()]).nullable();
 const dataKey = z.string().min(1).max(64);
 
 export const stackPropsSchema = z
@@ -44,7 +44,7 @@ export const textPropsSchema = z
 export const metricPropsSchema = z
 	.object({
 		label: shortText,
-		value: shortText,
+		value: z.union([shortText, z.number()]),
 		detail: z.string().max(500).optional(),
 		trend: z.enum(["up", "down", "neutral"]).optional(),
 	})
@@ -247,7 +247,7 @@ export const generativeUiCatalog = defineCatalog(schema, {
 });
 
 export function createGenerativeUiInstructions(): string {
-	return generativeUiCatalog.prompt({
+	let instructions = generativeUiCatalog.prompt({
 		mode: "inline",
 		customRules: [
 			"Prefer Generative UI over Markdown for a read-only explanation or research result whenever a catalog component or composition is semantically suitable and materially improves the presentation.",
@@ -262,4 +262,28 @@ export function createGenerativeUiInstructions(): string {
 			"Keep generated interfaces compact enough to fit inside a chat message.",
 		],
 	});
+
+	for (const [start, end] of [
+		[
+			"ARRAY STATE ACTIONS:",
+			`AVAILABLE COMPONENTS (${GENERATIVE_UI_COMPONENTS.length}):`,
+		],
+		["STATE WATCHERS:", "RULES:"],
+	] as const) {
+		const startIndex = instructions.indexOf(`\n${start}\n`);
+		const endIndex = instructions.indexOf(`\n${end}\n`, startIndex);
+		if (startIndex >= 0 && endIndex > startIndex) {
+			instructions = `${instructions.slice(0, startIndex)}${instructions.slice(endIndex)}`;
+		}
+	}
+
+	return instructions
+		.split("\n")
+		.filter(
+			(line) =>
+				!["- pushState:", "- removeState:", "- validateForm:"].some((prefix) =>
+					line.startsWith(prefix),
+				),
+		)
+		.join("\n");
 }

@@ -47,12 +47,41 @@ describe("generative UI catalog", () => {
 		);
 	});
 
+	it("advertises only renderable props and supported actions", () => {
+		const generativeUiInstructions = createGenerativeUiInstructions();
+		const metricLine = generativeUiInstructions
+			.split("\n")
+			.find((line) => line.startsWith("- Metric:"));
+		const dataTableLine = generativeUiInstructions
+			.split("\n")
+			.find((line) => line.startsWith("- DataTable:"));
+
+		expect(metricLine).toContain("value: string | number");
+		expect(dataTableLine).toContain(
+			"Record<string, string | number | boolean>",
+		);
+		expect(dataTableLine).not.toContain("unknown");
+		expect(generativeUiInstructions).toContain("- setState:");
+		expect(generativeUiInstructions).toContain("- toggleState:");
+		expect(generativeUiInstructions).not.toContain("ARRAY STATE ACTIONS:");
+		expect(generativeUiInstructions).not.toContain("STATE WATCHERS:");
+		expect(generativeUiInstructions).not.toContain("- pushState:");
+		expect(generativeUiInstructions).not.toContain("- removeState:");
+		expect(generativeUiInstructions).not.toContain("- validateForm:");
+	});
+
 	it("rejects model-controlled styling and bounded data overflow", () => {
 		const tooManyColumns = Array.from({ length: 11 }, (_, index) => ({
 			key: `c${index}`,
 			label: `Column ${index}`,
 		}));
 
+		expect(
+			dataTablePropsSchema.safeParse({
+				columns: [{ key: "status", label: "Status" }],
+				data: [{ status: null }],
+			}).success,
+		).toBe(true);
 		expect(
 			dataTablePropsSchema.safeParse({
 				columns: [{ key: "name", label: "Name" }],
