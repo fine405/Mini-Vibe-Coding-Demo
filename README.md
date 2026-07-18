@@ -188,11 +188,10 @@ curl -fsS https://YOUR_DEMO_HOST/api/providers
 
 ### Vercel Chat 流量开关
 
-`CHAT_ENABLED` 是服务端总开关，控制托管 Key 和页面一次性 BYOK 的所有新 Chat 请求：
+`CHAT_ENABLED` 是服务端总开关，控制托管 Key 和页面一次性 BYOK 的所有新 Chat 请求，并采用显式开启策略：
 
-- 未配置时保持向后兼容，Chat 启用。
-- 去除前后空白后，只有大小写不敏感的 `true` 表示启用。
-- `false`、空值或其他配置值都会 fail closed：`POST /api/chat` 在读取请求体和调用 DeepSeek/Tavily 前返回 `503 CHAT_DISABLED`。
+- 只有显式配置为精确值 `true` 时才启用 Chat。
+- 未配置、`false`、空值、大小写或空白不匹配以及其他值都会 fail closed：`POST /api/chat` 在读取请求体和调用 DeepSeek/Tavily 前返回 `503 CHAT_DISABLED`。
 
 该变量按 Vercel environment/deployment 生效，不是跨 Production、Preview 和 Custom Environment 的账户级总开关。为了让下面的 Production 切换成为唯一线上入口，最简单的做法是只在 Production 放 Provider Key；如果 Preview/Custom 也持有 Key，必须在各自环境中单独配置并切换 `CHAT_ENABLED`。
 

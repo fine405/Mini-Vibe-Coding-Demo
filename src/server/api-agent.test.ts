@@ -1,6 +1,6 @@
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createWorkspaceSnapshot } from "@/modules/workspace/domain";
 import {
 	HttpResearchGateway,
@@ -126,6 +126,14 @@ function collectTextDeltas(events: UiStreamEvent[]): string {
 }
 
 describe("POST /api/chat", () => {
+	beforeEach(() => {
+		vi.stubEnv("CHAT_ENABLED", "true");
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
 	it("streams web research sources before a research-only answer without finalizing", async () => {
 		const { snapshot } = createWorkspaceSnapshot({ "/src/App.tsx": "old" });
 		const responses: MockStreamChunk[][] = [

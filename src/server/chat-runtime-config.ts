@@ -9,12 +9,8 @@ export function readHostedTavilyApiKey(
 export function readHostedChatStatus(
 	environment: Record<string, string | undefined>,
 ): HostedChatStatus {
-	const configuredValue = environment.CHAT_ENABLED;
-
 	return {
-		enabled:
-			configuredValue === undefined ||
-			configuredValue.trim().toLowerCase() === "true",
+		enabled: environment.CHAT_ENABLED === "true",
 		tavilyConfigured: Boolean(readHostedTavilyApiKey(environment)),
 	};
 }

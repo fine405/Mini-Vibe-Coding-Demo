@@ -6,9 +6,8 @@ import {
 
 describe("readHostedChatStatus", () => {
 	it.each([
-		[undefined, true],
+		[undefined, false],
 		["true", true],
-		["  TrUe  ", true],
 	])("maps CHAT_ENABLED=%s to enabled=%s", (value, enabled) => {
 		expect(
 			readHostedChatStatus({
@@ -17,7 +16,7 @@ describe("readHostedChatStatus", () => {
 		).toMatchObject({ enabled });
 	});
 
-	it.each(["false", " FALSE ", "", "   ", "yes", "1"])(
+	it.each(["false", "TRUE", " true ", "", "   ", "yes", "1"])(
 		"fails closed for CHAT_ENABLED=%j",
 		(value) => {
 			expect(readHostedChatStatus({ CHAT_ENABLED: value }).enabled).toBe(false);
@@ -28,11 +27,11 @@ describe("readHostedChatStatus", () => {
 		expect(
 			readHostedChatStatus({ TAVILY_API_KEY: "  hosted-secret  " }),
 		).toEqual({
-			enabled: true,
+			enabled: false,
 			tavilyConfigured: true,
 		});
 		expect(readHostedChatStatus({ TAVILY_API_KEY: "   " })).toEqual({
-			enabled: true,
+			enabled: false,
 			tavilyConfigured: false,
 		});
 	});

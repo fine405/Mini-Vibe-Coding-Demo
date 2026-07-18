@@ -5,15 +5,15 @@
 
 ## 1. Hosted Chat Runtime Configuration
 
-- [x] 1.1 Define the small `HostedChatStatus` interface and pure environment parser with absent/true compatibility and fail-closed invalid values.
-- [x] 1.2 Add unit tests for whitespace, case-insensitive true, false, empty/invalid values and Tavily configured status without exposing values.
+- [x] 1.1 Define the small `HostedChatStatus` interface and pure environment parser with exact `true` opt-in and fail-closed absent/invalid values.
+- [x] 1.2 Add unit tests for exact true, absent, whitespace/case-mismatched, false, empty/invalid values and Tavily configured status without exposing values.
 - [x] 1.3 Add `CHAT_ENABLED=true` guidance to `.env.example` without changing existing Provider Key names.
 
 ## 2. Server Gate and Public Status
 
 - [x] 2.1 Extend `ProvidersResponse` with secret-free `hostedChat.enabled` and `hostedChat.tavilyConfigured` booleans.
 - [x] 2.2 Add the `/api/chat` pre-body gate and fixed `503 CHAT_DISABLED` no-store response.
-- [x] 2.3 Add API tests proving enabled backward compatibility, disabled malformed/oversized body short-circuiting, no Provider/Research execution and no secret disclosure.
+- [x] 2.3 Add API tests proving existing behavior when explicitly enabled, disabled malformed/oversized body short-circuiting, no Provider/Research execution and no secret disclosure.
 
 ## 3. Chat and Settings UI
 

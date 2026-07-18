@@ -8,7 +8,7 @@
 
 ## What Changes
 
-- 新增服务端环境变量 `CHAT_ENABLED`；未配置时保持现有启用行为，显式 `true` 启用，显式 `false`、空值或其他无效值安全地禁用。
+- 新增服务端环境变量 `CHAT_ENABLED`；只有显式配置为精确值 `true` 时启用，未配置、`false`、空值或其他值安全地禁用。
 - `/api/chat` 在读取 Chat body、解析 Provider、创建 Research gateway 或调用任何第三方之前检查总开关；关闭时返回脱敏的 `503 CHAT_DISABLED` 与 `Cache-Control: no-store`。
 - 总开关关闭时页面 BYOK 同样不可使用，Chat 输入、建议和提交操作保持禁用。
 - `/api/providers` 增加公开的 `hostedChat` 布尔状态，只返回 `enabled` 与 `tavilyConfigured`；DeepSeek 的托管配置继续使用 Provider 自身的 `configured` 状态。
@@ -22,7 +22,7 @@
 - Affected specs: 新增 `hosted-chat-control` capability。
 - Affected code: `.env.example`、`README.md`、`src/server/api.ts`、Provider response types/hooks、`ChatPane`、`DemoCredentialSettings` 及对应测试。
 - API: `GET /api/providers` 增加 `hostedChat`；现有 `providers` 数组保持不变。`POST /api/chat` 在关闭时新增 `503 CHAT_DISABLED` 响应。
-- Compatibility: `CHAT_ENABLED` 缺省时继续启用，现有本地 `.env.local`、托管 Secret 和旧客户端不需要迁移。
+- Compatibility: `CHAT_ENABLED` 改为显式 opt-in；现有部署必须配置精确值 `true` 才能继续使用 Chat，旧客户端协议不需要迁移。
 - Security: 该开关阻断新请求，但不能撤回已发出的上游调用，也不能改变仍可直接访问的旧 Vercel deployment URL；如需紧急全局止损，仍应吊销 Provider Key 或使用平台访问控制。
 
 ## Dependencies and Archive Order

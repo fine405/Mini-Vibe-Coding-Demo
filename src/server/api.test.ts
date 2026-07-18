@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createWorkspaceSnapshot, hashText } from "@/modules/workspace/domain";
 import type { ResearchGateway } from "@/server/agent/research-gateway";
 import { createApi } from "@/server/api";
@@ -8,6 +8,14 @@ import {
 } from "@/server/providers/catalog";
 
 describe("Hono API", () => {
+	beforeEach(() => {
+		vi.stubEnv("CHAT_ENABLED", "true");
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
 	it("reports the runtime as healthy", async () => {
 		const response = await createApi().request("/api/health");
 
@@ -57,11 +65,10 @@ describe("Hono API", () => {
 		expect(JSON.stringify(body)).not.toContain("hosted-status-secret");
 	});
 
-	it("reads hosted Chat status from server environment without exposing values", async () => {
-		vi.stubEnv("CHAT_ENABLED", "disable-canary");
+	it("fails closed when CHAT_ENABLED is missing without exposing values", async () => {
+		vi.unstubAllEnvs();
 		vi.stubEnv("TAVILY_API_KEY", "hosted-tavily-secret");
 		const api = createApi();
-		vi.unstubAllEnvs();
 
 		const response = await api.request("/api/providers");
 		const responseText = await response.text();
@@ -72,7 +79,6 @@ describe("Hono API", () => {
 			tavilyConfigured: true,
 		});
 		expect(responseText).not.toContain("hosted-tavily-secret");
-		expect(responseText).not.toContain("disable-canary");
 	});
 
 	it("returns same-origin downloads as sanitized attachments", async () => {

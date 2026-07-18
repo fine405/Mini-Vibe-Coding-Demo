@@ -2,12 +2,16 @@
 
 ### Requirement: Hosted Chat Traffic Switch
 
-The server SHALL use the server-only `CHAT_ENABLED` environment variable as a global gate for all new Chat, Provider and Research execution while preserving enabled behavior when the variable is absent.
+The server SHALL use the server-only `CHAT_ENABLED` environment variable as a global gate for all new Chat, Provider and Research execution and SHALL enable Chat only when the variable is explicitly configured to the exact value `true`.
 
-#### Scenario: Switch is absent or enabled
-- **WHEN** `CHAT_ENABLED` is absent or is the normalized value `true`
+#### Scenario: Switch is enabled
+- **WHEN** `CHAT_ENABLED` is configured to the exact value `true`
 - **THEN** existing server environment Provider configuration and page BYOK requests continue to work
 - **AND** existing clients remain compatible
+
+#### Scenario: Switch is absent
+- **WHEN** `CHAT_ENABLED` is absent
+- **THEN** Chat is disabled fail-closed
 
 #### Scenario: Switch is disabled
 - **WHEN** `CHAT_ENABLED` is `false`
@@ -16,7 +20,7 @@ The server SHALL use the server-only `CHAT_ENABLED` environment variable as a gl
 - **AND** page BYOK cannot bypass the gate
 
 #### Scenario: Switch has an invalid configured value
-- **WHEN** `CHAT_ENABLED` is configured to an empty or other value besides normalized `true`
+- **WHEN** `CHAT_ENABLED` is configured to an empty or other value besides the exact value `true`
 - **THEN** Chat is disabled fail-closed
 - **AND** the invalid value is not returned to the browser or written to application logs
 
