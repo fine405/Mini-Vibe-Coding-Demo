@@ -113,7 +113,7 @@ export function ThemeMenu() {
 				<DropdownMenuTrigger asChild>
 					<Button
 						aria-label={`Theme: ${activeLabel}`}
-						className="h-7 gap-1.5 px-2 text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary data-open:bg-bg-tertiary data-open:text-fg-primary"
+						className="h-7 gap-1.5 px-2 text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary focus-visible:border-transparent! focus-visible:bg-bg-tertiary focus-visible:text-fg-primary focus-visible:ring-0! data-open:bg-bg-tertiary data-open:text-fg-primary"
 						size="sm"
 						variant="ghost"
 					>

@@ -91,6 +91,11 @@ describe("WorkbenchHeader", () => {
 		const themeTrigger = screen.getByRole("button", { name: "Theme: Night" });
 		const moreTrigger = screen.getByRole("button", { name: "More actions" });
 		expect(themeTrigger.querySelector(".lucide-moon")).toBeInTheDocument();
+		expect(themeTrigger).toHaveClass(
+			"focus-visible:border-transparent!",
+			"focus-visible:ring-0!",
+			"focus-visible:bg-bg-tertiary",
+		);
 		expect(
 			themeTrigger.compareDocumentPosition(moreTrigger) &
 				Node.DOCUMENT_POSITION_FOLLOWING,
