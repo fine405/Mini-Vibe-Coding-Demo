@@ -40,8 +40,8 @@
 
 ## 6. Random Initial Theme
 
-- [x] 6.1 先增加 store 行为测试，覆盖无偏好时随机选择并持久化，以及已有偏好不调用随机逻辑。
-- [x] 6.2 在 hydration 中仅对缺失存储键的首次访问随机选择六个 ThemeMode 之一，并复用现有 `setMode` 应用和保存主题。
+- [x] 6.1 先增加 store 行为测试，覆盖无偏好时随机选择但不持久化、主动选择后才保存，以及已有偏好不调用随机逻辑。
+- [x] 6.2 在 hydration 中仅对缺失存储键的访问随机选择六个 ThemeMode 之一，只更新内存与 DOM；保留 `setMode` 作为主动选择的持久化入口。
 - [x] 6.3 运行相关测试、typecheck、完整 `pnpm check` 和 OpenSpec strict validation。
 
 ## 7. Snow Placeholder Entry

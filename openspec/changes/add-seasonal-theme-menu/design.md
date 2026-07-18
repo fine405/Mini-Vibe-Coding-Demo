@@ -42,7 +42,7 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 
 `resolveTheme(mode)` 是唯一映射点。Editor、Diff 和 Preview 不感知季节 ThemeMode，继续通过 `ResolvedTheme` 获得 light/dark，避免把视频效果耦合进编辑器主题。
 
-本地没有主题偏好时，首次 hydration 通过 `Math.random` 从六个 `ThemeMode` 中等概率选择一个，并立即持久化该 `mode`，因此后续刷新保持稳定。已有偏好不调用随机逻辑。读取旧存储时，`light → day`、`dark → night`；legacy `auto` 根据当前系统配色一次性归一为 `day` 或 `night`，之后不继续监听系统变化。
+本地没有主题偏好时，hydration 通过 `Math.random` 从六个 `ThemeMode` 中等概率选择一个，只更新当前内存状态并应用 DOM theme，不写入 localStorage；因此用户主动选择前，每次加载都可获得新的随机主题。菜单和快捷键继续通过 `setMode` 更新并持久化，已有偏好不调用随机逻辑。持久化版本升为 1：现有 version 0 存储无法区分历史随机结果与真实用户选择，因此保守视为已有偏好并迁移；读取旧值时，`light → day`、`dark → night`，legacy `auto` 根据当前系统配色一次性归一为 `day` 或 `night`，之后不继续监听系统变化。
 
 ### 2. Theme 是 Header 一级菜单
 
@@ -112,7 +112,7 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 3. 下载并校验 dany.works Summer 视频与森林环境声，作为本地 Demo 资源记录来源与临时使用限制。
 4. 挂载 Summer overlay 与 audio，验证成对播放/暂停、自动播放降级、层级、淡入和 pointer 行为。
 5. 更新快捷键文档，运行主题/Header 相关测试及完整 `pnpm check`。
-6. 为无持久化偏好的首次 hydration 随机选择并保存主题，已有偏好继续按原值恢复。
+6. 为无持久化偏好的 hydration 随机选择内存主题且不保存；仅主动选择写入偏好，已有偏好继续按原值恢复。
 
 回滚时可移除 Overlay 与新菜单，并把已存的季节 mode 通过同一 normalize 逻辑回退为 Day/Night；Workspace 数据不受影响。
 

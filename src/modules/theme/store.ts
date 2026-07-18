@@ -31,6 +31,11 @@ const resolveTheme = (mode: ThemeMode): ResolvedTheme =>
 const getRandomMode = (): ThemeMode =>
 	THEME_MODES[Math.floor(Math.random() * THEME_MODES.length)] ?? "night";
 
+const getPersistedMode = (state: unknown): unknown =>
+	typeof state === "object" && state !== null && "mode" in state
+		? state.mode
+		: undefined;
+
 // Older versions persisted light, dark, or auto; fold them into explicit modes.
 const normalizeMode = (mode: unknown): ThemeMode => {
 	if (THEME_MODES.includes(mode as ThemeMode)) return mode as ThemeMode;
@@ -64,17 +69,26 @@ export const useThemeStore = create<ThemeState>()(
 		}),
 		{
 			name: THEME_STORAGE_KEY,
+			version: 1,
 			partialize: (state) => ({ mode: state.mode }), // Only persist mode preference
+			migrate: (persistedState) => ({
+				mode: normalizeMode(getPersistedMode(persistedState)),
+			}),
+			merge: (persistedState, currentState) => {
+				const mode =
+					persistedState === undefined
+						? getRandomMode()
+						: normalizeMode(getPersistedMode(persistedState));
+				return {
+					...currentState,
+					mode,
+					resolvedTheme: resolveTheme(mode),
+				};
+			},
 			onRehydrateStorage: () => (state) => {
 				// When storage loads, apply the theme immediately
 				if (state) {
-					const hasStoredPreference =
-						typeof window !== "undefined" &&
-						window.localStorage.getItem(THEME_STORAGE_KEY) !== null;
-					const mode = hasStoredPreference
-						? normalizeMode(state.mode)
-						: getRandomMode();
-					state.setMode(mode);
+					applyTheme(state.resolvedTheme);
 				}
 			},
 		},
@@ -84,8 +98,5 @@ export const useThemeStore = create<ThemeState>()(
 // Initial application to prevent flash (can be called in main entry)
 export const initTheme = () => {
 	const state = useThemeStore.getState();
-	const mode = normalizeMode(state.mode);
-	const resolvedTheme = resolveTheme(mode);
-	useThemeStore.setState({ mode, resolvedTheme });
-	applyTheme(resolvedTheme);
+	applyTheme(state.resolvedTheme);
 };

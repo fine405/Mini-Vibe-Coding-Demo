@@ -113,7 +113,7 @@ The system SHALL support six explicit theme modes: `day`, `night`, `summer`, `dr
 
 ### Requirement: Theme Persistence
 
-The system SHALL persist a selected or randomly initialized explicit ThemeMode to localStorage and restore a valid mode on page load.
+The system SHALL persist only a user-selected explicit ThemeMode to localStorage and restore a valid saved mode on page load.
 
 #### Scenario: Theme restored on page reload
 - **GIVEN** the user previously selected any of the six supported themes
@@ -124,7 +124,8 @@ The system SHALL persist a selected or randomly initialized explicit ThemeMode t
 - **GIVEN** no theme preference exists in localStorage
 - **WHEN** the user visits the application
 - **THEN** the application randomly selects one of the six supported ThemeModes
-- **AND** the selected mode and its resolved color scheme are applied and persisted
+- **AND** the selected mode and its resolved color scheme are applied for the current load
+- **AND** no theme preference is written to localStorage until the user explicitly selects a theme
 
 #### Scenario: Legacy explicit preference is migrated
 - **GIVEN** localStorage contains the legacy mode `light` or `dark`

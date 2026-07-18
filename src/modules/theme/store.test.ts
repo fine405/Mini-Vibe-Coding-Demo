@@ -7,7 +7,7 @@ import {
 	it,
 	vi,
 } from "vitest";
-import { useThemeStore } from "@/modules/theme/store";
+import { initTheme, useThemeStore } from "@/modules/theme/store";
 import type { ResolvedTheme, ThemeMode } from "@/modules/theme/types";
 
 const originalMatchMedia = window.matchMedia;
@@ -42,18 +42,30 @@ describe("theme store", () => {
 
 	afterEach(() => vi.restoreAllMocks());
 
-	it("chooses and persists a random theme when no preference exists", async () => {
+	it("chooses a random theme without persisting it when no preference exists", async () => {
 		vi.spyOn(Math, "random").mockReturnValue(0.99);
 
 		await useThemeStore.persist.rehydrate();
+		initTheme();
 
 		expect(useThemeStore.getState()).toMatchObject({
 			mode: "snow",
 			resolvedTheme: "light",
 		});
+		expect(localStorage.getItem("mini-lovable-theme")).toBeNull();
+	});
+
+	it("persists a theme after the user explicitly selects it", async () => {
+		vi.spyOn(Math, "random").mockReturnValue(0.99);
+		await useThemeStore.persist.rehydrate();
+		initTheme();
+		expect(localStorage.getItem("mini-lovable-theme")).toBeNull();
+
+		useThemeStore.getState().setMode("day");
+
 		expect(
 			JSON.parse(localStorage.getItem("mini-lovable-theme") ?? "null"),
-		).toMatchObject({ state: { mode: "snow" } });
+		).toMatchObject({ state: { mode: "day" }, version: 1 });
 	});
 
 	it("restores an existing theme preference without choosing a random one", async () => {
