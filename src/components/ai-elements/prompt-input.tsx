@@ -505,6 +505,7 @@ export type PromptInputProps = Omit<
 		code: "max_files" | "max_file_size" | "accept";
 		message: string;
 	}) => void;
+	onAttachmentsChange?: (files: FileUIPart[]) => void;
 	onSubmit: (
 		message: PromptInputMessage,
 		event: FormEvent<HTMLFormElement>,
@@ -520,6 +521,7 @@ export const PromptInput = ({
 	maxFiles,
 	maxFileSize,
 	onError,
+	onAttachmentsChange,
 	onSubmit,
 	children,
 	...props
@@ -547,6 +549,10 @@ export const PromptInput = ({
 	useEffect(() => {
 		filesRef.current = files;
 	}, [files]);
+
+	useEffect(() => {
+		onAttachmentsChange?.(files);
+	}, [files, onAttachmentsChange]);
 
 	const openFileDialogLocal = useCallback(() => {
 		inputRef.current?.click();

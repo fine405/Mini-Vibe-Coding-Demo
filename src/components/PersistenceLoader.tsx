@@ -8,7 +8,7 @@ import { browserWorkspace } from "@/modules/workspace/browser";
 type LoadingPhase = "loading" | "transitioning" | "done";
 
 // Header logo position
-const HEADER_LOGO_X = 26; // px from left edge to logo center
+const HEADER_LOGO_X = 22; // px from left edge to logo center
 const HEADER_LOGO_Y = 20; // px from top (half of 40px header)
 const LOGO_SIZE = 96; // Loading logo size
 const HEADER_LOGO_SIZE = 20; // Header logo size

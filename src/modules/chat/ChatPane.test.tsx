@@ -205,6 +205,48 @@ describe("AgentChatMessage", () => {
 		expect(screen.getByRole("tab", { name: "Generative UI" })).toBeVisible();
 	});
 
+	it("only enables submit when the composer contains non-whitespace text", async () => {
+		const user = userEvent.setup();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.resolve(configuredProviderCatalogResponse())),
+		);
+
+		render(<ChatPane />);
+		const input = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		const submit = screen.getByRole("button", { name: "Submit" });
+
+		expect(submit).toBeDisabled();
+		await user.type(input, "   ");
+		expect(submit).toBeDisabled();
+		await user.type(input, "Build a dashboard");
+		expect(submit).toBeEnabled();
+		await user.clear(input);
+		expect(submit).toBeDisabled();
+	});
+
+	it("enables submit for an attachment-only message", async () => {
+		const user = userEvent.setup();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.resolve(configuredProviderCatalogResponse())),
+		);
+
+		render(<ChatPane />);
+		await screen.findByPlaceholderText("Describe what you want to build…");
+		const submit = screen.getByRole("button", { name: "Submit" });
+		expect(submit).toBeDisabled();
+
+		await user.upload(
+			screen.getByLabelText("Upload files"),
+			new File(["diagram"], "diagram.txt", { type: "text/plain" }),
+		);
+
+		expect(submit).toBeEnabled();
+	});
+
 	it("uses demo credentials for the current page and forgets them on remount", async () => {
 		const user = userEvent.setup();
 		const chatBodies: Array<Record<string, unknown>> = [];
@@ -1267,13 +1309,14 @@ describe("AgentChatMessage", () => {
 		const input = await screen.findByPlaceholderText(
 			"Describe what you want to build…",
 		);
-		expect(screen.getByRole("button", { name: "Submit" })).toHaveClass(
-			"bg-blue-600",
-		);
+		expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
 		expect(
 			document.querySelectorAll('[data-slot="agent-chat-composer"]'),
 		).toHaveLength(1);
 		await user.type(input, "Update the app");
+		expect(screen.getByRole("button", { name: "Submit" })).toHaveClass(
+			"bg-blue-600",
+		);
 		await user.click(screen.getByRole("button", { name: "Submit" }));
 		expect(
 			screen.queryByRole("heading", {
@@ -1294,9 +1337,7 @@ describe("AgentChatMessage", () => {
 
 		await waitFor(() => expect(chatSignal?.aborted).toBe(true));
 		await waitFor(() =>
-			expect(screen.getByRole("button", { name: "Submit" })).toHaveClass(
-				"bg-blue-600",
-			),
+			expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled(),
 		);
 		expect(useAgentChangeSessionStore.getState().phase).toBe("idle");
 	});

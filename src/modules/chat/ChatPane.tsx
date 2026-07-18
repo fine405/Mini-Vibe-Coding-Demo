@@ -403,6 +403,12 @@ function AgentChatPane({
 	const [snapshotOmissions, setSnapshotOmissions] = useState<
 		SnapshotOmission[]
 	>([]);
+	const [composerText, setComposerText] = useState("");
+	const [hasAttachments, setHasAttachments] = useState(false);
+	const handleAttachmentsChange = useCallback(
+		(files: PromptInputMessage["files"]) => setHasAttachments(files.length > 0),
+		[],
+	);
 	const selection = useMemo(
 		() => resolveProviderSelection(providers, preferredSelection),
 		[providers, preferredSelection],
@@ -524,7 +530,10 @@ function AgentChatPane({
 		await stopRun();
 		onClearCredentials();
 	}, [onClearCredentials, stopRun]);
-	const submitReady = canSend && status === "ready";
+	const submitReady =
+		canSend &&
+		status === "ready" &&
+		(composerText.trim().length > 0 || hasAttachments);
 	const stopShortcuts = useMemo<KeyboardShortcut[]>(
 		() => [
 			{
@@ -565,6 +574,7 @@ function AgentChatPane({
 	const submit = async ({ text, files }: PromptInputMessage) => {
 		const prompt = text.trim();
 		if ((!prompt && files.length === 0) || !canSend || generating) return;
+		setComposerText("");
 		clearError();
 		void conversationRef.current?.scrollToBottom();
 		await sendMessage({ text: prompt, files });
@@ -574,6 +584,7 @@ function AgentChatPane({
 			const composer = composerRef.current;
 			if (!composer || !canSend || generating) return;
 			composer.value = prompt;
+			setComposerText(prompt);
 			composer.focus();
 			composer.setSelectionRange(prompt.length, prompt.length);
 		},
@@ -652,12 +663,14 @@ function AgentChatPane({
 						? "[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:border-blue-500/40 [&_[data-slot=input-group]]:bg-card/50 [&_[data-slot=input-group]]:shadow-[0_20px_60px_-36px_rgba(37,99,235,0.8)]"
 						: "[&_[data-slot=input-group]]:rounded-xl"
 				}
+				onAttachmentsChange={handleAttachmentsChange}
 				onSubmit={submit}
 			>
 				<PromptInputBody>
 					<PromptInputTextarea
 						className={prominent ? "min-h-20 px-4 pt-4 text-sm" : undefined}
 						disabled={!canSend || generating}
+						onChange={(event) => setComposerText(event.currentTarget.value)}
 						placeholder={
 							catalogError
 								? "Provider configuration unavailable"
@@ -687,7 +700,7 @@ function AgentChatPane({
 								? "rounded-lg bg-blue-600 text-white hover:bg-blue-500"
 								: "rounded-lg"
 						}
-						disabled={!canSend}
+						disabled={!generating && !submitReady}
 						onStop={() => void stopRun()}
 						status={status}
 						title={generating ? "Stop (Esc)" : undefined}

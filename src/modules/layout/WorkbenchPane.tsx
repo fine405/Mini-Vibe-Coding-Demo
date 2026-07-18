@@ -56,7 +56,11 @@ export function WorkbenchPane(props: WorkbenchPaneProps) {
 								</Panel>
 							</PanelGroup>
 						</div>
-						<div className="h-full w-full" hidden={activeView !== "preview"}>
+						<div
+							className="h-full w-full"
+							hidden={activeView !== "preview"}
+							id="tour-preview-workspace"
+						>
 							<Suspense fallback={<PanelLoading label="preview" />}>
 								<PreviewPane />
 							</Suspense>
