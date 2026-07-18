@@ -4,7 +4,8 @@ The Summer files are temporary local-demo assets copied from dany.works on
 2026-07-18. The source site does not publish a reuse license for them. Obtain
 permission from the author or replace those files with licensed media before
 any public deployment, distribution, or commercial use. Drizzle permission is
-recorded separately with its asset below.
+recorded separately with its asset below. Snow provenance is recorded from the
+user-provided file metadata; no reuse license was provided.
 
 ## `summer-leaves.mp4`
 
@@ -42,3 +43,15 @@ recorded separately with its asset below.
   500 Hz, smoothed over 500 ms and verified against a 20–800 Hz spectrogram.
   The same ranges are exported by `src/modules/theme/drizzleAudio.ts` for
   synchronized effects.
+
+## `snow-christmas.mp3`
+
+- Source: user-provided local file `Christmas.mp3` on 2026-07-18
+- Embedded artist: `SchisMatiC`
+- Embedded title: `圣诞结（纯钢琴伴奏）`
+- Embedded album: `Christmas 2025`
+- Permission: no reuse license or permission record was provided
+- SHA-256: `af9a64a8287e1bf75d328cb9dc90e0b2b9a3c9f7a6f878dd029edaaf0ec22091`
+- File: 8,133,469 bytes; 201.195 seconds; 44.1 kHz stereo; 320 kbps MP3
+- Handling: original file; no trimming or transcoding
+- Application playback: volume `0.5`

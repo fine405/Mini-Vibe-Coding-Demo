@@ -19,6 +19,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DrizzleThemeAudio } from "@/modules/theme/DrizzleThemeAudio";
+import { SnowThemeAudio } from "@/modules/theme/SnowThemeAudio";
 import { SummerThemeMedia } from "@/modules/theme/SummerThemeMedia";
 import { useThemeStore } from "@/modules/theme/store";
 import { ThemeNoiseTexture } from "@/modules/theme/ThemeNoiseTexture";
@@ -52,7 +53,6 @@ const THEME_OPTIONS: Array<{
 		label: "Snow",
 		shortcut: "W",
 		icon: Snowflake,
-		pending: true,
 	},
 ];
 
@@ -110,6 +110,7 @@ export function ThemeMenu() {
 			<ThemeNoiseTexture />
 			<SummerThemeMedia />
 			<DrizzleThemeAudio />
+			<SnowThemeAudio />
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button

@@ -120,7 +120,8 @@ describe("WorkbenchHeader", () => {
 		expect(drizzleItem).toHaveTextContent("R");
 		expect(drizzleItem).not.toHaveTextContent("Soon");
 		expect(breezeItem).toHaveTextContent("SoonB");
-		expect(snowItem).toHaveTextContent("SoonW");
+		expect(snowItem).toHaveTextContent("W");
+		expect(snowItem).not.toHaveTextContent("Soon");
 		expect(snowItem.querySelector(".lucide-snowflake")).toBeInTheDocument();
 		expect(nightItem).toHaveAttribute("aria-checked", "true");
 
