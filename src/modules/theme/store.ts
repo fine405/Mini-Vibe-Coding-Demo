@@ -8,7 +8,7 @@ import type {
 
 const THEME_STORAGE_KEY = "mini-lovable-theme";
 
-// Helper to get system theme
+// Helper to get system theme, used to migrate legacy "auto" preferences
 const getSystemTheme = (): ResolvedTheme => {
 	if (typeof window === "undefined") return "dark";
 	return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -16,10 +16,10 @@ const getSystemTheme = (): ResolvedTheme => {
 		: "light";
 };
 
-// Helper to resolve theme based on mode
-const resolveTheme = (mode: ThemeMode): ResolvedTheme => {
-	if (mode === "auto") return getSystemTheme();
-	return mode;
+// Older versions persisted "auto" as a mode; fold it into a concrete theme
+const normalizeMode = (mode: unknown): ThemeMode => {
+	if (mode === "light" || mode === "dark") return mode;
+	return getSystemTheme();
 };
 
 // Apply theme to document
@@ -35,44 +35,25 @@ const applyTheme = (theme: ResolvedTheme) => {
 
 export const useThemeStore = create<ThemeState>()(
 	persist(
-		(set, get) => {
-			// Initialize system listener when matchMedia is available (browser only)
-			if (
-				typeof window !== "undefined" &&
-				typeof window.matchMedia === "function"
-			) {
-				const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-				const handleChange = () => {
-					const { mode } = get();
-					if (mode === "auto") {
-						const newTheme = getSystemTheme();
-						set({ resolvedTheme: newTheme });
-						applyTheme(newTheme);
-					}
-				};
-				mediaQuery.addEventListener("change", handleChange);
-			}
+		(set) => ({
+			mode: "dark", // Default to dark to match current behavior
+			resolvedTheme: "dark",
 
-			return {
-				mode: "dark", // Default to dark to match current behavior
-				resolvedTheme: "dark",
-
-				setMode: (mode: ThemeMode) => {
-					const resolvedTheme = resolveTheme(mode);
-					set({ mode, resolvedTheme });
-					applyTheme(resolvedTheme);
-				},
-			};
-		},
+			setMode: (mode: ThemeMode) => {
+				set({ mode, resolvedTheme: mode });
+				applyTheme(mode);
+			},
+		}),
 		{
 			name: THEME_STORAGE_KEY,
 			partialize: (state) => ({ mode: state.mode }), // Only persist mode preference
 			onRehydrateStorage: () => (state) => {
 				// When storage loads, apply the theme immediately
 				if (state) {
-					const resolvedTheme = resolveTheme(state.mode);
-					state.resolvedTheme = resolvedTheme;
-					applyTheme(resolvedTheme);
+					const mode = normalizeMode(state.mode);
+					state.mode = mode;
+					state.resolvedTheme = mode;
+					applyTheme(mode);
 				}
 			},
 		},
@@ -82,7 +63,7 @@ export const useThemeStore = create<ThemeState>()(
 // Initial application to prevent flash (can be called in main entry)
 export const initTheme = () => {
 	const state = useThemeStore.getState();
-	const resolvedTheme = resolveTheme(state.mode);
-	useThemeStore.setState({ resolvedTheme });
-	applyTheme(resolvedTheme);
+	const mode = normalizeMode(state.mode);
+	useThemeStore.setState({ mode, resolvedTheme: mode });
+	applyTheme(mode);
 };

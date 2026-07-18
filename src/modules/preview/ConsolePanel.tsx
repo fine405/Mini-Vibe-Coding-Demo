@@ -6,8 +6,9 @@ import {
 } from "@/modules/preview/consoleBridge";
 import { useConsoleStore } from "@/modules/preview/consoleStore";
 
-export function ConsolePanel({ sourceLabel }: { sourceLabel: string }) {
+export function ConsolePanel() {
 	const logs = useConsoleStore((state) => state.logs);
+	const sourceLabel = useConsoleStore((state) => state.sourceLabel);
 	const addLog = useConsoleStore((state) => state.addLog);
 	const clearLogs = useConsoleStore((state) => state.clearLogs);
 
@@ -78,7 +79,6 @@ export function ConsolePanel({ sourceLabel }: { sourceLabel: string }) {
 
 	return (
 		<div
-			id="tour-console"
 			className="h-full flex flex-col bg-bg-secondary animate-fade-in"
 			style={{ cursor: "var(--cursor-default)" }}
 		>

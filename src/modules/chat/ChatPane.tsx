@@ -12,6 +12,8 @@ import {
 	AlertTriangleIcon,
 	BotIcon,
 	KeyRoundIcon,
+	Loader2Icon,
+	PanelLeftCloseIcon,
 	RefreshCwIcon,
 } from "lucide-react";
 import {
@@ -57,7 +59,15 @@ import {
 	ToolOutput,
 	type ToolPart,
 } from "@/components/ai-elements/tool";
+import { BrandMark } from "@/components/BrandMark";
+import { BrandName } from "@/components/BrandName";
 import { Button } from "@/components/ui/button";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
 	type KeyboardShortcut,
 	useKeyboardShortcuts,
@@ -84,6 +94,7 @@ import {
 	ResearchToolResult,
 } from "@/modules/chat/ResearchToolResult";
 import { useEditor } from "@/modules/editor/store";
+import { useLayoutStore } from "@/modules/layout/store";
 import type { ModelSelection } from "@/modules/providers/types";
 import { TOUR_STEP_IDS } from "@/modules/tour/constants";
 import { browserWorkspace } from "@/modules/workspace/browser";
@@ -501,6 +512,7 @@ function AgentChatPane({
 		},
 	});
 	const generating = status === "submitted" || status === "streaming";
+	const setChatVisible = useLayoutStore((state) => state.setChatVisible);
 	const stopRun = useCallback(async () => {
 		const runId = activeRunToken.get();
 		await stop();
@@ -688,20 +700,19 @@ function AgentChatPane({
 	return (
 		<section
 			aria-label="Coding agent"
-			className="flex h-full min-w-0 flex-col border-r bg-background text-foreground"
+			className="flex h-full min-w-0 flex-col bg-background text-foreground"
 			id={TOUR_STEP_IDS.CHAT_PANE}
 		>
-			<header className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
-				<div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-					<BotIcon className="size-4" />
-				</div>
-				<div className="min-w-0 flex-1">
-					<p className="truncate text-sm font-medium">Coding Agent</p>
-					<p className="truncate text-[11px] text-muted-foreground">
-						{generating
-							? "Working in an isolated workspace…"
-							: "Changes require your approval"}
-					</p>
+			<header className="flex h-10 shrink-0 items-center gap-1 border-b border-border-primary px-3">
+				<div className="flex min-w-0 flex-1 items-center gap-2">
+					<BrandMark className="size-5" />
+					<BrandName className="text-[13px]" />
+					{generating && (
+						<Loader2Icon
+							aria-label="Agent is working"
+							className="size-3.5 animate-spin text-fg-muted"
+						/>
+					)}
 				</div>
 				<DemoCredentialSettings
 					deploymentEnabled={deploymentEnabled}
@@ -711,15 +722,37 @@ function AgentChatPane({
 					onSave={onSaveCredentials}
 					pageStatus={credentialStatus}
 				/>
-				<Button
-					aria-label="Clear conversation"
-					disabled={messages.length === 0 && !error}
-					onClick={() => void clearConversation()}
-					size="icon-sm"
-					variant="ghost"
-				>
-					<RefreshCwIcon />
-				</Button>
+				<TooltipProvider delayDuration={300}>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								aria-label="Clear conversation"
+								className="text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
+								disabled={messages.length === 0 && !error}
+								onClick={() => void clearConversation()}
+								size="icon-sm"
+								variant="ghost"
+							>
+								<RefreshCwIcon />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>Clear conversation</TooltipContent>
+					</Tooltip>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								aria-label="Hide chat panel"
+								className="text-fg-muted hover:bg-bg-tertiary hover:text-fg-primary"
+								onClick={() => setChatVisible(false)}
+								size="icon-sm"
+								variant="ghost"
+							>
+								<PanelLeftCloseIcon />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>Hide Chat (⌘1)</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
 			</header>
 
 			<LayoutGroup id={`agent-chat-${sessionId}`}>

@@ -74,7 +74,7 @@ describe("EditorDiffView", () => {
 		);
 
 		expect(diffEditorMock.mock.lastCall?.[0]).toMatchObject({
-			theme: "vs-dark",
+			theme: "ml-dark",
 			options: {
 				renderSideBySide: true,
 				hideUnchangedRegions: { enabled: false },

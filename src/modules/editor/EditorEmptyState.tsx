@@ -2,10 +2,7 @@ import { Command, FileCode2, FolderOpen, Keyboard } from "lucide-react";
 
 export function EditorEmptyState() {
 	return (
-		<div
-			id="tour-editor"
-			className="h-full w-full flex flex-col bg-bg-primary text-fg-primary"
-		>
+		<div className="h-full w-full flex flex-col bg-bg-primary text-fg-primary">
 			<div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-secondary border-b border-border-primary">
 				Editor
 			</div>

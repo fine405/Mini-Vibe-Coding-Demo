@@ -151,7 +151,6 @@ describe("PreviewPane workspace integration", () => {
 	it("prewarms the replacement preview before retiring the current one", async () => {
 		const path = "/src/App.js";
 		render(<PreviewPane />);
-		const clearConsole = screen.getByRole("button", { name: "Clear Console" });
 
 		act(() => {
 			useFs
@@ -163,9 +162,6 @@ describe("PreviewPane workspace integration", () => {
 			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent("No flash"),
 		);
 		expect(screen.getAllByTestId("preview-runtime")).toHaveLength(1);
-		expect(screen.getByRole("button", { name: "Clear Console" })).toBe(
-			clearConsole,
-		);
 		const replacementMountedAt = sandpackMock.previewEvents.indexOf("mount:2");
 		const currentUnmountedAt = sandpackMock.previewEvents.indexOf("unmount:1");
 		expect(replacementMountedAt).toBeGreaterThan(-1);
@@ -212,7 +208,6 @@ describe("PreviewPane workspace integration", () => {
 		const after = before.replace("Hello React", "Switchable Draft");
 		const { snapshot } = await browserWorkspace.getSnapshot();
 		render(<PreviewPane />);
-		const clearConsole = screen.getByRole("button", { name: "Clear Console" });
 
 		act(() => {
 			useAgentChangeSessionStore.getState().begin(snapshot);
@@ -244,9 +239,6 @@ describe("PreviewPane workspace integration", () => {
 			expect(screen.getByTestId(`file-${path}`)).toHaveTextContent(
 				"Switchable Draft",
 			),
-		);
-		expect(screen.getByRole("button", { name: "Clear Console" })).toBe(
-			clearConsole,
 		);
 	});
 
@@ -318,7 +310,6 @@ describe("PreviewPane workspace integration", () => {
 		const after = before.replace("Hello React", "Rejected Draft");
 		const { snapshot } = await browserWorkspace.getSnapshot();
 		render(<PreviewPane />);
-		const clearConsole = screen.getByRole("button", { name: "Clear Console" });
 
 		act(() => {
 			useAgentChangeSessionStore.getState().begin(snapshot);
@@ -344,9 +335,6 @@ describe("PreviewPane workspace integration", () => {
 		expect(
 			screen.queryByRole("button", { name: "Agent Draft" }),
 		).not.toBeInTheDocument();
-		expect(screen.getByRole("button", { name: "Clear Console" })).toBe(
-			clearConsole,
-		);
 		expect(useFs.getState().filesByPath[path].content).toBe(before);
 	});
 
@@ -369,7 +357,6 @@ describe("PreviewPane workspace integration", () => {
 			],
 		};
 		render(<PreviewPane />);
-		const clearConsole = screen.getByRole("button", { name: "Clear Console" });
 
 		act(() => {
 			useAgentChangeSessionStore.getState().begin(snapshot);
@@ -401,9 +388,6 @@ describe("PreviewPane workspace integration", () => {
 		expect(
 			screen.queryByRole("button", { name: "Agent Draft" }),
 		).not.toBeInTheDocument();
-		expect(screen.getByRole("button", { name: "Clear Console" })).toBe(
-			clearConsole,
-		);
 		expect(useFs.getState().filesByPath[path].content).toBe(after);
 	});
 
@@ -412,6 +396,7 @@ describe("PreviewPane workspace integration", () => {
 		const before = useFs.getState().filesByPath[path].content;
 		const after = before.replace("Hello React", "Draft Console");
 		const { snapshot } = await browserWorkspace.getSnapshot();
+		useConsoleStore.getState().setSourceLabel("Current");
 		useConsoleStore.getState().addLog({
 			id: "current-log",
 			method: "log",
@@ -419,7 +404,7 @@ describe("PreviewPane workspace integration", () => {
 			timestamp: 0,
 		});
 		render(<PreviewPane />);
-		expect(screen.getByText("current output")).toBeInTheDocument();
+		expect(useConsoleStore.getState().logs).toHaveLength(1);
 
 		act(() => {
 			useAgentChangeSessionStore.getState().begin(snapshot);
@@ -431,9 +416,13 @@ describe("PreviewPane workspace integration", () => {
 		});
 
 		await waitFor(() =>
-			expect(screen.queryByText("current output")).not.toBeInTheDocument(),
+			expect(useConsoleStore.getState().logs).toHaveLength(0),
 		);
-		expect(screen.getByText("Agent Draft", { selector: "span" })).toBeVisible();
+		expect(useConsoleStore.getState().sourceLabel).toBe("Agent Draft");
+		expect(screen.getByRole("button", { name: "Agent Draft" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
 	});
 
 	it("updates Sandpack when an Agent change is applied", async () => {

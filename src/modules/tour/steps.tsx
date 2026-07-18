@@ -1,10 +1,9 @@
 import {
 	Code,
 	Command,
-	Eye,
 	FolderTree,
 	MessageSquare,
-	Terminal,
+	MoreHorizontal,
 } from "lucide-react";
 import { TOUR_STEP_IDS } from "@/modules/tour/constants";
 import type { TourStep } from "@/modules/tour/Tour";
@@ -27,67 +26,52 @@ export const tourSteps: TourStep[] = [
 		),
 	},
 	{
-		selectorId: TOUR_STEP_IDS.FILE_TREE,
-		position: "right",
-		content: (
-			<div className="space-y-2">
-				<div className="flex items-center gap-2">
-					<FolderTree className="h-5 w-5 text-accent" />
-					<h3 className="font-semibold text-fg-primary">File Tree</h3>
-				</div>
-				<p className="text-sm text-fg-secondary leading-relaxed">
-					Browse and manage your project files. Right-click for options like
-					rename and delete. Double-click to open files in the editor.
-				</p>
-			</div>
-		),
-	},
-	{
-		selectorId: TOUR_STEP_IDS.EDITOR,
+		selectorId: TOUR_STEP_IDS.VIEW_TABS,
 		position: "bottom",
 		content: (
 			<div className="space-y-2">
 				<div className="flex items-center gap-2">
 					<Code className="h-5 w-5 text-accent" />
-					<h3 className="font-semibold text-fg-primary">Code Editor</h3>
+					<h3 className="font-semibold text-fg-primary">Code &amp; Preview</h3>
 				</div>
 				<p className="text-sm text-fg-secondary leading-relaxed">
-					View and edit your code here. Accepted agent changes remain visible as
-					local modifications until you mark them clean or undo them.
+					Switch between editing your source files and the live running app. The
+					preview keeps running in the background, so switching is instant.
 				</p>
 			</div>
 		),
 	},
 	{
-		selectorId: TOUR_STEP_IDS.PREVIEW,
-		position: "left",
+		selectorId: TOUR_STEP_IDS.CODE_WORKSPACE,
+		position: "bottom",
 		content: (
 			<div className="space-y-2">
 				<div className="flex items-center gap-2">
-					<Eye className="h-5 w-5 text-accent" />
-					<h3 className="font-semibold text-fg-primary">Live Preview</h3>
+					<FolderTree className="h-5 w-5 text-accent" />
+					<h3 className="font-semibold text-fg-primary">Code Workspace</h3>
 				</div>
 				<p className="text-sm text-fg-secondary leading-relaxed">
-					See your app running in real-time. Changes are reflected instantly as
-					you edit code or accept AI patches.
+					Browse and manage files on the left — right-click for rename and
+					delete. Edit code on the right. Accepted agent changes remain visible
+					as local modifications until you mark them clean or undo them.
 				</p>
 			</div>
 		),
 	},
 	{
-		selectorId: TOUR_STEP_IDS.CONSOLE,
-		position: "left",
+		selectorId: TOUR_STEP_IDS.MORE_MENU,
+		position: "bottom",
 		content: (
 			<div className="space-y-2">
 				<div className="flex items-center gap-2">
-					<Terminal className="h-5 w-5 text-accent" />
-					<h3 className="font-semibold text-fg-primary">Console</h3>
+					<MoreHorizontal className="h-5 w-5 text-accent" />
+					<h3 className="font-semibold text-fg-primary">More Actions</h3>
 				</div>
 				<p className="text-sm text-fg-secondary leading-relaxed">
-					View console logs and errors from your running app. Toggle visibility
-					with{" "}
+					Project actions live here: start a new project, import or export it,
+					toggle the console (
 					<kbd className="px-1.5 py-0.5 rounded bg-bg-tertiary text-xs">⌘2</kbd>
-					.
+					), and replay this tour.
 				</p>
 			</div>
 		),

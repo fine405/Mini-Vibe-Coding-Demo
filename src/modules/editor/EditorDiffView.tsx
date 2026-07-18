@@ -1,5 +1,9 @@
 import { DiffEditor, type MonacoDiffEditor } from "@monaco-editor/react";
 import { useCallback, useEffect, useRef } from "react";
+import {
+	defineMonacoThemes,
+	getMonacoTheme,
+} from "@/modules/editor/monaco-theme";
 import { useThemeStore } from "@/modules/theme/store";
 
 interface EditorDiffViewProps {
@@ -35,7 +39,7 @@ export function EditorDiffView({
 		[],
 	);
 
-	const inlineTheme = resolvedTheme === "dark" ? "vs-dark" : "vs-light";
+	const inlineTheme = getMonacoTheme(resolvedTheme);
 	return (
 		<DiffEditor
 			height="100%"
@@ -43,6 +47,7 @@ export function EditorDiffView({
 			keepCurrentOriginalModel
 			language={language}
 			modified={modifiedContent}
+			beforeMount={defineMonacoThemes}
 			onMount={handleMount}
 			options={{
 				readOnly: true,
@@ -63,7 +68,7 @@ export function EditorDiffView({
 				padding: inline ? { top: 8, bottom: 72 } : { top: 8 },
 			}}
 			original={originalContent}
-			theme={inline ? inlineTheme : "vs-dark"}
+			theme={inlineTheme}
 		/>
 	);
 }

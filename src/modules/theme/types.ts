@@ -1,4 +1,4 @@
-export type ThemeMode = "dark" | "light" | "auto";
+export type ThemeMode = "dark" | "light";
 export type ResolvedTheme = "dark" | "light";
 
 export interface ThemeState {

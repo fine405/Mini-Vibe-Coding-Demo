@@ -5,17 +5,14 @@ import {
 } from "@codesandbox/sandpack-react";
 import { Loader2, Maximize2, Minimize2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import {
 	type AgentReviewSelections,
 	useAgentChangeSessionStore,
 } from "@/modules/agent-chat/change-session";
-import { useLayoutStore } from "@/modules/layout/store";
 import {
 	materializeAgentDraftFiles,
 	materializeSelectedAgentDraftFiles,
 } from "@/modules/preview/agentDraftFiles";
-import { ConsolePanel } from "@/modules/preview/ConsolePanel";
 import { useSandpackConsoleBridge } from "@/modules/preview/consoleBridge";
 import { useConsoleStore } from "@/modules/preview/consoleStore";
 import { useThemeStore } from "@/modules/theme/store";
@@ -114,9 +111,6 @@ function PreviewToolbar({
 }) {
 	return (
 		<div className="px-3 py-2 text-xs border-b border-border-primary flex items-center gap-2">
-			<span className="font-semibold uppercase tracking-wide text-fg-secondary">
-				Preview
-			</span>
 			{hasDraft && (
 				<div
 					aria-label="Preview source"
@@ -199,7 +193,6 @@ export function PreviewPane() {
 	const agentReviewSelections = useAgentChangeSessionStore(
 		(state) => state.reviewSelections,
 	);
-	const { showConsole } = useLayoutStore();
 	const { resolvedTheme } = useThemeStore();
 	const workspaceFiles = useMemo(
 		() =>
@@ -277,6 +270,11 @@ export function PreviewPane() {
 	const consoleSourceKey =
 		previewMode === "draft" ? `draft:${agentRunId}` : "current";
 	const previousConsoleSourceKeyRef = useRef(consoleSourceKey);
+	useEffect(() => {
+		useConsoleStore
+			.getState()
+			.setSourceLabel(previewMode === "draft" ? "Agent Draft" : "Current");
+	}, [previewMode]);
 	useEffect(() => {
 		if (previousConsoleSourceKeyRef.current === consoleSourceKey) return;
 		previousConsoleSourceKeyRef.current = consoleSourceKey;
@@ -391,7 +389,6 @@ export function PreviewPane() {
 
 	return (
 		<div
-			id="tour-preview"
 			ref={containerRef}
 			className="h-full w-full flex flex-col bg-bg-primary text-fg-primary"
 		>
@@ -406,74 +403,58 @@ export function PreviewPane() {
 				onToggleFullscreen={toggleFullscreen}
 				previewMode={previewMode}
 			/>
-			<PanelGroup direction="vertical" className="flex-1 overflow-hidden">
-				<Panel defaultSize={showConsole ? 75 : 100} minSize={30}>
-					<div className="relative h-full overflow-hidden">
-						{runtimes.map((runtime) => {
-							const isActive = runtime.id === activeRuntimeId;
-							const shouldBridgeConsole = runtimes.length === 1 || !isActive;
-							return (
-								<div
-									key={runtime.id}
-									aria-hidden={!isActive}
-									data-active={isActive}
-									data-testid="preview-runtime"
-									className={`absolute inset-0 ${
-										isActive ? "z-10" : "pointer-events-none z-0"
-									}`}
-								>
-									<SandpackProvider
-										files={isActive ? files : runtime.files}
-										template="react"
-										theme={resolvedTheme}
-										style={{ height: "100%" }}
-										options={{
-											autorun: true,
-											autoReload: true,
-											bundlerTimeOut: 15_000,
-											classes: { "sp-loading": "hidden" },
-											initMode: "immediate",
-											activeFile: "/src/App.js",
-											visibleFiles: ["/src/App.js", "/src/index.js"],
-										}}
-										customSetup={{ entry: "/src/index.js" }}
-										className="h-full overflow-hidden"
-									>
-										{isActive ? (
-											<SandpackClientFileSync
-												onStalledFiles={stageRuntime}
-												sourceFiles={files}
-											/>
-										) : (
-											<SandpackReadyListener
-												onReady={() => activateRuntime(runtime.id)}
-											/>
-										)}
-										{shouldBridgeConsole && <SandpackConsoleBridgeListener />}
-										<SandpackPreview
-											showOpenInCodeSandbox={false}
-											showRefreshButton={false}
-											style={{ height: "100%" }}
-										/>
-									</SandpackProvider>
-								</div>
-							);
-						})}
-					</div>
-				</Panel>
-				{showConsole && (
-					<>
-						<PanelResizeHandle className="h-px bg-border-primary hover:bg-accent transition-colors cursor-row-resize" />
-						<Panel defaultSize={25} minSize={10}>
-							<ConsolePanel
-								sourceLabel={
-									previewMode === "draft" ? "Agent Draft" : "Current"
-								}
-							/>
-						</Panel>
-					</>
-				)}
-			</PanelGroup>
+			<div className="relative flex-1 overflow-hidden">
+				{runtimes.map((runtime) => {
+					const isActive = runtime.id === activeRuntimeId;
+					const shouldBridgeConsole = runtimes.length === 1 || !isActive;
+					return (
+						<div
+							key={runtime.id}
+							aria-hidden={!isActive}
+							data-active={isActive}
+							data-testid="preview-runtime"
+							className={`absolute inset-0 ${
+								isActive ? "z-10" : "pointer-events-none z-0"
+							}`}
+						>
+							<SandpackProvider
+								files={isActive ? files : runtime.files}
+								template="react"
+								theme={resolvedTheme}
+								style={{ height: "100%" }}
+								options={{
+									autorun: true,
+									autoReload: true,
+									bundlerTimeOut: 15_000,
+									classes: { "sp-loading": "hidden" },
+									initMode: "immediate",
+									activeFile: "/src/App.js",
+									visibleFiles: ["/src/App.js", "/src/index.js"],
+								}}
+								customSetup={{ entry: "/src/index.js" }}
+								className="h-full overflow-hidden"
+							>
+								{isActive ? (
+									<SandpackClientFileSync
+										onStalledFiles={stageRuntime}
+										sourceFiles={files}
+									/>
+								) : (
+									<SandpackReadyListener
+										onReady={() => activateRuntime(runtime.id)}
+									/>
+								)}
+								{shouldBridgeConsole && <SandpackConsoleBridgeListener />}
+								<SandpackPreview
+									showOpenInCodeSandbox={false}
+									showRefreshButton={false}
+									style={{ height: "100%" }}
+								/>
+							</SandpackProvider>
+						</div>
+					);
+				})}
+			</div>
 		</div>
 	);
 }

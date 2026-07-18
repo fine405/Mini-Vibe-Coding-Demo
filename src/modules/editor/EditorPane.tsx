@@ -175,10 +175,7 @@ export function EditorPane() {
 	);
 
 	return (
-		<div
-			id="tour-editor"
-			className="flex h-full w-full flex-col bg-bg-primary text-fg-primary"
-		>
+		<div className="flex h-full w-full flex-col bg-bg-primary text-fg-primary">
 			<EditorTabs
 				activeFilePath={activeFilePath}
 				canRevert={canRevert}
