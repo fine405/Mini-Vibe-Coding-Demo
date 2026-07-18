@@ -82,8 +82,11 @@ function WorkspacePreviewProbe() {
 	);
 }
 
-function configuredProviderCatalogResponse() {
+function configuredProviderCatalogResponse(
+	hostedChat = { enabled: true, tavilyConfigured: false },
+) {
 	return Response.json({
+		hostedChat,
 		providers: [
 			{
 				id: "openai",
@@ -106,6 +109,7 @@ function configuredProviderCatalogResponse() {
 
 function unconfiguredDeepseekProviderCatalogResponse() {
 	return Response.json({
+		hostedChat: { enabled: true, tavilyConfigured: false },
 		providers: [
 			{
 				id: "deepseek",
@@ -113,6 +117,29 @@ function unconfiguredDeepseekProviderCatalogResponse() {
 				description: "DeepSeek models",
 				configured: false,
 				missingEnvVars: ["DEEPSEEK_API_KEY"],
+				defaultModelId: "deepseek/deepseek-chat",
+				models: [
+					{
+						id: "deepseek/deepseek-chat",
+						label: "DeepSeek Chat",
+						description: "Default",
+					},
+				],
+			},
+		],
+	});
+}
+
+function hostedDeepseekProviderCatalogResponse() {
+	return Response.json({
+		hostedChat: { enabled: true, tavilyConfigured: true },
+		providers: [
+			{
+				id: "deepseek",
+				name: "DeepSeek",
+				description: "DeepSeek models",
+				configured: true,
+				missingEnvVars: [],
 				defaultModelId: "deepseek/deepseek-chat",
 				models: [
 					{
@@ -230,6 +257,7 @@ describe("AgentChatMessage", () => {
 		await user.keyboard("{Enter}");
 		const deepseekInput = screen.getByLabelText("DEEPSEEK_API_KEY");
 		const tavilyInput = screen.getByLabelText("TAVILY_API_KEY");
+		expect(screen.getAllByText("Not configured")).toHaveLength(2);
 		expect(deepseekInput).toHaveAttribute("type", "password");
 		expect(deepseekInput).toHaveAttribute("autocomplete", "off");
 		await user.type(deepseekInput, "page-deepseek-secret");
@@ -311,6 +339,133 @@ describe("AgentChatMessage", () => {
 		expect(
 			await screen.findByPlaceholderText("Configure a provider key to start"),
 		).toBeDisabled();
+	});
+
+	it("disables chat and page credential editing when deployment chat is off", async () => {
+		const user = userEvent.setup();
+		const fetchMock = vi.fn((input: string | URL | Request) => {
+			const url =
+				typeof input === "string"
+					? input
+					: input instanceof URL
+						? input.href
+						: input.url;
+			if (url.endsWith("/api/providers")) {
+				return Promise.resolve(
+					configuredProviderCatalogResponse({
+						enabled: false,
+						tavilyConfigured: true,
+					}),
+				);
+			}
+			return Promise.reject(new Error(`Unexpected request: ${url}`));
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		render(<ChatPane />);
+
+		const input = await screen.findByPlaceholderText(
+			"Chat disabled by deployment",
+		);
+		expect(input).toBeDisabled();
+		expect(screen.getByText(/CHAT_ENABLED/)).toBeVisible();
+		expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+		for (const suggestion of screen.getAllByTestId("chat-suggestion")) {
+			expect(suggestion).toBeDisabled();
+		}
+
+		await user.click(
+			screen.getByRole("button", { name: "Demo credential settings" }),
+		);
+		expect(screen.getAllByText("Disabled by deployment")).toHaveLength(2);
+		expect(screen.getByLabelText("DEEPSEEK_API_KEY")).toBeDisabled();
+		expect(screen.getByLabelText("TAVILY_API_KEY")).toBeDisabled();
+		expect(
+			screen.getByRole("button", { name: "Save for this page" }),
+		).toBeDisabled();
+		expect(
+			fetchMock.mock.calls.some(([request]) => {
+				const url =
+					typeof request === "string"
+						? request
+						: request instanceof URL
+							? request.href
+							: request.url;
+				return url.endsWith("/api/chat");
+			}),
+		).toBe(false);
+	});
+
+	it("does not report deployment-disabled status when catalog loading fails", async () => {
+		const user = userEvent.setup();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.reject(new Error("catalog unavailable"))),
+		);
+
+		render(<ChatPane />);
+
+		expect(await screen.findByText("catalog unavailable")).toBeVisible();
+		expect(
+			screen.getByPlaceholderText("Provider configuration unavailable"),
+		).toBeDisabled();
+		expect(
+			screen.queryByPlaceholderText("Chat disabled by deployment"),
+		).not.toBeInTheDocument();
+
+		await user.click(
+			screen.getByRole("button", { name: "Demo credential settings" }),
+		);
+		expect(screen.getAllByText("Configuration unavailable")).toHaveLength(2);
+		expect(
+			screen.queryByText("Disabled by deployment"),
+		).not.toBeInTheDocument();
+	});
+
+	it("shows hosted DeepSeek and Tavily configuration without exposing values", async () => {
+		const user = userEvent.setup();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((input: string | URL | Request) => {
+				const url =
+					typeof input === "string"
+						? input
+						: input instanceof URL
+							? input.href
+							: input.url;
+				if (url.endsWith("/api/providers")) {
+					return Promise.resolve(hostedDeepseekProviderCatalogResponse());
+				}
+				return Promise.reject(new Error(`Unexpected request: ${url}`));
+			}),
+		);
+
+		render(<ChatPane />);
+		expect(
+			await screen.findByPlaceholderText("Describe what you want to build…"),
+		).toBeEnabled();
+
+		await user.click(
+			screen.getByRole("button", { name: "Demo credential settings" }),
+		);
+		expect(
+			screen.getAllByText("Configured by hosted environment"),
+		).toHaveLength(2);
+		expect(screen.getByLabelText("DEEPSEEK_API_KEY")).toHaveValue("");
+		expect(screen.getByLabelText("TAVILY_API_KEY")).toHaveValue("");
+		expect(
+			screen.queryByText(/hosted-deepseek-value|hosted-tavily-value/i),
+		).not.toBeInTheDocument();
+
+		await user.type(screen.getByLabelText("DEEPSEEK_API_KEY"), "page-deepseek");
+		await user.type(screen.getByLabelText("TAVILY_API_KEY"), "page-tavily");
+		await user.click(
+			screen.getByRole("button", { name: "Save for this page" }),
+		);
+		await user.click(
+			screen.getByRole("button", { name: "Demo credential settings" }),
+		);
+		expect(screen.getAllByText("Configured for this page")).toHaveLength(2);
 	});
 
 	it("fills suggestions at the caret without sending and rotates each tab", async () => {

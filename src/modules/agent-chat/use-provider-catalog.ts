@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import type {
+	HostedChatStatus,
 	ProvidersResponse,
 	PublicProvider,
 } from "@/modules/providers/types";
 
 interface ProviderCatalogState {
 	providers: PublicProvider[];
+	hostedChat: HostedChatStatus | null;
 	isLoading: boolean;
 	error: string | null;
 }
@@ -14,7 +16,10 @@ function isProvidersResponse(value: unknown): value is ProvidersResponse {
 	return Boolean(
 		value &&
 			typeof value === "object" &&
-			Array.isArray((value as ProvidersResponse).providers),
+			Array.isArray((value as ProvidersResponse).providers) &&
+			typeof (value as ProvidersResponse).hostedChat?.enabled === "boolean" &&
+			typeof (value as ProvidersResponse).hostedChat?.tavilyConfigured ===
+				"boolean",
 	);
 }
 
@@ -22,6 +27,7 @@ export function useProviderCatalog() {
 	const [reloadToken, setReloadToken] = useState(0);
 	const [state, setState] = useState<ProviderCatalogState>({
 		providers: [],
+		hostedChat: null,
 		isLoading: true,
 		error: null,
 	});
@@ -44,11 +50,17 @@ export function useProviderCatalog() {
 				if (!isProvidersResponse(body)) {
 					throw new Error("Provider catalog response was invalid");
 				}
-				setState({ providers: body.providers, isLoading: false, error: null });
+				setState({
+					providers: body.providers,
+					hostedChat: body.hostedChat,
+					isLoading: false,
+					error: null,
+				});
 			} catch (error) {
 				if (controller.signal.aborted) return;
 				setState({
 					providers: [],
+					hostedChat: null,
 					isLoading: false,
 					error:
 						error instanceof Error

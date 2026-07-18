@@ -31,19 +31,48 @@ describe("Hono API", () => {
 	});
 
 	it("returns the public provider catalog without secrets", async () => {
+		const hostedChat = {
+			enabled: true,
+			tavilyConfigured: true,
+			secretCanary: "hosted-status-secret",
+		};
 		const api = createApi({
 			providerCatalog: new ProviderCatalog(
 				new ObjectProviderConfigSource({ OPENAI_API_KEY: "server-secret" }),
 			),
+			hostedChat,
 		});
 
 		const response = await api.request("/api/providers");
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
+		expect(body.hostedChat).toEqual({
+			enabled: true,
+			tavilyConfigured: true,
+		});
 		expect(body.providers).toHaveLength(8);
 		expect(body.providers[0]).toMatchObject({ id: "openai", configured: true });
 		expect(JSON.stringify(body)).not.toContain("server-secret");
+		expect(JSON.stringify(body)).not.toContain("hosted-status-secret");
+	});
+
+	it("reads hosted Chat status from server environment without exposing values", async () => {
+		vi.stubEnv("CHAT_ENABLED", "disable-canary");
+		vi.stubEnv("TAVILY_API_KEY", "hosted-tavily-secret");
+		const api = createApi();
+		vi.unstubAllEnvs();
+
+		const response = await api.request("/api/providers");
+		const responseText = await response.text();
+
+		expect(response.status).toBe(200);
+		expect(JSON.parse(responseText).hostedChat).toEqual({
+			enabled: false,
+			tavilyConfigured: true,
+		});
+		expect(responseText).not.toContain("hosted-tavily-secret");
+		expect(responseText).not.toContain("disable-canary");
 	});
 
 	it("returns same-origin downloads as sanitized attachments", async () => {
@@ -105,6 +134,58 @@ describe("Hono API", () => {
 		});
 		expect(crossSite.status).toBe(403);
 		expect(crossSite.headers.get("cache-control")).toBe("no-store");
+		expect(await crossSite.json()).toMatchObject({
+			error: { code: "CROSS_SITE_REQUEST" },
+		});
+	});
+
+	it("short-circuits disabled chat before body and paid-service adapters", async () => {
+		const providerConfigGet = vi.fn(() => "hosted-provider-secret");
+		const modelResolver = vi.fn();
+		const researchGateway: ResearchGateway = {
+			searchWeb: vi.fn(),
+			searchWeather: vi.fn(),
+		};
+		const researchGatewayForTavilyKey = vi.fn(() => researchGateway);
+		const api = createApi({
+			providerCatalog: new ProviderCatalog({ get: providerConfigGet }),
+			modelResolver,
+			researchGateway,
+			researchGatewayForTavilyKey,
+			hostedChat: { enabled: false, tavilyConfigured: true },
+		});
+
+		const response = await api.request("/api/chat", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: `{"pageSecret":"must-not-leak","oversized":"${"x".repeat(2 * 1024 * 1024)}`,
+		});
+		const responseText = await response.text();
+
+		expect(response.status).toBe(503);
+		expect(response.headers.get("cache-control")).toBe("no-store");
+		expect(JSON.parse(responseText)).toEqual({
+			error: {
+				code: "CHAT_DISABLED",
+				message: "Chat is disabled by the deployment configuration",
+			},
+		});
+		expect(responseText).not.toContain("must-not-leak");
+		expect(providerConfigGet).not.toHaveBeenCalled();
+		expect(modelResolver).not.toHaveBeenCalled();
+		expect(researchGatewayForTavilyKey).not.toHaveBeenCalled();
+		expect(researchGateway.searchWeb).not.toHaveBeenCalled();
+		expect(researchGateway.searchWeather).not.toHaveBeenCalled();
+
+		const crossSite = await api.request("/api/chat", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				origin: "https://attacker.invalid",
+			},
+			body: "{}",
+		});
+		expect(crossSite.status).toBe(403);
 		expect(await crossSite.json()).toMatchObject({
 			error: { code: "CROSS_SITE_REQUEST" },
 		});

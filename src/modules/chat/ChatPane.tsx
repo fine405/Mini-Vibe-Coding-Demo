@@ -378,6 +378,7 @@ function AgentChatPane({
 	const [activeRunToken] = useState(() => new AgentRunToken());
 	const {
 		providers: serverProviders,
+		hostedChat,
 		isLoading,
 		error: catalogError,
 		reload,
@@ -400,7 +401,19 @@ function AgentChatPane({
 	const selectedProvider = providers.find(
 		(provider) => provider.id === selection?.providerId,
 	);
-	const canSend = Boolean(selection && selectedProvider?.configured);
+	const deploymentEnabled = hostedChat?.enabled ?? false;
+	const canSend =
+		deploymentEnabled && Boolean(selection && selectedProvider?.configured);
+	const hostedCredentialStatus = useMemo<EphemeralCredentialStatus>(
+		() => ({
+			deepseekConfigured: Boolean(
+				serverProviders.find((provider) => provider.id === "deepseek")
+					?.configured,
+			),
+			tavilyConfigured: hostedChat?.tavilyConfigured ?? false,
+		}),
+		[hostedChat?.tavilyConfigured, serverProviders],
+	);
 
 	const prepareSendMessagesRequest = useCallback<
 		PrepareSendMessagesRequest<UIMessage>
@@ -572,7 +585,17 @@ function AgentChatPane({
 					</Button>
 				</div>
 			)}
-			{!isLoading &&
+			{!isLoading && !catalogError && hostedChat?.enabled === false && (
+				<div className="flex gap-2 rounded-lg bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-200">
+					<AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
+					<span>
+						Chat is disabled by deployment. Set CHAT_ENABLED=true and redeploy
+						to accept new requests.
+					</span>
+				</div>
+			)}
+			{deploymentEnabled &&
+				!isLoading &&
 				providers.length > 0 &&
 				!providers.some((provider) => provider.configured) && (
 					<div className="flex gap-2 rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
@@ -587,7 +610,9 @@ function AgentChatPane({
 				<div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
 					<span className="min-w-0 flex-1">{error.message}</span>
 					<Button
+						disabled={!canSend}
 						onClick={() => {
+							if (!canSend) return;
 							clearError();
 							void regenerate();
 						}}
@@ -622,9 +647,15 @@ function AgentChatPane({
 						className={prominent ? "min-h-20 px-4 pt-4 text-sm" : undefined}
 						disabled={!canSend || generating}
 						placeholder={
-							canSend
-								? "Describe what you want to build…"
-								: "Configure a provider key to start"
+							catalogError
+								? "Provider configuration unavailable"
+								: isLoading
+									? "Loading provider configuration…"
+									: !deploymentEnabled
+										? "Chat disabled by deployment"
+										: canSend
+											? "Describe what you want to build…"
+											: "Configure a provider key to start"
 						}
 						ref={composerRef}
 					/>
@@ -673,9 +704,12 @@ function AgentChatPane({
 					</p>
 				</div>
 				<DemoCredentialSettings
+					deploymentEnabled={deploymentEnabled}
+					deploymentKnown={hostedChat !== null}
+					hostedStatus={hostedCredentialStatus}
 					onClear={clearDemoCredentials}
 					onSave={onSaveCredentials}
-					status={credentialStatus}
+					pageStatus={credentialStatus}
 				/>
 				<Button
 					aria-label="Clear conversation"
@@ -737,10 +771,14 @@ function AgentChatPane({
 									}
 									key={message.id}
 									message={message}
-									onRegenerate={() => {
-										clearError();
-										void regenerate({ messageId: message.id });
-									}}
+									onRegenerate={
+										canSend
+											? () => {
+													clearError();
+													void regenerate({ messageId: message.id });
+												}
+											: undefined
+									}
 								/>
 							))
 						)}

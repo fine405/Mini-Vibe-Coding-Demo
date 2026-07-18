@@ -1,12 +1,17 @@
 import "@tanstack/react-start/server-only";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import type { HostedChatStatus } from "@/modules/providers/types";
 import type { ChatModelResolver } from "@/server/agent/chat";
 import { createChatResponse } from "@/server/agent/chat";
 import {
 	HttpResearchGateway,
 	type ResearchGateway,
 } from "@/server/agent/research-gateway";
+import {
+	readHostedChatStatus,
+	readHostedTavilyApiKey,
+} from "@/server/chat-runtime-config";
 import {
 	EnvironmentProviderConfigSource,
 	ProviderCatalog,
@@ -17,6 +22,7 @@ export interface ApiDependencies {
 	modelResolver?: ChatModelResolver;
 	researchGateway?: ResearchGateway;
 	researchGatewayForTavilyKey?: (apiKey: string) => ResearchGateway;
+	hostedChat?: HostedChatStatus;
 }
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -24,14 +30,12 @@ export function createApi(dependencies: ApiDependencies = {}) {
 	const providerCatalog =
 		dependencies.providerCatalog ??
 		new ProviderCatalog(new EnvironmentProviderConfigSource());
-	const researchGateway =
-		dependencies.researchGateway ??
-		new HttpResearchGateway({ tavilyApiKey: process.env.TAVILY_API_KEY });
-	const researchGatewayForTavilyKey =
-		dependencies.researchGatewayForTavilyKey ??
-		(dependencies.researchGateway
-			? undefined
-			: (apiKey: string) => new HttpResearchGateway({ tavilyApiKey: apiKey }));
+	const hostedChat =
+		dependencies.hostedChat ?? readHostedChatStatus(process.env);
+	const publicHostedChat: HostedChatStatus = {
+		enabled: hostedChat.enabled,
+		tavilyConfigured: hostedChat.tavilyConfigured,
+	};
 
 	api.use("*", async (context, next) => {
 		const requestId =
@@ -62,6 +66,20 @@ export function createApi(dependencies: ApiDependencies = {}) {
 		}
 		context.header("X-Content-Type-Options", "nosniff");
 		context.header("X-Request-Id", requestId);
+	});
+	api.use("/chat", async (context, next) => {
+		if (context.req.method === "POST" && !hostedChat.enabled) {
+			return context.json(
+				{
+					error: {
+						code: "CHAT_DISABLED",
+						message: "Chat is disabled by the deployment configuration",
+					},
+				},
+				503,
+			);
+		}
+		await next();
 	});
 	api.use(
 		"/chat",
@@ -100,7 +118,10 @@ export function createApi(dependencies: ApiDependencies = {}) {
 		context.json({ ok: true, service: "mini-lovable-agent" }),
 	);
 	api.get("/providers", (context) =>
-		context.json({ providers: providerCatalog.listPublic() }),
+		context.json({
+			providers: providerCatalog.listPublic(),
+			hostedChat: publicHostedChat,
+		}),
 	);
 	api.post("/download", async (context) => {
 		const invalidDownload = () =>
@@ -159,14 +180,26 @@ export function createApi(dependencies: ApiDependencies = {}) {
 			},
 		});
 	});
-	api.post("/chat", (context) =>
-		createChatResponse(context.req.raw, context.get("requestId"), {
+	api.post("/chat", (context) => {
+		const researchGateway =
+			dependencies.researchGateway ??
+			new HttpResearchGateway({
+				tavilyApiKey: readHostedTavilyApiKey(process.env),
+			});
+		const researchGatewayForTavilyKey =
+			dependencies.researchGatewayForTavilyKey ??
+			(dependencies.researchGateway
+				? undefined
+				: (apiKey: string) =>
+						new HttpResearchGateway({ tavilyApiKey: apiKey }));
+
+		return createChatResponse(context.req.raw, context.get("requestId"), {
 			providerCatalog,
 			modelResolver: dependencies.modelResolver,
 			researchGateway,
 			researchGatewayForTavilyKey,
-		}),
-	);
+		});
+	});
 
 	api.notFound((context) =>
 		context.json(

@@ -70,6 +70,7 @@ Coding Agent 标题栏的设置按钮允许临时填写 `DEEPSEEK_API_KEY` 和 `
 - 不写入 localStorage、sessionStorage、IndexedDB、Cookie、URL、消息历史或项目导出。
 - 刷新、关闭、离开页面或卸载 Chat 面板后不会恢复；“Clear page credentials” 会先停止当前 Agent 请求。
 - 临时值存在时优先于同名服务端环境变量；没有临时值时，本地 `.env.local` 和托管平台 Secret 的原路径保持不变。
+- 服务端 `CHAT_ENABLED` 总开关优先级更高；关闭时页面 BYOK 也不能保存或发起 Chat。
 - 保存不会主动请求 DeepSeek/Tavily 验证 Key，只有实际 Chat/Research 调用才可能产生费用。
 
 浏览器 DevTools Network、同源脚本和浏览器扩展仍可能看到页面输入的 Key，JavaScript 字符串也无法保证物理清零。只在可信 HTTPS 演示页面使用低额度、可撤销的专用 Key，用后从 Provider 控制台轮换或吊销。
@@ -130,7 +131,7 @@ POST /api/chat → Hono → Mastra coding agent
 ## API
 
 - `GET /api/health`：运行状态
-- `GET /api/providers`：公开 Provider/模型描述及 `configured` 状态，不包含 key
+- `GET /api/providers`：公开 Provider/模型描述、`configured` 与 `hostedChat` 布尔状态，不包含 key
 - `POST /api/chat`：AI SDK v6 UI message stream
 
 ## 开发与验证
@@ -166,7 +167,7 @@ pnpm start
 
 推荐把演示者自己的 Key 配置为托管平台的加密 Secret，而不是在页面中填写：
 
-1. 在平台项目的 Production/Preview 环境变量中添加 `DEEPSEEK_API_KEY` 和可选的 `TAVILY_API_KEY`，不要添加 `VITE_` 前缀。
+1. 只在确实需要 Chat 的 Production/Preview 环境中添加 `DEEPSEEK_API_KEY`、可选的 `TAVILY_API_KEY`，并为每个持有 Key 的环境显式配置自己的 `CHAT_ENABLED=true`；不要添加 `VITE_` 前缀。
 2. 确认变量只对服务端运行时可见，并关闭反向代理/APM 的请求正文与敏感 Header 采集。
 3. 重新部署或重启 Node runtime；环境变量变更不会自动进入已经运行的实例。
 4. 为演示站点增加登录或访问密码、用户级限流和额度上限；同源校验不能替代身份认证。
@@ -179,10 +180,56 @@ curl -fsS https://YOUR_DEMO_HOST/api/providers
 ```
 
 - `/api/health` 应返回 `ok: true`。
-- `/api/providers` 中 DeepSeek 应为 `configured: true`，响应中不得出现 Key 或 Key 片段。
+- `/api/providers` 中 DeepSeek 应为 `configured: true`、`hostedChat.enabled` 应为 `true`，配置 Tavily 时 `hostedChat.tavilyConfigured` 也应为 `true`；响应中不得出现 Key 或 Key 片段。
+- 打开 Demo credentials 设置，DeepSeek/Tavily 应显示 “Configured by hosted environment”，输入框中不会出现托管 Key。
 - 不打开 Demo credentials，选择 DeepSeek 发一条简单请求；成功表示托管平台 `DEEPSEEK_API_KEY` 路径有效。
 - 再询问一个需要当前网页信息的问题；消息时间线应出现 `web_search` 和来源列表，表示托管平台 `TAVILY_API_KEY` 路径有效。
 - 在浏览器 Network 中确认 `/api/chat` 响应包含 `Cache-Control: no-store`，且应用响应和控制台日志没有 Key。平台日志也不应采集请求 body。
+
+### Vercel Chat 流量开关
+
+`CHAT_ENABLED` 是服务端总开关，控制托管 Key 和页面一次性 BYOK 的所有新 Chat 请求：
+
+- 未配置时保持向后兼容，Chat 启用。
+- 去除前后空白后，只有大小写不敏感的 `true` 表示启用。
+- `false`、空值或其他配置值都会 fail closed：`POST /api/chat` 在读取请求体和调用 DeepSeek/Tavily 前返回 `503 CHAT_DISABLED`。
+
+该变量按 Vercel environment/deployment 生效，不是跨 Production、Preview 和 Custom Environment 的账户级总开关。为了让下面的 Production 切换成为唯一线上入口，最简单的做法是只在 Production 放 Provider Key；如果 Preview/Custom 也持有 Key，必须在各自环境中单独配置并切换 `CHAT_ENABLED`。
+
+Vercel Dashboard 快速切换：
+
+1. 打开 Project → Settings → Environment Variables，搜索 `CHAT_ENABLED`。
+2. 编辑 Production 值为 `false`（关）或 `true`（开）；首次使用则新增该变量并只勾选 Production。
+3. 打开 Deployments，找到当前 Production deployment，选择 Redeploy。
+4. 等 Production 域名切换到新 deployment 后执行下方验证。
+
+已经安装并登录 Vercel CLI 时，可以在已 `vercel link` 的项目目录运行：
+
+```bash
+# 首次添加；按提示输入 true
+vercel env add CHAT_ENABLED production
+
+# 后续切换；按提示输入 false 或 true，--yes 只跳过更新确认
+vercel env update CHAT_ENABLED production --yes
+
+# 使用 Deployments 页面中的 immutable deployment URL 或 deployment ID
+vercel redeploy <production-deployment-id-or-url>
+```
+
+环境变量修改不会进入旧 deployment，必须 Redeploy。每次切换后先验证公开状态：
+
+```bash
+curl -sS https://YOUR_DEMO_HOST/api/providers
+
+# 关闭时应返回 HTTP 503、CHAT_DISABLED 和 Cache-Control: no-store
+curl -i -X POST https://YOUR_DEMO_HOST/api/chat \
+  -H 'content-type: application/json' \
+  --data '{}'
+```
+
+关闭后，`hostedChat.enabled` 应为 `false`，页面应提示 “Disabled by deployment”，输入、建议和一次性 Key 保存均不可用；上述 Chat 请求应为 `503`，Vercel/上游日志不应出现新的模型或 Tavily 调用。开启后，`hostedChat.enabled` 应为 `true`，再从 Production 域名发一条低成本受控 Chat，并按前述步骤验证 DeepSeek 与 Tavily。
+
+旧 deployment URL 会保留创建时的旧环境变量，即使 Production 域名已指向新 deployment 也可能继续可访问。紧急停流时不要只依赖此开关：同时启用 Vercel Deployment Protection，必要时立即在 DeepSeek/Tavily 控制台吊销或轮换 Key。
 
 验证一次性 BYOK 流程时，最好使用没有配置 DeepSeek/Tavily Secret 的独立 Preview 部署：
 

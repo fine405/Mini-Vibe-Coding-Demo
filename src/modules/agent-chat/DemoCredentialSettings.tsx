@@ -17,23 +17,39 @@ import type {
 } from "@/modules/agent-chat/ephemeral-credentials";
 
 interface DemoCredentialSettingsProps {
-	status: EphemeralCredentialStatus;
+	deploymentEnabled: boolean;
+	deploymentKnown: boolean;
+	hostedStatus: EphemeralCredentialStatus;
+	pageStatus: EphemeralCredentialStatus;
 	onSave(credentials: EphemeralCredentials): void;
 	onClear(): Promise<void>;
 }
 
-function CredentialStatus({ configured }: { configured: boolean }) {
-	return (
-		<span className="text-[11px] text-muted-foreground">
-			{configured
-				? "Configured for this page"
-				: "Uses server configuration when available"}
-		</span>
-	);
+function CredentialStatus({
+	deploymentEnabled,
+	deploymentKnown,
+	hostedConfigured,
+	pageConfigured,
+}: {
+	deploymentEnabled: boolean;
+	deploymentKnown: boolean;
+	hostedConfigured: boolean;
+	pageConfigured: boolean;
+}) {
+	let label = "Not configured";
+	if (!deploymentKnown) label = "Configuration unavailable";
+	else if (!deploymentEnabled) label = "Disabled by deployment";
+	else if (pageConfigured) label = "Configured for this page";
+	else if (hostedConfigured) label = "Configured by hosted environment";
+
+	return <span className="text-[11px] text-muted-foreground">{label}</span>;
 }
 
 export function DemoCredentialSettings({
-	status,
+	deploymentEnabled,
+	deploymentKnown,
+	hostedStatus,
+	pageStatus,
 	onSave,
 	onClear,
 }: DemoCredentialSettingsProps) {
@@ -42,7 +58,13 @@ export function DemoCredentialSettings({
 	const [tavilyApiKey, setTavilyApiKey] = useState("");
 	const [clearing, setClearing] = useState(false);
 	const hasDraft = Boolean(deepseekApiKey.trim() || tavilyApiKey.trim());
-	const hasCredentials = status.deepseekConfigured || status.tavilyConfigured;
+	const hasPageCredentials =
+		pageStatus.deepseekConfigured || pageStatus.tavilyConfigured;
+	const isConfigured =
+		deploymentEnabled &&
+		(hasPageCredentials ||
+			hostedStatus.deepseekConfigured ||
+			hostedStatus.tavilyConfigured);
 
 	const clearDraft = () => {
 		setDeepseekApiKey("");
@@ -53,6 +75,7 @@ export function DemoCredentialSettings({
 		if (!nextOpen) clearDraft();
 	};
 	const handleSave = () => {
+		if (!deploymentEnabled) return;
 		onSave({ deepseekApiKey, tavilyApiKey });
 		clearDraft();
 		setOpen(false);
@@ -78,7 +101,7 @@ export function DemoCredentialSettings({
 					variant="ghost"
 				>
 					<Settings2Icon />
-					{hasCredentials ? (
+					{isConfigured ? (
 						<span
 							aria-hidden="true"
 							className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-emerald-500"
@@ -93,8 +116,11 @@ export function DemoCredentialSettings({
 						Demo credentials
 					</DialogTitle>
 					<DialogDescription>
-						Temporary BYOK values for this page only. Hosted platform secrets
-						remain the safer default.
+						{!deploymentKnown
+							? "Hosted configuration is unavailable. Reload the provider catalog before adding page credentials."
+							: deploymentEnabled
+								? "Temporary BYOK values for this page only. Hosted platform secrets remain the safer default."
+								: "Chat is disabled by CHAT_ENABLED. Redeploy with it set to true before adding page credentials."}
 					</DialogDescription>
 				</DialogHeader>
 
@@ -104,15 +130,21 @@ export function DemoCredentialSettings({
 							<label className="font-mono text-xs" htmlFor="demo-deepseek-key">
 								DEEPSEEK_API_KEY
 							</label>
-							<CredentialStatus configured={status.deepseekConfigured} />
+							<CredentialStatus
+								deploymentEnabled={deploymentEnabled}
+								deploymentKnown={deploymentKnown}
+								hostedConfigured={hostedStatus.deepseekConfigured}
+								pageConfigured={pageStatus.deepseekConfigured}
+							/>
 						</div>
 						<Input
 							autoComplete="off"
+							disabled={!deploymentEnabled}
 							id="demo-deepseek-key"
 							maxLength={512}
 							onChange={(event) => setDeepseekApiKey(event.target.value)}
 							placeholder={
-								status.deepseekConfigured
+								pageStatus.deepseekConfigured
 									? "Enter a new value to replace it"
 									: "sk-…"
 							}
@@ -127,15 +159,21 @@ export function DemoCredentialSettings({
 							<label className="font-mono text-xs" htmlFor="demo-tavily-key">
 								TAVILY_API_KEY
 							</label>
-							<CredentialStatus configured={status.tavilyConfigured} />
+							<CredentialStatus
+								deploymentEnabled={deploymentEnabled}
+								deploymentKnown={deploymentKnown}
+								hostedConfigured={hostedStatus.tavilyConfigured}
+								pageConfigured={pageStatus.tavilyConfigured}
+							/>
 						</div>
 						<Input
 							autoComplete="off"
+							disabled={!deploymentEnabled}
 							id="demo-tavily-key"
 							maxLength={512}
 							onChange={(event) => setTavilyApiKey(event.target.value)}
 							placeholder={
-								status.tavilyConfigured
+								pageStatus.tavilyConfigured
 									? "Enter a new value to replace it"
 									: "tvly-…"
 							}
@@ -157,7 +195,7 @@ export function DemoCredentialSettings({
 
 				<DialogFooter className="sm:justify-between">
 					<Button
-						disabled={!hasCredentials || clearing}
+						disabled={!hasPageCredentials || clearing}
 						onClick={() => void handleClear()}
 						variant="destructive"
 					>
@@ -167,7 +205,10 @@ export function DemoCredentialSettings({
 						<Button onClick={() => handleOpenChange(false)} variant="outline">
 							Cancel
 						</Button>
-						<Button disabled={!hasDraft || clearing} onClick={handleSave}>
+						<Button
+							disabled={!deploymentEnabled || !hasDraft || clearing}
+							onClick={handleSave}
+						>
 							Save for this page
 						</Button>
 					</div>

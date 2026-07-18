@@ -19,6 +19,12 @@ export interface ModelSelection {
 	modelId: string;
 }
 
+export interface HostedChatStatus {
+	enabled: boolean;
+	tavilyConfigured: boolean;
+}
+
 export interface ProvidersResponse {
 	providers: PublicProvider[];
+	hostedChat: HostedChatStatus;
 }
