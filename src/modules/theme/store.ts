@@ -27,6 +27,9 @@ const getSystemTheme = (): ResolvedTheme => {
 const resolveTheme = (mode: ThemeMode): ResolvedTheme =>
 	mode === "night" ? "dark" : "light";
 
+const getRandomMode = (): ThemeMode =>
+	THEME_MODES[Math.floor(Math.random() * THEME_MODES.length)] ?? "night";
+
 // Older versions persisted light, dark, or auto; fold them into explicit modes.
 const normalizeMode = (mode: unknown): ThemeMode => {
 	if (THEME_MODES.includes(mode as ThemeMode)) return mode as ThemeMode;
@@ -64,7 +67,12 @@ export const useThemeStore = create<ThemeState>()(
 			onRehydrateStorage: () => (state) => {
 				// When storage loads, apply the theme immediately
 				if (state) {
-					const mode = normalizeMode(state.mode);
+					const hasStoredPreference =
+						typeof window !== "undefined" &&
+						window.localStorage.getItem(THEME_STORAGE_KEY) !== null;
+					const mode = hasStoredPreference
+						? normalizeMode(state.mode)
+						: getRandomMode();
 					state.setMode(mode);
 				}
 			},

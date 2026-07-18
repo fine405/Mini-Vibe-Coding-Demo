@@ -1,4 +1,12 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { useThemeStore } from "@/modules/theme/store";
 import type { ResolvedTheme, ThemeMode } from "@/modules/theme/types";
 
@@ -30,6 +38,38 @@ describe("theme store", () => {
 			configurable: true,
 			value: originalMatchMedia,
 		});
+	});
+
+	afterEach(() => vi.restoreAllMocks());
+
+	it("chooses and persists a random theme when no preference exists", async () => {
+		vi.spyOn(Math, "random").mockReturnValue(0.45);
+
+		await useThemeStore.persist.rehydrate();
+
+		expect(useThemeStore.getState()).toMatchObject({
+			mode: "summer",
+			resolvedTheme: "light",
+		});
+		expect(
+			JSON.parse(localStorage.getItem("mini-lovable-theme") ?? "null"),
+		).toMatchObject({ state: { mode: "summer" } });
+	});
+
+	it("restores an existing theme preference without choosing a random one", async () => {
+		localStorage.setItem(
+			"mini-lovable-theme",
+			JSON.stringify({ state: { mode: "breeze" }, version: 0 }),
+		);
+		const random = vi.spyOn(Math, "random");
+
+		await useThemeStore.persist.rehydrate();
+
+		expect(useThemeStore.getState()).toMatchObject({
+			mode: "breeze",
+			resolvedTheme: "light",
+		});
+		expect(random).not.toHaveBeenCalled();
 	});
 
 	it.each<[ThemeMode, ResolvedTheme]>([

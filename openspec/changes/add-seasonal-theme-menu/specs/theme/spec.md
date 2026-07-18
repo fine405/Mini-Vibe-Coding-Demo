@@ -88,17 +88,18 @@ The system SHALL support five explicit theme modes: `day`, `night`, `summer`, `d
 
 ### Requirement: Theme Persistence
 
-The system SHALL persist the selected explicit ThemeMode to localStorage and restore a valid mode on page load.
+The system SHALL persist a selected or randomly initialized explicit ThemeMode to localStorage and restore a valid mode on page load.
 
 #### Scenario: Theme restored on page reload
 - **GIVEN** the user previously selected any of the five supported themes
 - **WHEN** the user reloads the page
 - **THEN** the same ThemeMode and its resolved color scheme are restored
 
-#### Scenario: First-time visitor defaults to Night
+#### Scenario: First-time visitor receives a random theme
 - **GIVEN** no theme preference exists in localStorage
 - **WHEN** the user visits the application
-- **THEN** the application uses Night and the existing dark color scheme
+- **THEN** the application randomly selects one of the five supported ThemeModes
+- **AND** the selected mode and its resolved color scheme are applied and persisted
 
 #### Scenario: Legacy explicit preference is migrated
 - **GIVEN** localStorage contains the legacy mode `light` or `dark`
@@ -118,6 +119,7 @@ The system SHALL provide a dedicated Theme menu in the Header, separate from the
 #### Scenario: Theme trigger is visible
 - **WHEN** the Header is displayed
 - **THEN** a Theme trigger is visible between the Command Palette trigger and the More trigger
+- **AND** the trigger displays the active theme icon without a text label
 - **AND** its accessible name identifies the active theme
 
 #### Scenario: Theme menu lists available modes

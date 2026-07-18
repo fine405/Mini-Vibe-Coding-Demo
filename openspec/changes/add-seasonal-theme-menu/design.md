@@ -2,7 +2,7 @@
 
 当前 `ThemeMode` 与 `ResolvedTheme` 都只有 `light | dark`，Header 通过 `ThemeToggle` 直接翻转二者。Monaco 与 Sandpack Preview 依赖 `ResolvedTheme`，CSS 则通过根元素 `data-theme` 与 `.dark` 类切换 token。
 
-现有 OpenSpec 仍描述已经不存在的 `auto` 模式和三态循环按钮，与实际代码不一致。本变更会在增加季节主题的同时，让 spec 与当前 Night 默认、显式配色选择及 legacy `auto` 迁移行为重新一致。
+现有 OpenSpec 仍描述已经不存在的 `auto` 模式和三态循环按钮，与实际代码不一致。本变更会在增加季节主题的同时，让 spec 与随机初始主题、显式配色选择及 legacy `auto` 迁移行为重新一致。
 
 dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `object-fit: cover`、`object-position: top`、`mix-blend-mode: multiply` 与 700ms opacity transition；同时循环播放 `forest.mp3` 森林环境声。本项目暂时直接复用这两个文件及其成对启停行为，还原完整 Demo 效果。
 
@@ -38,11 +38,11 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 
 `resolveTheme(mode)` 是唯一映射点。Editor、Diff 和 Preview 不感知季节 ThemeMode，继续通过 `ResolvedTheme` 获得 light/dark，避免把视频效果耦合进编辑器主题。
 
-默认值继续保持当前行为：首次访问为 `night`。持久化仍只保存 `mode`。读取旧存储时，`light → day`、`dark → night`；legacy `auto` 根据当前系统配色一次性归一为 `day` 或 `night`，之后不继续监听系统变化。
+本地没有主题偏好时，首次 hydration 通过 `Math.random` 从五个 `ThemeMode` 中等概率选择一个，并立即持久化该 `mode`，因此后续刷新保持稳定。已有偏好不调用随机逻辑。读取旧存储时，`light → day`、`dark → night`；legacy `auto` 根据当前系统配色一次性归一为 `day` 或 `night`，之后不继续监听系统变化。
 
 ### 2. Theme 是 Header 一级菜单
 
-`WorkbenchHeader` 的右侧顺序保持为：Command Palette → Theme → More。Theme trigger 使用紧凑的图标与 `Theme` 文本，并通过 aria-label 暴露当前主题；More 菜单不出现 Theme 子项。
+`WorkbenchHeader` 的右侧顺序保持为：Command Palette → Theme → More。Theme trigger 仅显示当前主题图标与下拉箭头，并通过 aria-label 暴露当前主题；More 菜单不出现 Theme 子项。
 
 菜单使用现有 Radix Dropdown primitives。每行左侧显示主题图标/选中标记，中间显示 label；Drizzle 与 Breeze 带弱化 `Soon`；最右侧用现有 `DropdownMenuShortcut` 显示单字母。选择任意项后立即更新 store 并关闭菜单。
 
@@ -101,6 +101,7 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 3. 下载并校验 dany.works Summer 视频与森林环境声，作为本地 Demo 资源记录来源与临时使用限制。
 4. 挂载 Summer overlay 与 audio，验证成对播放/暂停、自动播放降级、层级、淡入和 pointer 行为。
 5. 更新快捷键文档，运行主题/Header 相关测试及完整 `pnpm check`。
+6. 为无持久化偏好的首次 hydration 随机选择并保存主题，已有偏好继续按原值恢复。
 
 回滚时可移除 Overlay 与新菜单，并把已存的季节 mode 通过同一 normalize 逻辑回退为 Day/Night；Workspace 数据不受影响。
 
