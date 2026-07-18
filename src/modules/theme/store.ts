@@ -8,6 +8,14 @@ import type {
 
 const THEME_STORAGE_KEY = "mini-lovable-theme";
 
+const THEME_MODES: ThemeMode[] = [
+	"day",
+	"night",
+	"summer",
+	"drizzle",
+	"breeze",
+];
+
 // Helper to get system theme, used to migrate legacy "auto" preferences
 const getSystemTheme = (): ResolvedTheme => {
 	if (typeof window === "undefined") return "dark";
@@ -16,10 +24,15 @@ const getSystemTheme = (): ResolvedTheme => {
 		: "light";
 };
 
-// Older versions persisted "auto" as a mode; fold it into a concrete theme
+const resolveTheme = (mode: ThemeMode): ResolvedTheme =>
+	mode === "night" ? "dark" : "light";
+
+// Older versions persisted light, dark, or auto; fold them into explicit modes.
 const normalizeMode = (mode: unknown): ThemeMode => {
-	if (mode === "light" || mode === "dark") return mode;
-	return getSystemTheme();
+	if (THEME_MODES.includes(mode as ThemeMode)) return mode as ThemeMode;
+	if (mode === "light") return "day";
+	if (mode === "dark") return "night";
+	return getSystemTheme() === "dark" ? "night" : "day";
 };
 
 // Apply theme to document
@@ -36,12 +49,13 @@ const applyTheme = (theme: ResolvedTheme) => {
 export const useThemeStore = create<ThemeState>()(
 	persist(
 		(set) => ({
-			mode: "dark", // Default to dark to match current behavior
+			mode: "night", // Default to dark to match current behavior
 			resolvedTheme: "dark",
 
 			setMode: (mode: ThemeMode) => {
-				set({ mode, resolvedTheme: mode });
-				applyTheme(mode);
+				const resolvedTheme = resolveTheme(mode);
+				set({ mode, resolvedTheme });
+				applyTheme(resolvedTheme);
 			},
 		}),
 		{
@@ -51,9 +65,7 @@ export const useThemeStore = create<ThemeState>()(
 				// When storage loads, apply the theme immediately
 				if (state) {
 					const mode = normalizeMode(state.mode);
-					state.mode = mode;
-					state.resolvedTheme = mode;
-					applyTheme(mode);
+					state.setMode(mode);
 				}
 			},
 		},
@@ -64,6 +76,7 @@ export const useThemeStore = create<ThemeState>()(
 export const initTheme = () => {
 	const state = useThemeStore.getState();
 	const mode = normalizeMode(state.mode);
-	useThemeStore.setState({ mode, resolvedTheme: mode });
-	applyTheme(mode);
+	const resolvedTheme = resolveTheme(mode);
+	useThemeStore.setState({ mode, resolvedTheme });
+	applyTheme(resolvedTheme);
 };

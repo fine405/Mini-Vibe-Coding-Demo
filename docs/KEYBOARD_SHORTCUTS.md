@@ -15,6 +15,17 @@
 - **⌘1** - Toggle Chat Panel
 - **⌘2** - Toggle Console Panel
 
+## Themes
+
+- **D** - Day
+- **N** - Night
+- **S** - Summer (leaf shadows and forest ambience)
+- **R** - Drizzle (effect coming soon)
+- **B** - Breeze (effect coming soon)
+
+Theme shortcuts only work outside inputs, textareas, selects, editable content,
+and the Monaco editor. Meta/Ctrl/Alt combinations do not switch themes.
+
 ## Chat
 - **⌘Enter** or **Ctrl+Enter** - Send chat message (in chat input)
 

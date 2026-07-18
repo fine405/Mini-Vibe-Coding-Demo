@@ -15,7 +15,7 @@ import {
 	TerminalSquare,
 	Upload,
 } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ThemeMenu } from "@/components/ThemeMenu";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -147,7 +147,7 @@ export function WorkbenchHeader({
 						<kbd className="text-[10px] leading-none text-fg-muted">⌘K</kbd>
 					</Button>
 
-					<ThemeToggle />
+					<ThemeMenu />
 
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
