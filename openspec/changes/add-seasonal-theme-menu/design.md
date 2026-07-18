@@ -6,6 +6,8 @@
 
 dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `object-fit: cover`、`object-position: top`、`mix-blend-mode: multiply` 与 700ms opacity transition；同时循环播放 `forest.mp3` 森林环境声。本项目暂时直接复用这两个文件及其成对启停行为，还原完整 Demo 效果。
 
+用户已取得指定 YouTube 视频作者许可，并要求截取该视频原声 `0:00–1:00` 作为 Drizzle 的循环背景声。Drizzle 只增加音频，不增加雨滴、雾面或颜色动画。
+
 ## Goals / Non-Goals
 
 ### Goals
@@ -14,12 +16,12 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 - 把用户选择的 Theme 与组件实际消费的 light/dark color scheme 分开。
 - 让 Summer 在现有 UI 之上产生不阻断操作的全屏叶影与森林环境声。
 - 让 Day/Night 获得细密但不影响文字清晰度的噪声质感。
-- 让 Drizzle、Breeze 与 Snow 的后续效果无需再次迁移持久化状态或菜单契约。
+- 让 Drizzle 获得独立雨声，并让 Breeze 与 Snow 的后续效果无需再次迁移持久化状态或菜单契约。
 - 保持现有 Day/Night token、Monaco theme 与 Preview theme 行为不变。
 
 ### Non-Goals
 
-- 本阶段不实现 Drizzle 的雨滴、雾面、声音或颜色动画。
+- 本阶段不实现 Drizzle 的雨滴、雾面或颜色动画。
 - 本阶段不实现 Breeze 的黄色枫叶粒子、风场或物理系统。
 - 本阶段不实现 Snow 的雪花、积雪、声音或颜色动画。
 - 不复制 dany.works 的 Rain/Midnight/Chaos 模式或移动端 Logo 手势。
@@ -36,7 +38,7 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 | `day` | Day | `D` | `light` | 现有浅色主题 |
 | `night` | Night | `N` | `dark` | 现有深色主题 |
 | `summer` | Summer | `S` | `light` | 全屏叶影视频 + 森林环境声 |
-| `drizzle` | Drizzle | `R` | `light` | Day 基线，菜单显示 `Soon` |
+| `drizzle` | Drizzle | `R` | `light` | Day 基线 + 循环雨声 |
 | `breeze` | Breeze | `B` | `light` | Day 基线，菜单显示 `Soon` |
 | `snow` | Snow | `W` | `light` | Day 基线，菜单显示 `Soon` |
 
@@ -48,9 +50,9 @@ dany.works 当前 Summer 由两部分组成：全屏 fixed `leaves.mp4` 使用 `
 
 `WorkbenchHeader` 的右侧顺序保持为：Command Palette → Theme → More。Theme trigger 仅显示当前主题图标与下拉箭头，并通过 aria-label 暴露当前主题；More 菜单不出现 Theme 子项。
 
-菜单使用现有 Radix Dropdown primitives。每行左侧显示主题图标/选中标记，中间显示 label；Drizzle、Breeze 与 Snow 带弱化 `Soon`；最右侧用现有 `DropdownMenuShortcut` 显示单字母。选择任意项后立即更新 store 并关闭菜单。
+菜单使用现有 Radix Dropdown primitives。每行左侧显示主题图标/选中标记，中间显示 label；Breeze 与 Snow 带弱化 `Soon`；最右侧用现有 `DropdownMenuShortcut` 显示单字母。选择任意项后立即更新 store 并关闭菜单。
 
-不使用 disabled placeholder：Drizzle、Breeze 与 Snow 是真实、可持久化的 ThemeMode，只是当前视觉与 Day 相同。这保证菜单、快捷键和后续效果接入使用同一状态契约。
+不使用 disabled placeholder：Drizzle、Breeze 与 Snow 都是真实、可持久化的 ThemeMode。Drizzle 播放雨声但视觉仍与 Day 相同；Breeze 与 Snow 暂时完全沿用 Day。这保证菜单、快捷键和后续效果接入使用同一状态契约。
 
 ### 3. 单字母快捷键只在非编辑上下文生效
 
@@ -94,13 +96,20 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 
 `ThemeNoiseTexture` 固定覆盖工作台、pointer-events none，层级为 z-30，低于 Summer 视频 z-40 和 Radix 菜单 z-50。Night 采用参考站的 10% opacity；Day 采用参考站的 15% opacity，但将应用的页面基底从中性灰改为浅暖白 `#F3F2F1`。Summer、Drizzle、Breeze、Snow 中 opacity 为 0，避免尚未设计的季节主题意外继承颗粒效果。
 
+### 7. Drizzle 使用授权雨声的前 60 秒
+
+指定来源为 `https://www.youtube.com/watch?v=dGwbIjhDhOE`，用户确认已取得视频作者许可。只截取原声音频 `0:00–1:00` 并转为本地 MP3，不下载或随应用分发其余内容。资源的下载日期、处理方式、媒体参数和 SHA-256 记录在 `public/themes/SOURCE.md`。
+
+常驻的 `DrizzleThemeAudio` 持有不可见 `<audio loop preload="none">`。进入 Drizzle 时播放；离开时 `pause()` 并把 `currentTime` 归零；恢复持久化 Drizzle 时若有声自动播放被浏览器阻止，在下一次 pointer/keyboard 用户交互重试。播放失败静默降级，不改变主题状态或工作台交互。
+
 ## Risks / Trade-offs
 
 - multiply overlay 会降低局部对比度，尤其是 Monaco 代码区 → Summer 是 Demo 氛围主题，保留 dany 的覆盖式效果；菜单层级高于视频，始终可切回。
-- Drizzle/Breeze/Snow 选择后与 Day 视觉相同，可能被误解为失效 → 菜单明确显示弱化 `Soon`，但仍保存真实 mode，为下一阶段保留稳定入口。
+- Drizzle 视觉与 Day 相同，可能被误解为未切换 → Drizzle 菜单项不显示 `Soon`，雨声提供可感知反馈；Breeze/Snow 继续显示弱化 `Soon`。
 - 原视频只有 720×1280，桌面 `cover` 会放大并裁掉大量竖向内容 → 先忠实复刻原站 Demo，通过实际桌面验收确认模糊程度；不做无信息增益的放大转码。
 - 有声自动播放在页面恢复时可能被浏览器拦截 → 显式主题切换直接播放；恢复场景保持视觉并在下一次用户交互重试音频。
 - 原视频和音频没有公开复用许可 → 仅作为本地 Demo 临时资产，公开部署前设置明确替换门槛。
+- Drizzle 雨声来自第三方视频 → 用户确认已取得作者许可，并在资源清单中记录来源与授权说明；仅截取所需 60 秒。
 - 全局字母键可能与应用交互冲突 → 严格排除 editable target 和 Meta/Ctrl/Alt 组合，并用测试覆盖输入框、contenteditable 与普通页面三类场景。
 - Zustand 旧存储包含 `light/dark/auto` → hydration 统一归一，避免旧值进入新 union 或产生错误闪烁。
 - 平铺位图可能产生可见重复或接缝 → 使用无方向性的细密灰度噪声，并在 Day/Night 桌面宽屏下检查重复边界、Monaco 与浅色 Preview；资源约 12 KB，只解码一次。
@@ -113,9 +122,10 @@ Theme 菜单组件挂载一次 window `keydown` listener，并使用固定映射
 4. 挂载 Summer overlay 与 audio，验证成对播放/暂停、自动播放降级、层级、淡入和 pointer 行为。
 5. 更新快捷键文档，运行主题/Header 相关测试及完整 `pnpm check`。
 6. 为无持久化偏好的 hydration 随机选择内存主题且不保存；仅主动选择写入偏好，已有偏好继续按原值恢复。
+7. 截取授权雨声前 60 秒，增加 Drizzle 音频生命周期与自动播放降级测试，并移除 Drizzle 的 `Soon` 标记。
 
 回滚时可移除 Overlay 与新菜单，并把已存的季节 mode 通过同一 normalize 逻辑回退为 Day/Night；Workspace 数据不受影响。
 
 ## Open Questions
 
-无。Drizzle、Breeze 与 Snow 的具体视觉将在独立后续 proposal 中确定。
+无。Drizzle 的具体视觉以及 Breeze、Snow 的完整效果将在独立后续 proposal 中确定。

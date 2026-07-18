@@ -49,3 +49,11 @@
 - [x] 7.1 先扩展 store、纹理和 Header 测试，覆盖 Snow 的浅色解析、占位菜单项、雪花图标、`W` 快捷键及无噪声效果。
 - [x] 7.2 将 Snow 接入 ThemeMode、随机初始化池、主题菜单和快捷键文档，保持 `Soon` 且不增加下雪视觉。
 - [x] 7.3 运行相关测试、typecheck、完整测试和范围 review。
+
+## 8. Drizzle Rain Ambience
+
+- [x] 8.1 用户确认已取得指定 YouTube 视频作者许可，并批准提取原声 `0:00–1:00` 作为 Drizzle 背景声。
+- [x] 8.2 下载授权来源的前 60 秒，转为本地 MP3，并记录来源、处理方式、时长、编码参数、文件大小与 SHA-256。
+- [x] 8.3 先增加测试，覆盖仅 Drizzle 激活时播放、离开时 pause/reset、循环、自动播放失败后交互重试，以及 Drizzle 菜单项移除 `Soon`。
+- [x] 8.4 实现 Drizzle 常驻音频组件并接入 Theme menu，不增加视觉层或其他主题行为。
+- [ ] 8.5 更新快捷键文档，运行相关测试、`pnpm typecheck`、完整 `pnpm check`，并完成范围 review。

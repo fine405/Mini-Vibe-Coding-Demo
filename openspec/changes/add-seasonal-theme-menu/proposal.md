@@ -12,7 +12,8 @@
 - 保留现有浅色/深色结构，并将面向用户的名称统一为 Day/Night；Day 的页面基底改为浅暖白 `#F3F2F1`；Day/Night 参考 lab01.dev 叠加不阻断交互的静态灰度噪声平铺纹理，共用 screen blend；Monaco 与 Preview 继续只消费解析后的 light/dark color scheme。
 - Summer 复用 dany.works 的完整氛围方式：在 Day 配色上叠加全屏循环叶影视频，并同步循环播放森林环境声；视频使用 `object-fit: cover`、`mix-blend-mode: multiply`、pointer-events none 与淡入淡出。
 - Summer 暂时直接使用 [dany.works/leaves.mp4](https://dany.works/leaves.mp4) 与 [dany.works/forest.mp3](https://dany.works/forest.mp3)：视频为 12 秒纯叶影循环，音频为约 196 秒森林环境声；实现时复制为本地 Demo 资源，不热链也不二次转码。
-- `Drizzle`、`Breeze` 和 `Snow` 本阶段作为可选择、可持久化的入口，暂时解析为 Day 配色并显示弱化的 `Soon` 状态，不增加雨滴、黄色枫叶、风场或下雪效果。
+- Drizzle 在 Day 配色上循环播放用户已获作者授权的雨声音频：从指定 YouTube 视频提取原声 `0:00–1:00`，转为本地 MP3 资源；不增加雨滴或雾面视觉层，菜单不再显示 `Soon`。
+- `Breeze` 和 `Snow` 本阶段继续作为可选择、可持久化的入口，暂时解析为 Day 配色并显示弱化的 `Soon` 状态，不增加黄色枫叶、风场或下雪效果。
 - 当本地没有主题偏好时，从六个主题中随机选择一个仅用于当前加载的初始主题，不写入 localStorage；只有菜单或快捷键的主动选择才持久化，已有偏好继续稳定恢复。
 - 更新主题与快捷键文档，并为状态迁移、菜单位置、快捷键输入保护和 Summer 视频/音频生命周期增加测试。
 
@@ -20,7 +21,7 @@
 
 - Affected specs: `theme`。
 - Affected code: `src/modules/theme/`、`src/components/ThemeToggle.tsx`（替换为菜单组件）、`src/components/ThemeMenu.tsx`、`src/modules/layout/WorkbenchHeader.tsx`、`docs/KEYBOARD_SHORTCUTS.md` 及相关测试。
-- Assets: 新增来自 dany.works 的临时 Summer 背景 MP4 与森林环境声 MP3，以及项目本地生成的 256×256 灰度噪声 PNG。原站媒体未声明可复用许可，因此仅用于当前本地 Demo，公开部署前必须取得许可或替换素材；噪声 PNG 不含第三方素材。
+- Assets: 新增来自 dany.works 的临时 Summer 背景 MP4 与森林环境声 MP3、用户已获作者授权的 YouTube 雨声前 60 秒 MP3，以及项目本地生成的 256×256 灰度噪声 PNG。资源来源、处理方式、校验值和授权说明记录在 `public/themes/SOURCE.md`。
 - Persistence: 继续使用 `mini-lovable-theme`；旧值 `light`、`dark`、`auto` 在读取时迁移为新 mode，不清空用户本地存储。
 - Dependencies: 不新增运行时依赖。
 - Non-breaking: Workspace、Agent、Editor、Preview 数据模型和现有 More 菜单动作均不变。
@@ -32,3 +33,5 @@
 同日用户要求先为“下雪天”增加主题入口，暂不实现视觉效果；因此在同一已批准的占位主题模型中增加 `Snow`、雪花图标和未冲突的 `W` 快捷键。
 
 同日用户进一步明确：随机初始主题不得固定在 localStorage 中，只有用户主动选择主题时才持久化。
+
+同日用户指定 `https://www.youtube.com/watch?v=dGwbIjhDhOE` 的原声音频前 1 分钟作为 Drizzle 背景声，并确认已取得视频作者许可、要求直接下载接入。

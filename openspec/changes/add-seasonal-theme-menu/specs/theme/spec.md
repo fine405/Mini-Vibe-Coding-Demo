@@ -48,15 +48,35 @@ The Summer theme SHALL apply the Day color scheme, display a non-interactive ful
 - **THEN** the selected Summer mode and Day color scheme remain active
 - **AND** the rest of the workbench remains operable
 
+### Requirement: Drizzle Rain Ambience
+
+The Drizzle theme SHALL apply the Day color scheme and loop the authorized first 60 seconds of the specified rain recording as audible background ambience without adding a visual overlay.
+
+#### Scenario: User enters Drizzle
+- **WHEN** the active theme changes to Drizzle
+- **THEN** the application resolves to the light color scheme
+- **AND** the rain ambience plays looped and audible
+- **AND** the menu does not identify Drizzle as coming later
+
+#### Scenario: User leaves Drizzle
+- **WHEN** the active theme changes from Drizzle to any other theme
+- **THEN** rain ambience playback pauses and resets to the beginning
+- **AND** the newly selected theme remains active
+
+#### Scenario: Audible playback is blocked during restoration
+- **GIVEN** Drizzle is restored from persisted state on page load
+- **WHEN** the browser blocks audible autoplay
+- **THEN** Drizzle and its Day color scheme remain active
+- **AND** rain ambience retries on the next pointer or keyboard user interaction
+
+#### Scenario: Rain playback cannot start
+- **WHEN** the browser rejects programmatic audio playback
+- **THEN** the selected Drizzle mode and Day color scheme remain active
+- **AND** the rest of the workbench remains operable
+
 ### Requirement: Placeholder Seasonal Themes
 
-The system SHALL expose Drizzle, Breeze, and Snow as selectable and persistable theme modes while their dedicated visual effects are pending.
-
-#### Scenario: User selects Drizzle placeholder
-- **WHEN** the user selects Drizzle from the menu or presses `R` on a non-editable surface
-- **THEN** Drizzle becomes the active persisted theme
-- **AND** the application uses the Day color scheme without a rain effect
-- **AND** the menu identifies the effect as coming later
+The system SHALL expose Breeze and Snow as selectable and persistable theme modes while their dedicated effects are pending.
 
 #### Scenario: User selects Breeze placeholder
 - **WHEN** the user selects Breeze from the menu or presses `B` on a non-editable surface

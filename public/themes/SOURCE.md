@@ -1,9 +1,10 @@
-# Summer demo media
+# Theme media sources
 
-These files are temporary local-demo assets copied from dany.works on
+The Summer files are temporary local-demo assets copied from dany.works on
 2026-07-18. The source site does not publish a reuse license for them. Obtain
-permission from the author or replace both files with licensed media before any
-public deployment, distribution, or commercial use.
+permission from the author or replace those files with licensed media before
+any public deployment, distribution, or commercial use. Drizzle permission is
+recorded separately with its asset below.
 
 ## `summer-leaves.mp4`
 
@@ -18,3 +19,16 @@ public deployment, distribution, or commercial use.
 - SHA-256: `db189a28c237a74f071b5dfa99463daac3cfdf9decd623e2f6e32d1d35141bec`
 - File: 1,961,805 bytes; 196.152 seconds; 24 kHz mono; 80 kbps MP3
 - Handling: original file; no trimming or transcoding
+
+## `drizzle-rain.mp3`
+
+- Source: <https://www.youtube.com/watch?v=dGwbIjhDhOE>
+- Source title: `✅世界公認最佳放鬆雷雨聲，樹林自然白噪音放鬆睡眠音樂雷雨聲…`
+- Author/channel: `自然音樂` (`@whitenoiseforsleeping`)
+- Permission: the user confirmed on 2026-07-18 that they obtained the
+  author's permission to use this excerpt
+- SHA-256: `ccc714cfcaa8e836b74468c9ebf2538e25c1eca2ea9939a59abb42b2c48f47c1`
+- File: 1,441,468 bytes; 60.029 seconds; 44.1 kHz stereo; 192 kbps MP3
+- Handling: source audio `0:00–1:00` only; transcoded from YouTube AAC to
+  MP3 with a 1 dB gain reduction to prevent clipping; no other source content
+  is included

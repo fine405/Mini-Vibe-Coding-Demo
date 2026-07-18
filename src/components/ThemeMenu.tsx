@@ -18,6 +18,7 @@ import {
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DrizzleThemeAudio } from "@/modules/theme/DrizzleThemeAudio";
 import { SummerThemeMedia } from "@/modules/theme/SummerThemeMedia";
 import { useThemeStore } from "@/modules/theme/store";
 import { ThemeNoiseTexture } from "@/modules/theme/ThemeNoiseTexture";
@@ -38,7 +39,6 @@ const THEME_OPTIONS: Array<{
 		label: "Drizzle",
 		shortcut: "R",
 		icon: CloudRain,
-		pending: true,
 	},
 	{
 		mode: "breeze",
@@ -109,6 +109,7 @@ export function ThemeMenu() {
 		<>
 			<ThemeNoiseTexture />
 			<SummerThemeMedia />
+			<DrizzleThemeAudio />
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button
@@ -127,17 +128,17 @@ export function ThemeMenu() {
 						value={mode}
 					>
 						{THEME_OPTIONS.map((option) => (
-							<DropdownMenuRadioItem key={option.mode} value={option.mode}>
+							<DropdownMenuRadioItem
+								className="grid grid-cols-[1rem_minmax(0,1fr)_2.5rem_1rem]"
+								key={option.mode}
+								value={option.mode}
+							>
 								<option.icon className="h-4 w-4 text-fg-muted" />
 								<span>{option.label}</span>
-								{option.pending && (
-									<span className="ml-auto text-[10px] text-fg-muted">
-										Soon
-									</span>
-								)}
-								<DropdownMenuShortcut
-									className={option.pending ? "ml-1 mr-4" : "mr-4"}
-								>
+								<span className="w-full text-right text-[10px] text-fg-muted">
+									{option.pending && "Soon"}
+								</span>
+								<DropdownMenuShortcut className="ml-0 w-full text-center">
 									{option.shortcut}
 								</DropdownMenuShortcut>
 							</DropdownMenuRadioItem>

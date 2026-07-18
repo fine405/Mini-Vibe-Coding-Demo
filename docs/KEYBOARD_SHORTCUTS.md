@@ -20,7 +20,7 @@
 - **D** - Day
 - **N** - Night
 - **S** - Summer (leaf shadows and forest ambience)
-- **R** - Drizzle (effect coming soon)
+- **R** - Drizzle (rain ambience)
 - **B** - Breeze (effect coming soon)
 - **W** - Snow (effect coming soon)
 
