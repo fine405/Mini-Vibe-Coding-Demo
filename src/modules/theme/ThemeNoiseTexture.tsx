@@ -13,12 +13,6 @@ export function ThemeNoiseTexture() {
 				mode === "day" && "opacity-15",
 			)}
 			data-testid="theme-noise-texture"
-		>
-			<svg>
-				<filter id="theme-noise-filter">
-					<feTurbulence baseFrequency="0.8" />
-				</filter>
-			</svg>
-		</figure>
+		/>
 	);
 }

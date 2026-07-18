@@ -120,7 +120,9 @@ body {
 }
 
 .theme-noise-texture {
-	filter: url("#theme-noise-filter") grayscale(100%);
+	background-image: url("/themes/noise.png");
+	background-repeat: repeat;
+	background-size: 128px 128px;
 	mix-blend-mode: screen;
 }
 

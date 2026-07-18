@@ -8,7 +8,7 @@ describe("ThemeNoiseTexture", () => {
 		useThemeStore.setState({ mode: "night", resolvedTheme: "dark" });
 	});
 
-	it("uses the Lab01 turbulence treatment for Night and Day", () => {
+	it("uses a pre-rendered noise texture for Night and Day", () => {
 		render(<ThemeNoiseTexture />);
 		const texture = screen.getByTestId("theme-noise-texture");
 
@@ -18,9 +18,7 @@ describe("ThemeNoiseTexture", () => {
 			"theme-noise-texture",
 			"opacity-10",
 		);
-		expect(
-			texture.querySelector("#theme-noise-filter feTurbulence"),
-		).toHaveAttribute("baseFrequency", "0.8");
+		expect(texture).toBeEmptyDOMElement();
 
 		act(() => useThemeStore.getState().setMode("day"));
 		expect(texture).toHaveClass("opacity-15");
