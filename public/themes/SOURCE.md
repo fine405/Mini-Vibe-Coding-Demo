@@ -55,3 +55,15 @@ user-provided file metadata; no reuse license was provided.
 - File: 8,133,469 bytes; 201.195 seconds; 44.1 kHz stereo; 320 kbps MP3
 - Handling: original file; no trimming or transcoding
 - Application playback: volume `0.5`
+
+## Snow theme visual effect
+
+- Inspiration: layered parallax snowfall from
+  <https://www.shadertoy.com/view/Mdt3Df> ("Snow (as shown in sweden)" by
+  Emil) and its sky-blue gradient palette (vec4(0.4, 0.8, 1.0) ≈ #66CCFF)
+- Implementation: original code, no source assets copied — the effect is a
+  procedural three.js particle system with sixteen crystal types generated
+  from stock primitives; the wintry theme palette is derived from the
+  reference gradient
+- Crystal taxonomy, ids, names, and spawn weights: product snow crystal
+  data table (see `src/modules/theme/snowflakes.ts`)

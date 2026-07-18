@@ -105,6 +105,48 @@
 	--accent-foreground: #ffffff;
 }
 
+/*
+ * Snow theme: wintry blue-gray palette inspired by the sky gradient in
+ * https://www.shadertoy.com/view/Mdt3Df (vec4(0.4, 0.8, 1.0) ≈ #66CCFF).
+ * The base sits clearly below white so snowfall stays readable, while the
+ * scheme remains a light one with dark text. The scene's haze color
+ * (SNOW_HAZE_COLOR in snowScene.ts) matches the gradient midpoint.
+ */
+:root[data-mode="snow"] {
+	--app-bg-primary: #b9cbdd;
+	--app-bg-secondary: #c8d6e5;
+	--app-bg-tertiary: #adc0d4;
+	--background: #b9cbdd;
+
+	--app-fg-primary: #1c2632;
+	--app-fg-secondary: #3a4a5d;
+	--app-fg-muted: #55677c;
+
+	--app-border-primary: #93a9bf;
+	--app-border-secondary: #b2c3d3;
+
+	--foreground: #1c2632;
+	--card: #c8d6e5;
+	--card-foreground: #1c2632;
+	--popover: #d2deea;
+	--popover-foreground: #1c2632;
+	--primary: #1c2632;
+	--primary-foreground: #eef4fa;
+	--secondary: #bccfdd;
+	--secondary-foreground: #1c2632;
+	--muted: #bccfdd;
+	--muted-foreground: #55677c;
+	--border: #93a9bf;
+	--input: #93a9bf;
+	--ring: #6e87a0;
+}
+
+/* Subtle overcast-sky gradient behind the snowfall. */
+:root[data-mode="snow"] body {
+	background-image: linear-gradient(to bottom, #9fb6cc, #cfdce9);
+	background-attachment: fixed;
+}
+
 a {
 	font-weight: 500;
 	color: #646cff;

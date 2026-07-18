@@ -101,6 +101,7 @@ describe("theme store", () => {
 				"data-theme",
 				resolvedTheme,
 			);
+			expect(document.documentElement).toHaveAttribute("data-mode", mode);
 			expect(document.documentElement.classList.contains("dark")).toBe(
 				resolvedTheme === "dark",
 			);

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DrizzleThemeAudio } from "@/modules/theme/DrizzleThemeAudio";
 import { SnowThemeAudio } from "@/modules/theme/SnowThemeAudio";
+import { SnowThemeCanvas } from "@/modules/theme/SnowThemeCanvas";
 import { SummerThemeMedia } from "@/modules/theme/SummerThemeMedia";
 import { useThemeStore } from "@/modules/theme/store";
 import { ThemeNoiseTexture } from "@/modules/theme/ThemeNoiseTexture";
@@ -111,6 +112,7 @@ export function ThemeMenu() {
 			<SummerThemeMedia />
 			<DrizzleThemeAudio />
 			<SnowThemeAudio />
+			<SnowThemeCanvas />
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button

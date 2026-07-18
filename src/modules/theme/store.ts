@@ -45,10 +45,13 @@ const normalizeMode = (mode: unknown): ThemeMode => {
 };
 
 // Apply theme to document
-const applyTheme = (theme: ResolvedTheme) => {
+const applyTheme = (theme: ResolvedTheme, mode: ThemeMode) => {
 	if (typeof document === "undefined") return;
 	const root = document.documentElement;
 	root.setAttribute("data-theme", theme);
+	// The full mode stays available so per-mode palettes (e.g. Snow's wintry
+	// blue) can override tokens without touching the light/dark scheme.
+	root.setAttribute("data-mode", mode);
 	root.classList.toggle("dark", theme === "dark");
 
 	// Update meta color-scheme for OS integration
@@ -64,7 +67,7 @@ export const useThemeStore = create<ThemeState>()(
 			setMode: (mode: ThemeMode) => {
 				const resolvedTheme = resolveTheme(mode);
 				set({ mode, resolvedTheme });
-				applyTheme(resolvedTheme);
+				applyTheme(resolvedTheme, mode);
 			},
 		}),
 		{
@@ -88,7 +91,7 @@ export const useThemeStore = create<ThemeState>()(
 			onRehydrateStorage: () => (state) => {
 				// When storage loads, apply the theme immediately
 				if (state) {
-					applyTheme(state.resolvedTheme);
+					applyTheme(state.resolvedTheme, state.mode);
 				}
 			},
 		},
@@ -98,5 +101,5 @@ export const useThemeStore = create<ThemeState>()(
 // Initial application to prevent flash (can be called in main entry)
 export const initTheme = () => {
 	const state = useThemeStore.getState();
-	applyTheme(state.resolvedTheme);
+	applyTheme(state.resolvedTheme, state.mode);
 };
