@@ -64,6 +64,14 @@ import {
 } from "@/hooks/useKeyboardShortcuts";
 import { ChangeSetReview } from "@/modules/agent-chat/ChangeSetReview";
 import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
+import { DemoCredentialSettings } from "@/modules/agent-chat/DemoCredentialSettings";
+import {
+	applyEphemeralProviderStatus,
+	createEphemeralCredentialHolder,
+	type EphemeralCredentialHolder,
+	type EphemeralCredentialStatus,
+	type EphemeralCredentials,
+} from "@/modules/agent-chat/ephemeral-credentials";
 import { ProviderModelSelector } from "@/modules/agent-chat/ProviderModelSelector";
 import { resolveProviderSelection } from "@/modules/agent-chat/provider-selection";
 import { collectResearchSources } from "@/modules/agent-chat/research";
@@ -348,18 +356,36 @@ export function AgentChatMessage({
 	);
 }
 
-function AgentChatPane({ sessionId }: { sessionId: string }) {
+interface AgentChatPaneProps {
+	sessionId: string;
+	credentialHolder: EphemeralCredentialHolder;
+	credentialStatus: EphemeralCredentialStatus;
+	onSaveCredentials(credentials: EphemeralCredentials): void;
+	onClearCredentials(): void;
+}
+
+function AgentChatPane({
+	sessionId,
+	credentialHolder,
+	credentialStatus,
+	onSaveCredentials,
+	onClearCredentials,
+}: AgentChatPaneProps) {
 	const reduceMotion = useReducedMotion();
 	const composerRef = useRef<HTMLTextAreaElement>(null);
 	const conversationRef = useRef<StickToBottomContext>(null);
 	const processedToolCallIdsRef = useRef(new Set<string>());
 	const [activeRunToken] = useState(() => new AgentRunToken());
 	const {
-		providers,
+		providers: serverProviders,
 		isLoading,
 		error: catalogError,
 		reload,
 	} = useProviderCatalog();
+	const providers = useMemo(
+		() => applyEphemeralProviderStatus(serverProviders, credentialStatus),
+		[credentialStatus, serverProviders],
+	);
 	const [preferredSelection, setPreferredSelection] =
 		useState<ModelSelection | null>(readStoredSelection);
 	const [snapshotOmissions, setSnapshotOmissions] = useState<
@@ -388,6 +414,18 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 			useAgentChangeSessionStore.getState().begin(preflight.snapshot);
 			activeRunToken.set(useAgentChangeSessionStore.getState().runId);
 			setSnapshotOmissions(preflight.omissions);
+			const storedCredentials = credentialHolder.read();
+			const ephemeralCredentials: EphemeralCredentials = {
+				deepseekApiKey:
+					providerId === "deepseek"
+						? storedCredentials.deepseekApiKey
+						: undefined,
+				tavilyApiKey: storedCredentials.tavilyApiKey,
+			};
+			const hasEphemeralCredentials = Boolean(
+				ephemeralCredentials.deepseekApiKey ||
+					ephemeralCredentials.tavilyApiKey,
+			);
 			return {
 				body: {
 					messages,
@@ -396,10 +434,11 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 					providerId,
 					modelId,
 					workspace: preflight.snapshot,
+					...(hasEphemeralCredentials ? { ephemeralCredentials } : {}),
 				},
 			};
 		},
-		[activeRunToken, providerId, modelId],
+		[activeRunToken, credentialHolder, providerId, modelId],
 	);
 	const transport = useMemo(
 		() =>
@@ -455,6 +494,11 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 		const session = useAgentChangeSessionStore.getState();
 		if (runId && session.runId === runId) session.clear();
 	}, [activeRunToken, stop]);
+	useEffect(() => () => void stopRun(), [stopRun]);
+	const clearDemoCredentials = useCallback(async () => {
+		await stopRun();
+		onClearCredentials();
+	}, [onClearCredentials, stopRun]);
 	const submitReady = canSend && status === "ready";
 	const stopShortcuts = useMemo<KeyboardShortcut[]>(
 		() => [
@@ -628,6 +672,11 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 							: "Changes require your approval"}
 					</p>
 				</div>
+				<DemoCredentialSettings
+					onClear={clearDemoCredentials}
+					onSave={onSaveCredentials}
+					status={credentialStatus}
+				/>
 				<Button
 					aria-label="Clear conversation"
 					disabled={messages.length === 0 && !error}
@@ -712,5 +761,28 @@ function AgentChatPane({ sessionId }: { sessionId: string }) {
 
 export function ChatPane() {
 	const sessionId = useAgentChatSessionStore((state) => state.sessionId);
-	return <AgentChatPane key={sessionId} sessionId={sessionId} />;
+	const [credentialHolder] = useState(createEphemeralCredentialHolder);
+	const [credentialStatus, setCredentialStatus] = useState(
+		credentialHolder.status,
+	);
+	const saveCredentials = useCallback(
+		(credentials: EphemeralCredentials) => {
+			setCredentialStatus(credentialHolder.update(credentials));
+		},
+		[credentialHolder],
+	);
+	const clearCredentials = useCallback(() => {
+		setCredentialStatus(credentialHolder.clear());
+	}, [credentialHolder]);
+
+	return (
+		<AgentChatPane
+			credentialHolder={credentialHolder}
+			credentialStatus={credentialStatus}
+			key={sessionId}
+			onClearCredentials={clearCredentials}
+			onSaveCredentials={saveCredentials}
+			sessionId={sessionId}
+		/>
+	);
 }

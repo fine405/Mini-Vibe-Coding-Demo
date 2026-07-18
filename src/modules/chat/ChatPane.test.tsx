@@ -14,6 +14,7 @@ import {
 } from "@/modules/chat/suggestion-prompts";
 import { EditorPane } from "@/modules/editor/EditorPane";
 import { useEditor } from "@/modules/editor/store";
+import { exportProjectAsJSON } from "@/modules/fs/export";
 import { useFs } from "@/modules/fs/store";
 import { TOUR_STEP_IDS } from "@/modules/tour/constants";
 import {
@@ -103,6 +104,28 @@ function configuredProviderCatalogResponse() {
 	});
 }
 
+function unconfiguredDeepseekProviderCatalogResponse() {
+	return Response.json({
+		providers: [
+			{
+				id: "deepseek",
+				name: "DeepSeek",
+				description: "DeepSeek models",
+				configured: false,
+				missingEnvVars: ["DEEPSEEK_API_KEY"],
+				defaultModelId: "deepseek/deepseek-chat",
+				models: [
+					{
+						id: "deepseek/deepseek-chat",
+						label: "DeepSeek Chat",
+						description: "Default",
+					},
+				],
+			},
+		],
+	});
+}
+
 describe("AgentChatMessage", () => {
 	it("covers the approved Catalog in the first Generative UI batch", () => {
 		const firstBatch = GENERATIVE_UI_SUGGESTIONS.slice(0, 3)
@@ -153,6 +176,141 @@ describe("AgentChatMessage", () => {
 			"active",
 		);
 		expect(screen.getByRole("tab", { name: "Generative UI" })).toBeVisible();
+	});
+
+	it("uses demo credentials for the current page and forgets them on remount", async () => {
+		const user = userEvent.setup();
+		const chatBodies: Array<Record<string, unknown>> = [];
+		const indexedDbOpen = vi.spyOn(window.indexedDB, "open");
+		window.localStorage.clear();
+		window.sessionStorage.clear();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+				const url =
+					typeof input === "string"
+						? input
+						: input instanceof URL
+							? input.href
+							: input.url;
+				if (url.endsWith("/api/providers")) {
+					return unconfiguredDeepseekProviderCatalogResponse();
+				}
+				if (url.endsWith("/api/chat")) {
+					const body =
+						input instanceof Request
+							? await input.clone().json()
+							: JSON.parse(String(init?.body));
+					chatBodies.push(body as Record<string, unknown>);
+					const stream = new ReadableStream<UIMessageChunk>({
+						start(controller) {
+							controller.enqueue({
+								type: "start",
+								messageId: "assistant-demo-credentials",
+							});
+							controller.enqueue({ type: "finish", finishReason: "stop" });
+							controller.close();
+						},
+					});
+					return createUIMessageStreamResponse({ stream });
+				}
+				throw new Error(`Unexpected request: ${url}`);
+			}),
+		);
+
+		const page = render(<ChatPane />);
+		expect(
+			await screen.findByPlaceholderText("Configure a provider key to start"),
+		).toBeDisabled();
+
+		const settingsButton = screen.getByRole("button", {
+			name: "Demo credential settings",
+		});
+		settingsButton.focus();
+		await user.keyboard("{Enter}");
+		const deepseekInput = screen.getByLabelText("DEEPSEEK_API_KEY");
+		const tavilyInput = screen.getByLabelText("TAVILY_API_KEY");
+		expect(deepseekInput).toHaveAttribute("type", "password");
+		expect(deepseekInput).toHaveAttribute("autocomplete", "off");
+		await user.type(deepseekInput, "page-deepseek-secret");
+		await user.type(tavilyInput, "page-tavily-secret");
+		await user.click(
+			screen.getByRole("button", { name: "Save for this page" }),
+		);
+		expect(chatBodies).toHaveLength(0);
+
+		await user.click(settingsButton);
+		expect(screen.getAllByText("Configured for this page")).toHaveLength(2);
+		expect(screen.getByLabelText("DEEPSEEK_API_KEY")).toHaveValue("");
+		expect(screen.getByLabelText("TAVILY_API_KEY")).toHaveValue("");
+		await user.type(
+			screen.getByLabelText("DEEPSEEK_API_KEY"),
+			"page-deepseek-replacement",
+		);
+		await user.click(
+			screen.getByRole("button", { name: "Save for this page" }),
+		);
+
+		const prompt = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await user.type(prompt, "Build a demo");
+		await user.click(screen.getByRole("button", { name: "Submit" }));
+		await waitFor(() => expect(chatBodies).toHaveLength(1));
+		expect(chatBodies[0]?.ephemeralCredentials).toEqual({
+			deepseekApiKey: "page-deepseek-replacement",
+			tavilyApiKey: "page-tavily-secret",
+		});
+		const persistedValues = Array.from(
+			{ length: window.localStorage.length },
+			(_, index) =>
+				window.localStorage.getItem(window.localStorage.key(index) ?? ""),
+		).join("\n");
+		expect(persistedValues).not.toContain("page-deepseek-secret");
+		expect(persistedValues).not.toContain("page-deepseek-replacement");
+		expect(persistedValues).not.toContain("page-tavily-secret");
+		const sessionValues = Array.from(
+			{ length: window.sessionStorage.length },
+			(_, index) =>
+				window.sessionStorage.getItem(window.sessionStorage.key(index) ?? ""),
+		).join("\n");
+		expect(sessionValues).not.toContain("page-deepseek-secret");
+		expect(sessionValues).not.toContain("page-deepseek-replacement");
+		expect(sessionValues).not.toContain("page-tavily-secret");
+		expect(document.cookie).not.toContain("page-deepseek-secret");
+		expect(document.cookie).not.toContain("page-deepseek-replacement");
+		expect(document.cookie).not.toContain("page-tavily-secret");
+		const { snapshot } = await browserWorkspace.getSnapshot();
+		expect(JSON.stringify(snapshot)).not.toContain("page-deepseek-secret");
+		expect(JSON.stringify(snapshot)).not.toContain("page-deepseek-replacement");
+		expect(JSON.stringify(snapshot)).not.toContain("page-tavily-secret");
+		expect(indexedDbOpen).not.toHaveBeenCalled();
+
+		const exportedBlobs: Blob[] = [];
+		vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+			exportedBlobs.push(blob as Blob);
+			return "blob:credential-export-test";
+		});
+		vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+		vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+			() => undefined,
+		);
+		exportProjectAsJSON(useFs.getState().filesByPath, "credential-test");
+		const exportedProject = await new Promise<string>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(String(reader.result));
+			reader.onerror = () => reject(reader.error);
+			reader.readAsText(exportedBlobs[0]);
+		});
+		expect(exportedProject).not.toContain("page-deepseek-secret");
+		expect(exportedProject).not.toContain("page-deepseek-replacement");
+		expect(exportedProject).not.toContain("page-tavily-secret");
+
+		page.unmount();
+		render(<ChatPane />);
+		expect(
+			await screen.findByPlaceholderText("Configure a provider key to start"),
+		).toBeDisabled();
 	});
 
 	it("fills suggestions at the caret without sending and rotates each tab", async () => {
@@ -986,6 +1144,139 @@ describe("AgentChatMessage", () => {
 			),
 		);
 		expect(useAgentChangeSessionStore.getState().phase).toBe("idle");
+	});
+
+	it("aborts the active chat request when the chat pane unmounts", async () => {
+		const user = userEvent.setup();
+		let chatSignal: AbortSignal | undefined;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				const url =
+					typeof input === "string"
+						? input
+						: input instanceof URL
+							? input.href
+							: input.url;
+				if (url.endsWith("/api/providers")) {
+					return Promise.resolve(configuredProviderCatalogResponse());
+				}
+
+				chatSignal =
+					init?.signal ??
+					(input instanceof Request ? input.signal : null) ??
+					undefined;
+				return new Promise<Response>((_resolve, reject) => {
+					const abort = () => reject(new DOMException("Stopped", "AbortError"));
+					if (chatSignal?.aborted) abort();
+					else chatSignal?.addEventListener("abort", abort, { once: true });
+				});
+			}),
+		);
+
+		const page = render(<ChatPane />);
+		const input = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await user.type(input, "Keep working");
+		await user.click(screen.getByRole("button", { name: "Submit" }));
+		await screen.findByRole("button", { name: "Stop" });
+
+		page.unmount();
+
+		await waitFor(() => expect(chatSignal?.aborted).toBe(true));
+	});
+
+	it("stops the active run before clearing demo credentials", async () => {
+		const user = userEvent.setup();
+		const chatBodies: Array<Record<string, unknown>> = [];
+		let chatSignal: AbortSignal | undefined;
+		let chatRequestCount = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				const url =
+					typeof input === "string"
+						? input
+						: input instanceof URL
+							? input.href
+							: input.url;
+				if (url.endsWith("/api/providers")) {
+					return Promise.resolve(configuredProviderCatalogResponse());
+				}
+				chatRequestCount += 1;
+
+				const captureBody = async () => {
+					const body =
+						input instanceof Request
+							? await input.clone().json()
+							: JSON.parse(String(init?.body));
+					chatBodies.push(body as Record<string, unknown>);
+				};
+				void captureBody();
+				if (chatRequestCount > 1) {
+					const stream = new ReadableStream<UIMessageChunk>({
+						start(controller) {
+							controller.enqueue({
+								type: "start",
+								messageId: "assistant-after-clear",
+							});
+							controller.enqueue({ type: "finish", finishReason: "stop" });
+							controller.close();
+						},
+					});
+					return Promise.resolve(createUIMessageStreamResponse({ stream }));
+				}
+
+				chatSignal =
+					init?.signal ??
+					(input instanceof Request ? input.signal : null) ??
+					undefined;
+				return new Promise<Response>((_resolve, reject) => {
+					const abort = () => reject(new DOMException("Stopped", "AbortError"));
+					if (chatSignal?.aborted) abort();
+					else chatSignal?.addEventListener("abort", abort, { once: true });
+				});
+			}),
+		);
+
+		render(<ChatPane />);
+		await screen.findByPlaceholderText("Describe what you want to build…");
+		await user.click(
+			screen.getByRole("button", { name: "Demo credential settings" }),
+		);
+		await user.type(screen.getByLabelText("DEEPSEEK_API_KEY"), "page-deepseek");
+		await user.type(screen.getByLabelText("TAVILY_API_KEY"), "page-tavily");
+		await user.click(
+			screen.getByRole("button", { name: "Save for this page" }),
+		);
+
+		const prompt = screen.getByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await user.type(prompt, "First run");
+		await user.click(screen.getByRole("button", { name: "Submit" }));
+		await screen.findByRole("button", { name: "Stop" });
+		await user.click(
+			screen.getByRole("button", { name: "Demo credential settings" }),
+		);
+		await user.click(
+			screen.getByRole("button", { name: "Clear page credentials" }),
+		);
+
+		await waitFor(() => expect(chatSignal?.aborted).toBe(true));
+		await waitFor(() => expect(chatBodies).toHaveLength(1));
+		expect(chatBodies[0]?.ephemeralCredentials).toEqual({
+			tavilyApiKey: "page-tavily",
+		});
+
+		const nextPrompt = await screen.findByPlaceholderText(
+			"Describe what you want to build…",
+		);
+		await user.type(nextPrompt, "Second run");
+		await user.click(screen.getByRole("button", { name: "Submit" }));
+		await waitFor(() => expect(chatBodies).toHaveLength(2));
+		expect(chatBodies[1]).not.toHaveProperty("ephemeralCredentials");
 	});
 
 	it("aborts the active chat request when the editor discards all drafts", async () => {

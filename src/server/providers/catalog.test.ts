@@ -129,4 +129,40 @@ describe("ProviderCatalog", () => {
 			},
 		});
 	});
+
+	it("uses a request-scoped DeepSeek key without changing other providers", () => {
+		const catalog = new ProviderCatalog(
+			new ObjectProviderConfigSource({
+				DEEPSEEK_API_KEY: "server-deepseek",
+				OPENAI_API_KEY: "server-openai",
+			}),
+		);
+
+		expect(
+			catalog.resolve(
+				{
+					providerId: "deepseek",
+					modelId: "deepseek/deepseek-chat",
+				},
+				{ deepseekApiKey: "page-deepseek" },
+			),
+		).toMatchObject({ mastraModel: { apiKey: "page-deepseek" } });
+		expect(
+			catalog.resolve(
+				{ providerId: "openai", modelId: "openai/gpt-5.4" },
+				{ deepseekApiKey: "page-deepseek" },
+			),
+		).toMatchObject({ mastraModel: { apiKey: "server-openai" } });
+
+		const pageOnly = new ProviderCatalog(new ObjectProviderConfigSource({}));
+		expect(
+			pageOnly.resolve(
+				{
+					providerId: "deepseek",
+					modelId: "deepseek/deepseek-chat",
+				},
+				{ deepseekApiKey: "page-only-deepseek" },
+			),
+		).toMatchObject({ mastraModel: { apiKey: "page-only-deepseek" } });
+	});
 });

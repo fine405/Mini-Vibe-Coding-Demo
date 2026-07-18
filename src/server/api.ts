@@ -16,6 +16,7 @@ export interface ApiDependencies {
 	providerCatalog?: ProviderCatalog;
 	modelResolver?: ChatModelResolver;
 	researchGateway?: ResearchGateway;
+	researchGatewayForTavilyKey?: (apiKey: string) => ResearchGateway;
 }
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -26,11 +27,19 @@ export function createApi(dependencies: ApiDependencies = {}) {
 	const researchGateway =
 		dependencies.researchGateway ??
 		new HttpResearchGateway({ tavilyApiKey: process.env.TAVILY_API_KEY });
+	const researchGatewayForTavilyKey =
+		dependencies.researchGatewayForTavilyKey ??
+		(dependencies.researchGateway
+			? undefined
+			: (apiKey: string) => new HttpResearchGateway({ tavilyApiKey: apiKey }));
 
 	api.use("*", async (context, next) => {
 		const requestId =
 			context.req.header("x-request-id")?.slice(0, 100) ?? crypto.randomUUID();
 		context.set("requestId", requestId);
+		if (context.req.path === "/api/chat") {
+			context.header("Cache-Control", "no-store");
+		}
 		const fetchSite = context.req.header("sec-fetch-site");
 		const origin = context.req.header("origin");
 		if (
@@ -48,6 +57,9 @@ export function createApi(dependencies: ApiDependencies = {}) {
 			);
 		}
 		await next();
+		if (context.req.path === "/api/chat") {
+			context.res.headers.set("Cache-Control", "no-store");
+		}
 		context.header("X-Content-Type-Options", "nosniff");
 		context.header("X-Request-Id", requestId);
 	});
@@ -152,6 +164,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
 			providerCatalog,
 			modelResolver: dependencies.modelResolver,
 			researchGateway,
+			researchGatewayForTavilyKey,
 		}),
 	);
 

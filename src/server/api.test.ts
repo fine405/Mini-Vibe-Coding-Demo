@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createWorkspaceSnapshot, hashText } from "@/modules/workspace/domain";
+import type { ResearchGateway } from "@/server/agent/research-gateway";
 import { createApi } from "@/server/api";
 import {
 	ObjectProviderConfigSource,
@@ -98,10 +99,12 @@ describe("Hono API", () => {
 		});
 
 		expect(malformed.status).toBe(400);
+		expect(malformed.headers.get("cache-control")).toBe("no-store");
 		expect(await malformed.json()).toMatchObject({
 			error: { code: "INVALID_JSON" },
 		});
 		expect(crossSite.status).toBe(403);
+		expect(crossSite.headers.get("cache-control")).toBe("no-store");
 		expect(await crossSite.json()).toMatchObject({
 			error: { code: "CROSS_SITE_REQUEST" },
 		});
@@ -130,6 +133,112 @@ describe("Hono API", () => {
 		expect(await response.json()).toMatchObject({
 			error: { code: "PROVIDER_NOT_CONFIGURED" },
 		});
+	});
+
+	it("uses bounded page credentials only for the current chat request", async () => {
+		const { snapshot } = createWorkspaceSnapshot({ "/a.ts": "old" });
+		const canary = `page-canary-${"x".repeat(470)}-tail`;
+		const canaryPrefix = canary.slice(0, 18);
+		const canarySuffix = canary.slice(-18);
+		const modelResolver = vi.fn(() => {
+			throw new Error(`stop before paid execution ${canary}`);
+		});
+		const researchGateway: ResearchGateway = {
+			searchWeb: vi.fn(),
+			searchWeather: vi.fn(),
+		};
+		const researchGatewayForTavilyKey = vi.fn(() => researchGateway);
+		const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		const api = createApi({
+			providerCatalog: new ProviderCatalog(new ObjectProviderConfigSource({})),
+			modelResolver,
+			researchGateway,
+			researchGatewayForTavilyKey,
+		});
+
+		const response = await api.request("/api/chat", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				messages: [
+					{
+						id: "user-page-credentials",
+						role: "user",
+						parts: [{ type: "text", text: "Change it" }],
+					},
+				],
+				providerId: "deepseek",
+				modelId: "deepseek/deepseek-chat",
+				workspace: snapshot,
+				ephemeralCredentials: {
+					deepseekApiKey: `  ${canary}  `,
+					tavilyApiKey: "page-tavily-secret",
+				},
+			}),
+		});
+		const body = await response.text();
+		const serializedLogs = JSON.stringify(log.mock.calls);
+		log.mockRestore();
+
+		expect(response.status).toBe(500);
+		expect(response.headers.get("cache-control")).toBe("no-store");
+		expect(modelResolver).toHaveBeenCalledWith(
+			expect.objectContaining({
+				mastraModel: expect.objectContaining({ apiKey: canary }),
+			}),
+		);
+		expect(researchGatewayForTavilyKey).toHaveBeenCalledWith(
+			"page-tavily-secret",
+		);
+		expect(body).not.toContain(canary);
+		expect(body).not.toContain(canaryPrefix);
+		expect(body).not.toContain(canarySuffix);
+		expect(body).not.toContain(String(canary.length));
+		expect(serializedLogs).not.toContain(canary);
+		expect(serializedLogs).not.toContain(canaryPrefix);
+		expect(serializedLogs).not.toContain(canarySuffix);
+	});
+
+	it("rejects unknown or oversized demo credentials before model execution", async () => {
+		const { snapshot } = createWorkspaceSnapshot({ "/a.ts": "old" });
+		const canary = "must-not-echo-this-value";
+		const modelResolver = vi.fn();
+		const api = createApi({
+			providerCatalog: new ProviderCatalog(
+				new ObjectProviderConfigSource({ DEEPSEEK_API_KEY: "server-key" }),
+			),
+			modelResolver,
+		});
+		const baseBody = {
+			messages: [
+				{
+					id: "user-invalid-credentials",
+					role: "user",
+					parts: [{ type: "text", text: "Change it" }],
+				},
+			],
+			providerId: "deepseek",
+			modelId: "deepseek/deepseek-chat",
+			workspace: snapshot,
+		};
+
+		for (const ephemeralCredentials of [
+			{ OPENAI_API_KEY: canary },
+			{ deepseekApiKey: canary.repeat(30) },
+		]) {
+			const response = await api.request("/api/chat", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ ...baseBody, ephemeralCredentials }),
+			});
+			const responseText = await response.text();
+
+			expect(response.status).toBe(400);
+			expect(response.headers.get("cache-control")).toBe("no-store");
+			expect(responseText).toContain("INVALID_REQUEST");
+			expect(responseText).not.toContain(canary);
+		}
+		expect(modelResolver).not.toHaveBeenCalled();
 	});
 
 	it("rejects non-allowlisted models before resolving a paid model", async () => {

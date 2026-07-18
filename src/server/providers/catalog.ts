@@ -24,6 +24,10 @@ export interface ResolvedProviderModel extends ModelSelection {
 	mastraModel: MastraModelConfig;
 }
 
+export interface ProviderCredentialOverrides {
+	deepseekApiKey?: string;
+}
+
 export class EnvironmentProviderConfigSource implements ProviderConfigSource {
 	get(name: string): string | undefined {
 		return process.env[name];
@@ -296,7 +300,10 @@ export class ProviderCatalog {
 		});
 	}
 
-	resolve(selection: ModelSelection): ResolvedProviderModel {
+	resolve(
+		selection: ModelSelection,
+		overrides: ProviderCredentialOverrides = {},
+	): ResolvedProviderModel {
 		const provider = PROVIDERS.find(
 			(candidate) => candidate.id === selection.providerId,
 		);
@@ -306,7 +313,9 @@ export class ProviderCatalog {
 				`Unknown provider: ${selection.providerId}`,
 			);
 		}
-		const apiKey = this.configuredKey(provider);
+		const requestKey =
+			provider.id === "deepseek" ? overrides.deepseekApiKey?.trim() : undefined;
+		const apiKey = requestKey || this.configuredKey(provider);
 		if (!apiKey) {
 			throw new ProviderCatalogError(
 				"PROVIDER_NOT_CONFIGURED",

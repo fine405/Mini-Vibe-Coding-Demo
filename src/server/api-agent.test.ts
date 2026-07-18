@@ -2,7 +2,10 @@ import { simulateReadableStream } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkspaceSnapshot } from "@/modules/workspace/domain";
-import type { ResearchGateway } from "@/server/agent/research-gateway";
+import {
+	HttpResearchGateway,
+	type ResearchGateway,
+} from "@/server/agent/research-gateway";
 import { createApi } from "@/server/api";
 import {
 	ObjectProviderConfigSource,
@@ -165,25 +168,37 @@ describe("POST /api/chat", () => {
 				stream: simulateReadableStream({ chunks: responses[responseIndex++] }),
 			}),
 		});
-		const researchGateway: ResearchGateway = {
-			searchWeb: vi.fn(async () => ({
+		const tavilyApiKey = "request-tavily-canary";
+		const tavilyFetch = vi.fn<typeof fetch>(async (_input, init) => {
+			expect(new Headers(init?.headers).get("authorization")).toBe(
+				`Bearer ${tavilyApiKey}`,
+			);
+			return Response.json({
 				query: "latest React release",
-				sources: [
+				results: [
 					{
 						title: "React versions",
 						url: "https://react.dev/versions",
-						snippet: "Current React release information.",
+						content: "Current React release information.",
 					},
 				],
-			})),
+			});
+		});
+		const fallbackResearchGateway: ResearchGateway = {
+			searchWeb: vi.fn(),
 			searchWeather: vi.fn(),
 		};
+		const researchGatewayForTavilyKey = vi.fn(
+			(apiKey: string): ResearchGateway =>
+				new HttpResearchGateway({ fetch: tavilyFetch, tavilyApiKey: apiKey }),
+		);
 		const api = createApi({
 			providerCatalog: new ProviderCatalog(
 				new ObjectProviderConfigSource({ OPENAI_API_KEY: "test-only" }),
 			),
 			modelResolver: () => model,
-			researchGateway,
+			researchGateway: fallbackResearchGateway,
+			researchGatewayForTavilyKey,
 		});
 
 		const response = await api.request("/api/chat", {
@@ -202,6 +217,7 @@ describe("POST /api/chat", () => {
 				providerId: "openai",
 				modelId: "openai/gpt-5.4",
 				workspace: snapshot,
+				ephemeralCredentials: { tavilyApiKey },
 			}),
 		});
 		const streamText = await response.text();
@@ -214,27 +230,33 @@ describe("POST /api/chat", () => {
 		);
 
 		expect(response.status).toBe(200);
+		expect(response.headers.get("cache-control")).toBe("no-store");
 		expect(streamText).toContain("web_search");
 		expect(sourceIndex).toBeGreaterThanOrEqual(0);
 		expect(answerIndex).toBeGreaterThan(sourceIndex);
 		expect(collectTextDeltas(events)).toContain("React release details");
 		expect(streamText).not.toContain("finalize_changes");
-		expect(researchGateway.searchWeb).toHaveBeenCalledWith(
-			expect.objectContaining({ query: "latest React release" }),
-			expect.any(AbortSignal),
-		);
+		expect(streamText).not.toContain(tavilyApiKey);
+		expect(streamText).not.toContain(tavilyApiKey.slice(0, 12));
+		expect(researchGatewayForTavilyKey).toHaveBeenCalledWith(tavilyApiKey);
+		expect(fallbackResearchGateway.searchWeb).not.toHaveBeenCalled();
+		expect(tavilyFetch).toHaveBeenCalledTimes(1);
 	});
 
-	it("streams a real Mastra tool loop and a finalized ChangeSet without a provider key", async () => {
+	it("streams a real Mastra tool loop with a request-scoped DeepSeek key", async () => {
 		const { snapshot } = createWorkspaceSnapshot({
 			"/src/App.tsx": "export default () => null;",
 		});
+		const deepseekApiKey = "request-deepseek-canary";
 		const mockModel = createAgentMockModel();
 		const api = createApi({
-			providerCatalog: new ProviderCatalog(
-				new ObjectProviderConfigSource({ OPENAI_API_KEY: "test-only" }),
-			),
-			modelResolver: () => mockModel.model,
+			providerCatalog: new ProviderCatalog(new ObjectProviderConfigSource({})),
+			modelResolver: (resolved) => {
+				expect(resolved.mastraModel).toMatchObject({
+					apiKey: deepseekApiKey,
+				});
+				return mockModel.model;
+			},
 		});
 
 		const response = await api.request("/api/chat", {
@@ -248,9 +270,10 @@ describe("POST /api/chat", () => {
 						parts: [{ type: "text", text: "Update the app" }],
 					},
 				],
-				providerId: "openai",
-				modelId: "openai/gpt-5.4",
+				providerId: "deepseek",
+				modelId: "deepseek/deepseek-chat",
 				workspace: snapshot,
+				ephemeralCredentials: { deepseekApiKey },
 			}),
 		});
 		const streamText = await response.text();
@@ -259,6 +282,8 @@ describe("POST /api/chat", () => {
 		expect(response.headers.get("x-vercel-ai-ui-message-stream")).toBe("v1");
 		expect(streamText).toContain("finalize_changes");
 		expect(streamText).toContain("/src/App.tsx");
+		expect(streamText).not.toContain(deepseekApiKey);
+		expect(streamText).not.toContain(deepseekApiKey.slice(0, 12));
 		expect(mockModel.doStream).toHaveBeenCalledTimes(3);
 		expect(snapshot.files["/src/App.tsx"].content).toContain("null");
 	});

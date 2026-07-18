@@ -45,8 +45,9 @@ Mini Lovable Agent Studio 是一个浏览器内的 AI 编程工作台：真实 c
 ### Providers
 
 - OpenAI、Qwen、DeepSeek、Anthropic、Google、Moonshot、xAI、OpenRouter 始终出现在公开目录。
-- Key 只从服务端环境按请求读取；公开 API 只能返回 `configured`、缺少的变量名和公开模型描述。
-- 模型 ID 必须通过服务端 allowlist；浏览器只持久化 Provider/模型 ID。
+- Key 默认从服务端环境按请求读取；线上访问者演示只允许 DeepSeek/Tavily Key 在当前 Chat Agent 页面内存中短暂保存，并随使用它的单次 Chat 请求传输，不得持久化或回显。
+- 公开 API 只能返回 `configured`、缺少的变量名和公开模型描述；模型 ID 必须通过服务端 allowlist。
+- 浏览器只持久化 Provider/模型 ID；演示 Key 刷新、离开页面或退出 Chat Agent 后不得恢复。
 
 ## Conventions
 
@@ -60,3 +61,4 @@ Mini Lovable Agent Studio 是一个浏览器内的 AI 编程工作台：真实 c
 - `pnpm build` 输出 Nitro Node server 到 `.output/server/index.mjs`，`pnpm start` 启动。
 - 公开互联网部署前必须增加认证、用户级限流和配额；当前阶段面向本地或受控可信环境。
 - 保持同源 API，拒绝显式 cross-site 请求；聊天请求和 Agent 快照有独立大小限制。
+- 线上优先使用托管平台的服务端 Secret；页面演示 Key 只能通过 HTTPS 使用，并应专用、低额度、可撤销且在演示后轮换。

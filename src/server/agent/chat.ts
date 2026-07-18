@@ -5,6 +5,7 @@ import type { MastraModelConfig } from "@mastra/core/llm";
 import { RequestContext } from "@mastra/core/request-context";
 import { createUIMessageStreamResponse, type UIMessageChunk } from "ai";
 import { z } from "zod";
+import { ephemeralCredentialsSchema } from "@/modules/agent-chat/ephemeral-credentials";
 import { workspaceSnapshotSchema } from "@/modules/workspace/schema";
 import {
 	AGENT_MAX_STEPS,
@@ -35,6 +36,7 @@ const chatRequestSchema = z.object({
 	providerId: z.string().min(1),
 	modelId: z.string().min(1),
 	workspace: workspaceSnapshotSchema,
+	ephemeralCredentials: ephemeralCredentialsSchema.optional(),
 });
 
 export type ChatModelResolver = (
@@ -45,6 +47,7 @@ export interface ChatDependencies {
 	providerCatalog: ProviderCatalog;
 	modelResolver?: ChatModelResolver;
 	researchGateway: ResearchGateway;
+	researchGatewayForTavilyKey?: (apiKey: string) => ResearchGateway;
 }
 
 type MastraV6ChatOptions = Parameters<typeof handleChatStream>[0];
@@ -130,10 +133,18 @@ export async function createChatResponse(
 	}
 
 	try {
-		const resolved = dependencies.providerCatalog.resolve({
-			providerId: parsed.data.providerId,
-			modelId: parsed.data.modelId,
-		});
+		const credentials = parsed.data.ephemeralCredentials;
+		const researchGateway =
+			credentials?.tavilyApiKey && dependencies.researchGatewayForTavilyKey
+				? dependencies.researchGatewayForTavilyKey(credentials.tavilyApiKey)
+				: dependencies.researchGateway;
+		const resolved = dependencies.providerCatalog.resolve(
+			{
+				providerId: parsed.data.providerId,
+				modelId: parsed.data.modelId,
+			},
+			{ deepseekApiKey: credentials?.deepseekApiKey },
+		);
 		const runWorkspace = new RunWorkspace(parsed.data.workspace);
 		const requestContext = new RequestContext<CodingRequestContext>();
 		requestContext.set(
@@ -141,7 +152,7 @@ export async function createChatResponse(
 			dependencies.modelResolver?.(resolved) ?? resolved.mastraModel,
 		);
 		requestContext.set("runWorkspace", runWorkspace);
-		requestContext.set("researchGateway", dependencies.researchGateway);
+		requestContext.set("researchGateway", researchGateway);
 		requestContext.set("requestId", requestId);
 		const abortSignal = AbortSignal.any([
 			request.signal,
