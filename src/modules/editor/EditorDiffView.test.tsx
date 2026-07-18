@@ -1,6 +1,7 @@
 import { act, render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorDiffView } from "@/modules/editor/EditorDiffView";
+import { useThemeStore } from "@/modules/theme/store";
 
 const { diffEditorMock } = vi.hoisted(() => ({
 	diffEditorMock: vi.fn((_props: Record<string, unknown>) => (
@@ -13,6 +14,12 @@ vi.mock("@monaco-editor/react", () => ({
 }));
 
 describe("EditorDiffView", () => {
+	// The store rehydrates to a random theme when no preference exists;
+	// pin Night so editor theme assertions stay deterministic.
+	beforeEach(() => {
+		useThemeStore.setState({ mode: "night", resolvedTheme: "dark" });
+	});
+
 	it("configures Agent review as a read-only unified diff", () => {
 		render(
 			<EditorDiffView
