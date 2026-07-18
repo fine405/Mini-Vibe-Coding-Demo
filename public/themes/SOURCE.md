@@ -32,3 +32,13 @@ recorded separately with its asset below.
 - Handling: source audio `0:00–1:00` only; transcoded from YouTube AAC to
   MP3 with a 1 dB gain reduction to prevent clipping; no other source content
   is included
+- Application playback: volume `0.5` (approximately 6 dB below the asset)
+- Thunder ranges, relative to the clip:
+  - `12.0–17.4s`
+  - `22.3–25.0s`
+  - `26.0–38.0s`
+  - `44.9–60.0s` (continues beyond the clip boundary)
+- Detection: 100 ms frames comparing energy below 250 Hz with energy above
+  500 Hz, smoothed over 500 ms and verified against a 20–800 Hz spectrogram.
+  The same ranges are exported by `src/modules/theme/drizzleAudio.ts` for
+  synchronized effects.

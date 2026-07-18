@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
+import {
+	DRIZZLE_AUDIO_SRC,
+	DRIZZLE_AUDIO_VOLUME,
+} from "@/modules/theme/drizzleAudio";
 import { useThemeStore } from "@/modules/theme/store";
-
-const DRIZZLE_AUDIO_SRC = "/themes/drizzle-rain.mp3";
 
 const playAudio = (audio: HTMLAudioElement, onRejected: () => void) => {
 	try {
@@ -23,6 +25,7 @@ export function DrizzleThemeAudio() {
 		const audio = audioRef.current;
 		if (!audio) return;
 
+		audio.volume = DRIZZLE_AUDIO_VOLUME;
 		isDrizzleRef.current = isDrizzle;
 		audioBlockedRef.current = false;
 		if (!isDrizzle) return;

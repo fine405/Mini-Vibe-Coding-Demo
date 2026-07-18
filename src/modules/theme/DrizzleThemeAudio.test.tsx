@@ -1,6 +1,10 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DrizzleThemeAudio } from "@/modules/theme/DrizzleThemeAudio";
+import {
+	DRIZZLE_AUDIO_VOLUME,
+	DRIZZLE_THUNDER_RANGES,
+} from "@/modules/theme/drizzleAudio";
 import { useThemeStore } from "@/modules/theme/store";
 
 describe("DrizzleThemeAudio", () => {
@@ -25,6 +29,7 @@ describe("DrizzleThemeAudio", () => {
 		expect(audio).toHaveAttribute("loop");
 		expect(audio).toHaveAttribute("preload", "none");
 		expect(audio).toHaveAttribute("src", "/themes/drizzle-rain.mp3");
+		expect(audio).toHaveProperty("volume", DRIZZLE_AUDIO_VOLUME);
 
 		act(() => useThemeStore.getState().setMode("drizzle"));
 		await waitFor(() => expect(play).toHaveBeenCalledOnce());
@@ -40,6 +45,15 @@ describe("DrizzleThemeAudio", () => {
 		unmount();
 		expect(pause).toHaveBeenCalledTimes(2);
 		expect(audio).toHaveProperty("currentTime", 0);
+	});
+
+	it("exposes the analyzed thunder ranges for synchronized effects", () => {
+		expect(DRIZZLE_THUNDER_RANGES).toEqual([
+			{ startSeconds: 12, endSeconds: 17.4, truncatedByClip: false },
+			{ startSeconds: 22.3, endSeconds: 25, truncatedByClip: false },
+			{ startSeconds: 26, endSeconds: 38, truncatedByClip: false },
+			{ startSeconds: 44.9, endSeconds: 60, truncatedByClip: true },
+		]);
 	});
 
 	it("retries blocked Drizzle audio on the next interaction", async () => {
