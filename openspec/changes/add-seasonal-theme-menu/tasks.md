@@ -32,10 +32,10 @@
 
 ## 5. Day/Night Noise Texture
 
-- [x] 5.1 核对 lab01.dev 的源码与参考图，确认 `feTurbulence(0.8)`、grayscale、screen blend 以及 10%/15% 透明度。
-- [x] 5.2 先增加行为测试，覆盖 SVG filter、Night/Day 透明度、pointer-events none，以及三个季节主题不显示该层。
-- [x] 5.3 实现固定 z-30 噪声层；Night 使用 10% opacity，Day 使用 15% opacity 与浅暖白 `#F3F2F1` 基底，保持低于 Summer 视频和 Radix 菜单。
-- [x] 5.4 在实际桌面宽屏分别验收 Day/Night 的纹理强度、文字/Monaco 清晰度、菜单层级和交互穿透。
+- [x] 5.1 核对 lab01.dev 的源码与参考图，确认 grayscale、screen blend 以及 10%/15% 透明度的视觉基线。
+- [x] 5.2 先增加行为测试，覆盖不含运行时 SVG 的静态纹理层、Night/Day 透明度、pointer-events none，以及三个季节主题不显示该层。
+- [x] 5.3 生成 256×256 灰度 PNG，并实现固定 z-30 平铺噪声层；Night 使用 10% opacity，Day 使用 15% opacity 与浅暖白 `#F3F2F1` 基底，保持低于 Summer 视频和 Radix 菜单。
+- [x] 5.4 在实际桌面宽屏分别验收 Day/Night 的纹理强度、平铺接缝、文字/Monaco 清晰度、菜单层级和交互穿透。
 - [x] 5.5 运行 OpenSpec strict validation、相关测试与完整 `pnpm check`，并完成 design QA。
 
 ## 6. Random Initial Theme

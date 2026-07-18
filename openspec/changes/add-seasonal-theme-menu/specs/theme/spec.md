@@ -70,13 +70,13 @@ The Day and Night themes SHALL display a subtle non-interactive grayscale noise 
 
 #### Scenario: Night displays Lab01-style light grain
 - **WHEN** Night is active
-- **THEN** a fixed grayscale `feTurbulence` texture is visible using a screen blend at 10% opacity
+- **THEN** a fixed pre-rendered grayscale texture is tiled using a screen blend at 10% opacity
 - **AND** the texture does not intercept pointer input
 
 #### Scenario: Day displays grain on a warm white base
 - **WHEN** Day is active
 - **THEN** the page base is warm white `#F3F2F1`
-- **AND** the same grayscale `feTurbulence` texture uses a screen blend at 15% opacity
+- **AND** the same pre-rendered grayscale texture is tiled using a screen blend at 15% opacity
 - **AND** the texture does not intercept pointer input
 
 #### Scenario: Seasonal theme is active
