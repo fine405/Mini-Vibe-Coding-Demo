@@ -34,4 +34,4 @@
 
 同日用户进一步明确：随机初始主题不得固定在 localStorage 中，只有用户主动选择主题时才持久化。
 
-同日用户指定 `https://www.youtube.com/watch?v=dGwbIjhDhOE` 的原声音频前 1 分钟作为 Drizzle 背景声，并确认已取得视频作者许可、要求直接下载接入。
+同日用户指定 `https://www.youtube.com/watch?v=dGwbIjhDhOE` 的原声音频前 1 分钟作为 Drizzle 背景声；在被告知需要确认复用许可后，用户确认已取得视频作者许可，并以“直接从上面下载吧”明确批准本 proposal 增量的实现范围。
