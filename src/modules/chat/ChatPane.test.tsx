@@ -1320,7 +1320,9 @@ describe("AgentChatMessage", () => {
 		).toHaveLength(1);
 		await user.type(input, "Update the app");
 		expect(screen.getByRole("button", { name: "Submit" })).toHaveClass(
-			"bg-[#090a0f]",
+			"bg-neutral-800",
+			"dark:bg-neutral-200",
+			"dark:text-neutral-950",
 		);
 		await user.click(screen.getByRole("button", { name: "Submit" }));
 		expect(
