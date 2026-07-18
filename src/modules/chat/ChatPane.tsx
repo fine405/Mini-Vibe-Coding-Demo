@@ -71,6 +71,7 @@ import {
 	type KeyboardShortcut,
 	useKeyboardShortcuts,
 } from "@/hooks/useKeyboardShortcuts";
+import { cn } from "@/lib/utils";
 import { ChangeSetReview } from "@/modules/agent-chat/ChangeSetReview";
 import { useAgentChangeSessionStore } from "@/modules/agent-chat/change-session";
 import { DemoCredentialSettings } from "@/modules/agent-chat/DemoCredentialSettings";
@@ -657,11 +658,12 @@ function AgentChatPane({
 			}
 		>
 			<PromptInput
-				className={
+				className={cn(
+					"[&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-card/80 [&_[data-slot=input-group]]:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-18px_rgba(15,23,42,0.12)] [&_[data-slot=input-group]]:transition-[border-color,background-color,box-shadow] [&_[data-slot=input-group]]:duration-200 [&_[data-slot=input-group]]:hover:border-violet-400/30 [&_[data-slot=input-group]]:has-[[data-slot=input-group-control]:focus-visible]:border-violet-500/50 [&_[data-slot=input-group]]:has-[[data-slot=input-group-control]:focus-visible]:ring-4 [&_[data-slot=input-group]]:has-[[data-slot=input-group-control]:focus-visible]:ring-violet-500/10 [&_[data-slot=input-group]]:has-[[data-slot=input-group-control]:focus-visible]:shadow-[0_10px_30px_-18px_rgba(109,40,217,0.35)] dark:[&_[data-slot=input-group]]:hover:border-violet-400/30 dark:[&_[data-slot=input-group]]:has-[[data-slot=input-group-control]:focus-visible]:border-violet-400/50 dark:[&_[data-slot=input-group]]:has-[[data-slot=input-group-control]:focus-visible]:ring-violet-400/15",
 					prominent
-						? "[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:border-blue-500/40 [&_[data-slot=input-group]]:bg-card/50 [&_[data-slot=input-group]]:shadow-[0_20px_60px_-36px_rgba(37,99,235,0.8)]"
-						: "[&_[data-slot=input-group]]:rounded-xl"
-				}
+						? "[&_[data-slot=input-group]]:rounded-2xl"
+						: "[&_[data-slot=input-group]]:rounded-xl",
+				)}
 				onAttachmentsChange={handleAttachmentsChange}
 				onSubmit={submit}
 			>

@@ -220,6 +220,14 @@ describe("AgentChatMessage", () => {
 			"Describe what you want to build…",
 		);
 		const submit = screen.getByRole("button", { name: "Submit" });
+		const form = input.closest("form");
+		expect(form).toHaveClass(
+			"[&_[data-slot=input-group]]:border-border/70",
+			"[&_[data-slot=input-group]]:bg-card/80",
+			"[&_[data-slot=input-group]]:hover:border-violet-400/30",
+			"[&_[data-slot=input-group]]:has-[[data-slot=input-group-control]:focus-visible]:border-violet-500/50",
+			"[&_[data-slot=input-group]]:has-[[data-slot=input-group-control]:focus-visible]:ring-violet-500/10",
+		);
 
 		expect(submit).toBeDisabled();
 		await user.type(input, "   ");
