@@ -319,7 +319,7 @@ describe("AgentChatMessage", () => {
 		const saveButton = screen.getByRole("button", {
 			name: "Save for this page",
 		});
-		expect(saveButton).toHaveClass("from-blue-600", "to-violet-600");
+		expect(saveButton).toHaveClass("bg-primary", "text-primary-foreground");
 		await user.click(saveButton);
 		expect(chatBodies).toHaveLength(0);
 
