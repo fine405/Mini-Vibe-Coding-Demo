@@ -10,7 +10,6 @@ import {
 import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import {
 	AlertTriangleIcon,
-	BotIcon,
 	KeyRoundIcon,
 	Loader2Icon,
 	PanelLeftCloseIcon,
@@ -776,9 +775,7 @@ function AgentChatPane({
 						{messages.length === 0 ? (
 							<ConversationEmptyState className="min-h-full justify-start overflow-y-auto px-4 py-6">
 								<div className="flex w-full max-w-2xl flex-1 flex-col items-center justify-center py-6">
-									<div className="flex size-14 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-[0_0_48px_-16px_rgba(59,130,246,0.9)]">
-										<BotIcon className="size-7" />
-									</div>
+									<BrandMark className="size-14" />
 									<h2 className="mt-6 text-balance text-xl font-semibold tracking-tight">
 										Build with a real coding agent
 									</h2>
