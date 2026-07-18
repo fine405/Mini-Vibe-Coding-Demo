@@ -118,7 +118,6 @@ export function ThemeMenu() {
 						variant="ghost"
 					>
 						<ActiveIcon className="h-3.5 w-3.5" />
-						<span className="text-xs font-medium">Theme</span>
 						<ChevronDown className="h-3 w-3" />
 					</Button>
 				</DropdownMenuTrigger>
