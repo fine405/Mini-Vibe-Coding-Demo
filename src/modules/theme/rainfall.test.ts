@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	createRainfall,
+	depositSurfaceWater,
 	EJECT_SPEED_FRACTION,
 	getCrownRadius,
 	getDropCount,
@@ -13,7 +14,9 @@ import {
 	RAIN_LAYER_CONFIG,
 	RAIN_WIND_RANGE,
 	RING_LIFETIME_SECONDS,
+	setRainSurfaces,
 	stepRainfall,
+	stepSurfaceWater,
 } from "@/modules/theme/rainfall";
 
 const steady = (value: number) => () => value;
@@ -129,7 +132,7 @@ describe("rainfall simulation", () => {
 
 		expect(state.rings.length).toBeGreaterThan(0);
 		const ring = state.rings[0];
-		expect(ring.groundY).toBe(100);
+		expect(ring.y).toBe(100);
 		expect(Number.isFinite(ring.x)).toBe(true);
 		expect(ring.lifetime).toBe(RING_LIFETIME_SECONDS);
 
@@ -146,6 +149,61 @@ describe("rainfall simulation", () => {
 		// Recycled above the top edge with a fresh age.
 		expect(drop.y).toBeLessThan(0);
 		expect(drop.age).toBe(0);
+	});
+
+	it("stops a fast drop at a registered component and deposits water", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		for (const candidate of state.drops) {
+			candidate.x = 10;
+			candidate.y = -100;
+		}
+		const drop = state.drops.find((candidate) => candidate.layer === "near");
+		expect(drop).toBeDefined();
+		if (!drop) return;
+		drop.x = 120;
+		drop.y = 45;
+		drop.speed = 700;
+		drop.turbulenceAmplitude = 0;
+		drop.windSusceptibility = 0;
+
+		stepRainfall(state, 0.05, steady(0.5));
+
+		expect(drop.y).toBeLessThan(0);
+		expect(state.rings.some((ring) => ring.y < 72)).toBe(true);
+		expect(state.surfaceBeads).toHaveLength(1);
+		expect(state.surfaceBeads[0]?.surfaceId).toBe("brand");
+	});
+
+	it("moves accumulated water to a rounded edge and emits a runoff drop", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		for (let index = 0; index < 4; index++) {
+			depositSurfaceWater(
+				state,
+				{
+					normalX: 0,
+					normalY: -1,
+					surfaceId: "brand",
+					t: 0,
+					x: 82,
+					y: 70,
+				},
+				0.5,
+			);
+		}
+
+		for (let index = 0; index < 180; index++) {
+			stepSurfaceWater(state, 1 / 60, steady(0.5));
+		}
+
+		expect(state.runoffDrops.length).toBeGreaterThan(0);
+		expect(state.runoffDrops[0]?.y).toBeGreaterThan(70);
+		expect(state.runoffDrops[0]?.x).toBeLessThan(70);
 	});
 
 	it("reserves visible bottom-edge splashes for the near layer", () => {

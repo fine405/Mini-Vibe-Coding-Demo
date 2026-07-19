@@ -664,6 +664,7 @@ function AgentChatPane({
 						? "[&_[data-slot=input-group]]:rounded-2xl"
 						: "[&_[data-slot=input-group]]:rounded-xl",
 				)}
+				data-rain-surface="agent-composer"
 				onAttachmentsChange={handleAttachmentsChange}
 				onSubmit={submit}
 			>
@@ -777,7 +778,7 @@ function AgentChatPane({
 						{messages.length === 0 ? (
 							<ConversationEmptyState className="min-h-full justify-start overflow-y-auto px-4 py-6">
 								<div className="flex w-full max-w-2xl flex-1 flex-col items-center justify-center py-6">
-									<BrandMark className="size-14" />
+									<BrandMark className="size-14" rainSurfaceId="agent-brand" />
 									<h2 className="mt-6 text-balance text-xl font-semibold tracking-tight">
 										Build with a real coding agent
 									</h2>

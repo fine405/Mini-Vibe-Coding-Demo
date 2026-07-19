@@ -19,6 +19,12 @@
  *   recycle silently so the viewport edge does not read as a hard surface.
  */
 
+import {
+	findRainSurfaceHit,
+	type RainSurfaceGeometry,
+	type RainSurfaceHit,
+} from "@/modules/theme/rainSurfaces";
+
 export type RainLayer = "far" | "mid" | "near";
 
 export interface Raindrop {
@@ -56,14 +62,43 @@ export interface SprayDroplet {
 	size: number;
 }
 
-/** Expanding crown ring left by an impact on the ground line. */
+/** Expanding crown ring left by an impact on a solid surface. */
 export interface SplashRing {
 	x: number;
-	groundY: number;
+	y: number;
+	/** Rotation of the impacted surface tangent, in radians. */
+	tangentAngle: number;
 	age: number;
 	lifetime: number;
 	maxRadius: number;
 	alpha: number;
+}
+
+export interface WetRainSurface extends RainSurfaceGeometry {
+	leftReservoir: number;
+	rightReservoir: number;
+}
+
+/** A small packet of water moving along a component's top edge. */
+export interface SurfaceWaterBead {
+	surfaceId: string;
+	/** Normalized position along the straight portion of the top edge. */
+	u: number;
+	velocity: number;
+	volume: number;
+}
+
+/** Water released from a rounded component edge back into the rain field. */
+export interface RunoffDroplet {
+	x: number;
+	y: number;
+	vx: number;
+	vy: number;
+	age: number;
+	volume: number;
+	alpha: number;
+	size: number;
+	sourceSurfaceId: string;
 }
 
 export interface RainfallState {
@@ -73,6 +108,9 @@ export interface RainfallState {
 	drops: Raindrop[];
 	sprays: SprayDroplet[];
 	rings: SplashRing[];
+	surfaces: WetRainSurface[];
+	surfaceBeads: SurfaceWaterBead[];
+	runoffDrops: RunoffDroplet[];
 	spawnAccumulator: number;
 }
 
@@ -184,6 +222,8 @@ export const RING_LIFETIME_SECONDS = 0.28;
 /** Hard bounds on live splash particles to keep the frame cheap. */
 export const MAX_SPRAY_COUNT = 90;
 export const MAX_RING_COUNT = 36;
+export const MAX_SURFACE_BEAD_COUNT = 72;
+export const MAX_RUNOFF_DROP_COUNT = 36;
 
 /** Some near-camera impacts make a visible splash at the bottom edge. */
 export const NEAR_SPLASH_CHANCE = 0.3;
@@ -250,6 +290,9 @@ export const createRainfall = (
 		drops,
 		sprays: [],
 		rings: [],
+		surfaces: [],
+		surfaceBeads: [],
+		runoffDrops: [],
 		spawnAccumulator: 0,
 	};
 };
@@ -261,42 +304,51 @@ export const createRainfall = (
 export const getCrownRadius = (impactSpeed: number): number =>
 	1.4 + (impactSpeed / 640) * 3.6;
 
-const spawnSplash = (
+const spawnImpact = (
 	state: RainfallState,
-	drop: Raindrop,
+	point: { x: number; y: number; normalX: number; normalY: number },
+	impactSpeed: number,
+	alpha: number,
+	size: number,
 	random: () => number,
 ): void => {
-	const config = RAIN_LAYER_CONFIG[drop.layer];
 	const dropletCount = 2 + Math.round(random());
+	const tangentX = -point.normalY;
+	const tangentY = point.normalX;
 
 	for (let i = 0; i < dropletCount; i++) {
 		const angle = (random() * 2 - 1) * EJECT_SPREAD_RADIANS;
-		const speed = drop.speed * rand(random, EJECT_SPEED_FRACTION);
-		const vy = -speed * Math.cos(angle);
-		// Ballistic time of flight back to the ground line, capped.
-		const lifetime = Math.min(0.5, (-2 * vy) / RAIN_GRAVITY);
+		const speed = impactSpeed * rand(random, EJECT_SPEED_FRACTION);
+		const normalSpeed = speed * Math.cos(angle);
+		const tangentSpeed = speed * Math.sin(angle);
+		const vx = point.normalX * normalSpeed + tangentX * tangentSpeed;
+		const vy = point.normalY * normalSpeed + tangentY * tangentSpeed;
+		const lifetime = Math.min(
+			0.5,
+			Math.max(0.16, vy < 0 ? (-2 * vy) / RAIN_GRAVITY : 0.16),
+		);
 		state.sprays.push({
-			x: drop.x,
-			y: state.height - 1,
-			vx: speed * Math.sin(angle),
+			x: point.x + point.normalX,
+			y: point.y + point.normalY,
+			vx,
 			vy,
 			age: 0,
 			lifetime,
-			alpha: Math.min(0.42, drop.alpha * 1.45),
-			size: config.strokeWidth,
+			alpha: Math.min(0.42, alpha * 1.45),
+			size,
 		});
 	}
 
 	state.rings.push({
-		x: drop.x,
-		groundY: state.height,
+		x: point.x,
+		y: point.y,
+		tangentAngle: Math.atan2(tangentY, tangentX),
 		age: 0,
 		lifetime: RING_LIFETIME_SECONDS,
-		maxRadius: getCrownRadius(drop.speed),
-		alpha: Math.min(0.36, drop.alpha * 1.3),
+		maxRadius: getCrownRadius(impactSpeed),
+		alpha: Math.min(0.36, alpha * 1.3),
 	});
 
-	// Shed the oldest particles when the caps are exceeded.
 	if (state.sprays.length > MAX_SPRAY_COUNT) {
 		state.sprays.splice(0, state.sprays.length - MAX_SPRAY_COUNT);
 	}
@@ -305,7 +357,206 @@ const spawnSplash = (
 	}
 };
 
+const getTopTrack = (surface: RainSurfaceGeometry) => {
+	const radius = Math.min(surface.radius, surface.width * 0.5);
+	const left = surface.x + radius;
+	const right = surface.x + surface.width - radius;
+	return { left, width: Math.max(1, right - left) };
+};
+
+export const setRainSurfaces = (
+	state: RainfallState,
+	surfaces: readonly RainSurfaceGeometry[],
+): void => {
+	const previous = new Map(
+		state.surfaces.map((surface) => [surface.id, surface] as const),
+	);
+	state.surfaces = surfaces.map((surface) => ({
+		...surface,
+		leftReservoir: previous.get(surface.id)?.leftReservoir ?? 0,
+		rightReservoir: previous.get(surface.id)?.rightReservoir ?? 0,
+	}));
+	const activeIds = new Set(state.surfaces.map((surface) => surface.id));
+	state.surfaceBeads = state.surfaceBeads.filter((bead) =>
+		activeIds.has(bead.surfaceId),
+	);
+};
+
+const getSurfaceById = (
+	state: RainfallState,
+	id: string,
+): WetRainSurface | undefined =>
+	state.surfaces.find((surface) => surface.id === id);
+
+export const depositSurfaceWater = (
+	state: RainfallState,
+	hit: RainSurfaceHit,
+	volume: number,
+): void => {
+	if (volume <= 0 || hit.normalY > -0.2) return;
+	const surface = getSurfaceById(state, hit.surfaceId);
+	if (!surface) return;
+	const track = getTopTrack(surface);
+	const u = clamp01((hit.x - track.left) / track.width);
+	const mergeDistance = 12 / track.width;
+	const existing = state.surfaceBeads.find(
+		(bead) =>
+			bead.surfaceId === surface.id && Math.abs(bead.u - u) <= mergeDistance,
+	);
+	if (existing) {
+		const nextVolume = existing.volume + volume;
+		existing.u = (existing.u * existing.volume + u * volume) / nextVolume;
+		existing.volume = nextVolume;
+		return;
+	}
+
+	if (state.surfaceBeads.length >= MAX_SURFACE_BEAD_COUNT) {
+		const nearest = state.surfaceBeads.reduce<SurfaceWaterBead | undefined>(
+			(best, bead) => {
+				if (bead.surfaceId !== surface.id) return best;
+				if (!best || Math.abs(bead.u - u) < Math.abs(best.u - u)) return bead;
+				return best;
+			},
+			undefined,
+		);
+		if (nearest) nearest.volume += volume;
+		return;
+	}
+
+	state.surfaceBeads.push({ surfaceId: surface.id, u, velocity: 0, volume });
+};
+
+const emitRunoff = (
+	state: RainfallState,
+	surface: WetRainSurface,
+	side: "left" | "right",
+	volume: number,
+	random: () => number,
+): void => {
+	if (state.runoffDrops.length >= MAX_RUNOFF_DROP_COUNT) return;
+	const direction = side === "left" ? -1 : 1;
+	state.runoffDrops.push({
+		x: side === "left" ? surface.x - 0.75 : surface.x + surface.width + 0.75,
+		y: surface.y + Math.max(2, surface.radius * 0.72),
+		vx: direction * (8 + random() * 10),
+		vy: 25 + random() * 20,
+		age: 0,
+		volume,
+		alpha: 0.46,
+		size: 1.15 + Math.sqrt(volume) * 0.38,
+		sourceSurfaceId: surface.id,
+	});
+};
+
+export const stepSurfaceWater = (
+	state: RainfallState,
+	dt: number,
+	random: () => number = Math.random,
+): void => {
+	if (dt <= 0) return;
+	for (let index = state.surfaceBeads.length - 1; index >= 0; index--) {
+		const bead = state.surfaceBeads[index];
+		const surface = getSurfaceById(state, bead.surfaceId);
+		if (!surface) {
+			state.surfaceBeads.splice(index, 1);
+			continue;
+		}
+		const track = getTopTrack(surface);
+		const side = bead.u < 0.5 ? -1 : bead.u > 0.5 ? 1 : random() < 0.5 ? -1 : 1;
+		const distanceFromCenter = Math.abs(bead.u - 0.5) * 2;
+		bead.velocity += side * (42 + distanceFromCenter * 96) * dt;
+		bead.velocity *= Math.exp(-3.4 * dt);
+		bead.u += (bead.velocity / track.width) * dt;
+
+		if (bead.u <= 0) {
+			surface.leftReservoir += bead.volume;
+			state.surfaceBeads.splice(index, 1);
+		} else if (bead.u >= 1) {
+			surface.rightReservoir += bead.volume;
+			state.surfaceBeads.splice(index, 1);
+		}
+	}
+
+	for (const surface of state.surfaces) {
+		const releaseVolume = Math.min(2.2, 0.75 + surface.width / 500);
+		while (
+			surface.leftReservoir >= releaseVolume &&
+			state.runoffDrops.length < MAX_RUNOFF_DROP_COUNT
+		) {
+			surface.leftReservoir -= releaseVolume;
+			emitRunoff(state, surface, "left", releaseVolume, random);
+		}
+		while (
+			surface.rightReservoir >= releaseVolume &&
+			state.runoffDrops.length < MAX_RUNOFF_DROP_COUNT
+		) {
+			surface.rightReservoir -= releaseVolume;
+			emitRunoff(state, surface, "right", releaseVolume, random);
+		}
+	}
+};
+
+const DROP_WATER_VOLUME: Record<RainLayer, number> = {
+	far: 0.08,
+	mid: 0.2,
+	near: 0.48,
+};
+
 const WRAP_MARGIN = 24;
+
+const stepRunoffDrops = (
+	state: RainfallState,
+	dt: number,
+	random: () => number,
+): void => {
+	for (let index = state.runoffDrops.length - 1; index >= 0; index--) {
+		const drop = state.runoffDrops[index];
+		const start = { x: drop.x, y: drop.y };
+		drop.age += dt;
+		drop.vy += 1800 * dt;
+		drop.x += drop.vx * dt;
+		drop.y += drop.vy * dt;
+		const candidateSurfaces =
+			drop.age < 0.12
+				? state.surfaces.filter(
+						(surface) => surface.id !== drop.sourceSurfaceId,
+					)
+				: state.surfaces;
+		const hit = findRainSurfaceHit(start, drop, candidateSurfaces);
+		if (hit) {
+			depositSurfaceWater(state, hit, drop.volume * 0.8);
+			spawnImpact(
+				state,
+				hit,
+				Math.hypot(drop.vx, drop.vy),
+				drop.alpha,
+				drop.size,
+				random,
+			);
+			state.runoffDrops.splice(index, 1);
+			continue;
+		}
+		if (drop.y >= state.height) {
+			spawnImpact(
+				state,
+				{ x: drop.x, y: state.height, normalX: 0, normalY: -1 },
+				Math.hypot(drop.vx, drop.vy),
+				drop.alpha,
+				drop.size,
+				random,
+			);
+			state.runoffDrops.splice(index, 1);
+			continue;
+		}
+		if (
+			drop.age > 4 ||
+			drop.x < -WRAP_MARGIN ||
+			drop.x > state.width + WRAP_MARGIN
+		) {
+			state.runoffDrops.splice(index, 1);
+		}
+	}
+};
 
 export const stepRainfall = (
 	state: RainfallState,
@@ -359,6 +610,8 @@ export const stepRainfall = (
 		const drop = state.drops[index];
 		const config = RAIN_LAYER_CONFIG[drop.layer];
 		drop.age += dt;
+		const previousX = drop.x;
+		const previousY = drop.y;
 
 		drop.vx =
 			wind * config.windFactor * drop.windSusceptibility +
@@ -367,10 +620,42 @@ export const stepRainfall = (
 		drop.x += drop.vx * dt;
 		drop.y += drop.speed * dt;
 
+		const surfaceHit = findRainSurfaceHit(
+			{ x: previousX, y: previousY },
+			drop,
+			state.surfaces,
+		);
+		if (surfaceHit) {
+			depositSurfaceWater(state, surfaceHit, DROP_WATER_VOLUME[drop.layer]);
+			if (drop.layer === "near" || (drop.layer === "mid" && random() < 0.4)) {
+				spawnImpact(
+					state,
+					surfaceHit,
+					drop.speed,
+					drop.alpha,
+					config.strokeWidth,
+					random,
+				);
+			}
+			if (state.drops.length > targetCount) {
+				state.drops.splice(index, 1);
+				continue;
+			}
+			randomizeDrop(drop, drop.layer, state.width, state.height, random, false);
+			continue;
+		}
+
 		// Near drops occasionally splash; surplus drops retire at the bottom.
 		if (drop.y >= state.height) {
 			if (drop.layer === "near" && random() < NEAR_SPLASH_CHANCE) {
-				spawnSplash(state, drop, random);
+				spawnImpact(
+					state,
+					{ x: drop.x, y: state.height, normalX: 0, normalY: -1 },
+					drop.speed,
+					drop.alpha,
+					config.strokeWidth,
+					random,
+				);
 			}
 			if (state.drops.length > targetCount) {
 				state.drops.splice(index, 1);
@@ -387,6 +672,9 @@ export const stepRainfall = (
 			drop.x -= state.width + WRAP_MARGIN * 2;
 		}
 	}
+
+	stepSurfaceWater(state, dt, random);
+	stepRunoffDrops(state, dt, random);
 
 	for (let i = state.sprays.length - 1; i >= 0; i--) {
 		const spray = state.sprays[i];

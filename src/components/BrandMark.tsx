@@ -2,7 +2,13 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 
-export function BrandMark({ className }: { className?: string }) {
+export function BrandMark({
+	className,
+	rainSurfaceId,
+}: {
+	className?: string;
+	rainSurfaceId?: string;
+}) {
 	const reduceMotion = useReducedMotion();
 	const id = useId().replaceAll(":", "");
 	const surfaceGradientId = `${id}-surface`;
@@ -16,6 +22,7 @@ export function BrandMark({ className }: { className?: string }) {
 				"shrink-0 overflow-hidden rounded-[30%] bg-[#090a0f] shadow-[0_10px_30px_-16px_rgba(76,90,180,0.8)] ring-1 ring-white/10",
 				className,
 			)}
+			data-rain-surface={rainSurfaceId}
 		>
 			<svg
 				className="size-full"

@@ -21,13 +21,19 @@ import {
 	getDropFade,
 	RAIN_LAYER_CONFIG,
 	type RainfallState,
+	setRainSurfaces,
 	stepRainfall,
 } from "@/modules/theme/rainfall";
+import {
+	type RainSurfaceGeometry,
+	signedDistanceToRainSurface,
+} from "@/modules/theme/rainSurfaces";
 
 export interface RainSceneHandle {
 	update: (dt: number, audioTime?: number | null) => void;
 	renderStill: () => void;
 	resize: (width: number, height: number) => void;
+	setSurfaces: (surfaces: readonly RainSurfaceGeometry[]) => void;
 	dispose: () => void;
 }
 
@@ -72,8 +78,14 @@ const drawLightning = (
 const drawDrop = (
 	ctx: CanvasRenderingContext2D,
 	drop: RainfallState["drops"][number],
+	surfaces: RainfallState["surfaces"],
 	forceVisible: boolean,
 ): void => {
+	if (
+		surfaces.some((surface) => signedDistanceToRainSurface(drop, surface) <= 0)
+	) {
+		return;
+	}
 	const config = RAIN_LAYER_CONFIG[drop.layer];
 	const alpha = drop.alpha * (forceVisible ? 1 : getDropFade(drop));
 	if (alpha <= 0) return;
@@ -98,6 +110,89 @@ const drawDrop = (
 	ctx.stroke();
 };
 
+const drawSurfaceWater = (
+	ctx: CanvasRenderingContext2D,
+	state: RainfallState,
+): void => {
+	for (const bead of state.surfaceBeads) {
+		const surface = state.surfaces.find(
+			(candidate) => candidate.id === bead.surfaceId,
+		);
+		if (!surface) continue;
+		const radius = Math.min(surface.radius, surface.width * 0.5);
+		const trackLeft = surface.x + radius;
+		const trackWidth = Math.max(1, surface.width - radius * 2);
+		const x = trackLeft + bead.u * trackWidth;
+		const beadRadius = Math.min(3.2, 1 + Math.sqrt(bead.volume) * 0.8);
+		const alpha = Math.min(0.52, 0.22 + bead.volume * 0.12);
+		ctx.fillStyle = `rgba(${STREAK_RGB}, ${alpha})`;
+		ctx.beginPath();
+		ctx.ellipse(
+			x,
+			surface.y + 0.15,
+			beadRadius * 1.5,
+			beadRadius,
+			0,
+			0,
+			Math.PI * 2,
+		);
+		ctx.fill();
+		ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.55})`;
+		ctx.beginPath();
+		ctx.ellipse(
+			x - beadRadius * 0.3,
+			surface.y - beadRadius * 0.2,
+			beadRadius * 0.42,
+			beadRadius * 0.22,
+			0,
+			0,
+			Math.PI * 2,
+		);
+		ctx.fill();
+	}
+
+	for (const surface of state.surfaces) {
+		for (const side of ["left", "right"] as const) {
+			const volume =
+				side === "left" ? surface.leftReservoir : surface.rightReservoir;
+			if (volume <= 0.03) continue;
+			const direction = side === "left" ? -1 : 1;
+			const edgeX =
+				side === "left"
+					? surface.x + surface.radius
+					: surface.x + surface.width - surface.radius;
+			const sideX =
+				side === "left" ? surface.x - 0.2 : surface.x + surface.width + 0.2;
+			const alpha = Math.min(0.48, 0.16 + volume * 0.16);
+			ctx.strokeStyle = `rgba(${STREAK_RGB}, ${alpha})`;
+			ctx.lineWidth = Math.min(2.2, 0.8 + volume * 0.45);
+			ctx.beginPath();
+			ctx.moveTo(edgeX, surface.y);
+			ctx.quadraticCurveTo(
+				edgeX + direction * surface.radius * 0.65,
+				surface.y,
+				sideX,
+				surface.y + surface.radius * 0.72,
+			);
+			ctx.stroke();
+		}
+	}
+
+	for (const drop of state.runoffDrops) {
+		const alpha = drop.alpha * Math.min(1, drop.age / 0.08);
+		ctx.strokeStyle = `rgba(${STREAK_RGB}, ${alpha * 0.7})`;
+		ctx.lineWidth = drop.size;
+		ctx.beginPath();
+		ctx.moveTo(drop.x - drop.vx * 0.025, drop.y - drop.vy * 0.025);
+		ctx.lineTo(drop.x, drop.y);
+		ctx.stroke();
+		ctx.fillStyle = `rgba(246, 250, 253, ${alpha})`;
+		ctx.beginPath();
+		ctx.ellipse(drop.x, drop.y, drop.size * 0.65, drop.size, 0, 0, Math.PI * 2);
+		ctx.fill();
+	}
+};
+
 const draw = (
 	ctx: CanvasRenderingContext2D,
 	state: RainfallState,
@@ -109,8 +204,9 @@ const draw = (
 	drawLightning(ctx, state, visual);
 
 	for (const drop of state.drops) {
-		drawDrop(ctx, drop, forceVisible);
+		drawDrop(ctx, drop, state.surfaces, forceVisible);
 	}
+	drawSurfaceWater(ctx, state);
 
 	for (const spray of state.sprays) {
 		const alpha = spray.alpha * (1 - spray.age / spray.lifetime);
@@ -136,10 +232,10 @@ const draw = (
 		ctx.beginPath();
 		ctx.ellipse(
 			ring.x,
-			ring.groundY,
+			ring.y,
 			radiusX,
 			radiusX * RING_ASPECT,
-			0,
+			ring.tangentAngle,
 			0,
 			Math.PI * 2,
 		);
@@ -186,13 +282,21 @@ export const createRainScene = (
 		},
 		renderStill: () => draw(ctx, state, visual, true),
 		resize: (nextWidth: number, nextHeight: number) => {
+			const surfaces = state.surfaces;
 			state = createRainfall(nextWidth, nextHeight, random, visual.intensity);
+			setRainSurfaces(state, surfaces);
 			applySize();
+		},
+		setSurfaces: (surfaces: readonly RainSurfaceGeometry[]) => {
+			setRainSurfaces(state, surfaces);
 		},
 		dispose: () => {
 			state.drops = [];
 			state.sprays = [];
 			state.rings = [];
+			state.surfaces = [];
+			state.surfaceBeads = [];
+			state.runoffDrops = [];
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 		},
 	};

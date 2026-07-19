@@ -203,6 +203,9 @@ describe("AgentChatMessage", () => {
 			"active",
 		);
 		expect(screen.getByRole("tab", { name: "Generative UI" })).toBeVisible();
+		expect(
+			document.querySelector('[data-rain-surface="agent-brand"]'),
+		).toBeVisible();
 		for (const suggestion of screen.getAllByTestId("chat-suggestion")) {
 			expect(suggestion.querySelector("svg")).toHaveClass("text-violet-500");
 		}
@@ -221,6 +224,7 @@ describe("AgentChatMessage", () => {
 		);
 		const submit = screen.getByRole("button", { name: "Submit" });
 		const form = input.closest("form");
+		expect(form).toHaveAttribute("data-rain-surface", "agent-composer");
 		expect(form).toHaveClass(
 			"[&_[data-slot=input-group]]:border-border/70",
 			"[&_[data-slot=input-group]]:bg-card/80",
