@@ -22,19 +22,21 @@ export interface DrizzleVisualState {
 	thunder: number;
 	/** Short lightning exposure pulse, separate from the long thunder rumble. */
 	lightning: number;
+	/** Visible channel reserved for the weaker return stroke after sheet lightning. */
+	bolt: number;
 }
 
 const DRIZZLE_LIGHTNING_FLASHES = [
-	{ timeSeconds: 12.08, strength: 1 },
-	{ timeSeconds: 12.34, strength: 0.48 },
-	{ timeSeconds: 22.38, strength: 0.86 },
-	{ timeSeconds: 22.62, strength: 0.38 },
-	{ timeSeconds: 26.08, strength: 1 },
-	{ timeSeconds: 26.34, strength: 0.52 },
-	{ timeSeconds: 31.8, strength: 0.45 },
-	{ timeSeconds: 44.98, strength: 0.94 },
-	{ timeSeconds: 45.25, strength: 0.42 },
-	{ timeSeconds: 52.7, strength: 0.52 },
+	{ timeSeconds: 12.08, strength: 1, boltStrength: 0 },
+	{ timeSeconds: 12.34, strength: 0.48, boltStrength: 1 },
+	{ timeSeconds: 22.38, strength: 0.86, boltStrength: 0 },
+	{ timeSeconds: 22.62, strength: 0.38, boltStrength: 0.76 },
+	{ timeSeconds: 26.08, strength: 1, boltStrength: 0 },
+	{ timeSeconds: 26.34, strength: 0.52, boltStrength: 0.9 },
+	{ timeSeconds: 31.8, strength: 0.45, boltStrength: 0 },
+	{ timeSeconds: 44.98, strength: 0.94, boltStrength: 0 },
+	{ timeSeconds: 45.25, strength: 0.42, boltStrength: 0.84 },
+	{ timeSeconds: 52.7, strength: 0.52, boltStrength: 0.28 },
 ] as const;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
@@ -64,7 +66,10 @@ const getThunderEnvelope = (
 	return Math.max(rangeEnvelope, wrapRelease);
 };
 
-const getLightningEnvelope = (timeSeconds: number): number => {
+const getFlashEnvelope = (
+	timeSeconds: number,
+	getStrength: (flash: (typeof DRIZZLE_LIGHTNING_FLASHES)[number]) => number,
+): number => {
 	const attackSeconds = 0.045;
 	const decaySeconds = 0.16;
 	return DRIZZLE_LIGHTNING_FLASHES.reduce((strongest, flash) => {
@@ -74,9 +79,15 @@ const getLightningEnvelope = (timeSeconds: number): number => {
 			elapsed < 0
 				? smoothstep(1 + elapsed / attackSeconds)
 				: Math.exp(-elapsed / decaySeconds) * (1 - smoothstep(elapsed / 0.6));
-		return Math.max(strongest, flash.strength * pulse);
+		return Math.max(strongest, getStrength(flash) * pulse);
 	}, 0);
 };
+
+const getLightningEnvelope = (timeSeconds: number): number =>
+	getFlashEnvelope(timeSeconds, (flash) => flash.strength);
+
+const getBoltEnvelope = (timeSeconds: number): number =>
+	getFlashEnvelope(timeSeconds, (flash) => flash.boltStrength);
 
 export const getDrizzleVisualState = (
 	timeSeconds: number,
@@ -95,6 +106,7 @@ export const getDrizzleVisualState = (
 		elapsedTime >= DRIZZLE_AUDIO_LOOP_SECONDS,
 	);
 	const lightning = getLightningEnvelope(normalizedTime);
+	const bolt = getBoltEnvelope(normalizedTime);
 
 	return {
 		intensity: Math.min(
@@ -104,6 +116,7 @@ export const getDrizzleVisualState = (
 		windBoost: 1 + thunder * 0.22,
 		thunder,
 		lightning,
+		bolt,
 	};
 };
 

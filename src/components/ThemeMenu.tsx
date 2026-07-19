@@ -18,6 +18,7 @@ import {
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DrizzleStormCanvas } from "@/modules/theme/DrizzleStormCanvas";
 import { DrizzleThemeAudio } from "@/modules/theme/DrizzleThemeAudio";
 import { DrizzleThemeCanvas } from "@/modules/theme/DrizzleThemeCanvas";
 import { SnowThemeAudio } from "@/modules/theme/SnowThemeAudio";
@@ -113,6 +114,7 @@ export function ThemeMenu() {
 			<ThemeNoiseTexture />
 			<SummerThemeMedia />
 			<DrizzleThemeAudio />
+			<DrizzleStormCanvas />
 			<DrizzleThemeCanvas />
 			<SnowThemeAudio />
 			<SnowThemeCanvas />

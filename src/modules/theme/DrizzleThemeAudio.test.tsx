@@ -73,6 +73,8 @@ describe("DrizzleThemeAudio", () => {
 		expect(thunder.windBoost).toBeGreaterThan(quiet.windBoost);
 		expect(primaryFlash.lightning).toBeGreaterThan(0.9);
 		expect(returnFlash.lightning).toBeGreaterThan(0.35);
+		expect(primaryFlash.bolt).toBe(0);
+		expect(returnFlash.bolt).toBeGreaterThan(0.8);
 		expect(quiet.lightning).toBe(0);
 	});
 
