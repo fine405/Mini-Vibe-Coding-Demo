@@ -1,6 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { useLayoutStore } from "@/modules/layout/store";
 import { useThemeStore } from "@/modules/theme/store";
 import { WorkbenchHeader } from "./WorkbenchHeader";
@@ -18,6 +26,12 @@ describe("WorkbenchHeader", () => {
 			activeView: "preview",
 		});
 		useThemeStore.setState({ mode: "night", resolvedTheme: "dark" });
+	});
+
+	afterEach(() => {
+		Reflect.deleteProperty(document, "fullscreenElement");
+		Reflect.deleteProperty(document, "exitFullscreen");
+		Reflect.deleteProperty(document.documentElement, "requestFullscreen");
 	});
 
 	afterAll(() => vi.restoreAllMocks());
@@ -82,6 +96,48 @@ describe("WorkbenchHeader", () => {
 		await user.click(await screen.findByRole("menuitem", { name: /console/i }));
 
 		expect(useLayoutStore.getState().showConsole).toBe(true);
+	});
+
+	it("toggles fullscreen from the more menu and keyboard shortcut", async () => {
+		let fullscreenElement: Element | null = null;
+		const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+		const exitFullscreen = vi.fn().mockResolvedValue(undefined);
+		Object.defineProperty(document, "fullscreenElement", {
+			configurable: true,
+			get: () => fullscreenElement,
+		});
+		Object.defineProperty(document, "exitFullscreen", {
+			configurable: true,
+			value: exitFullscreen,
+		});
+		Object.defineProperty(document.documentElement, "requestFullscreen", {
+			configurable: true,
+			value: requestFullscreen,
+		});
+
+		const user = userEvent.setup();
+		render(<WorkbenchHeader />);
+
+		await user.click(screen.getByRole("button", { name: "More actions" }));
+		const enterFullscreenItem = await screen.findByRole("menuitem", {
+			name: /enter full screen/i,
+		});
+		expect(enterFullscreenItem).toHaveTextContent("⌃⌘F");
+		await user.click(enterFullscreenItem);
+		expect(requestFullscreen).toHaveBeenCalledOnce();
+
+		fullscreenElement = document.documentElement;
+		fireEvent(document, new Event("fullscreenchange"));
+		await user.click(screen.getByRole("button", { name: "More actions" }));
+		await user.click(
+			await screen.findByRole("menuitem", { name: /exit full screen/i }),
+		);
+		expect(exitFullscreen).toHaveBeenCalledOnce();
+
+		fullscreenElement = null;
+		fireEvent(document, new Event("fullscreenchange"));
+		fireEvent.keyDown(window, { key: "f", ctrlKey: true, metaKey: true });
+		expect(requestFullscreen).toHaveBeenCalledTimes(2);
 	});
 
 	it("selects themes from a dedicated header menu", async () => {

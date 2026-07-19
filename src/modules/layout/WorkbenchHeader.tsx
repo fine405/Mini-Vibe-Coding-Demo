@@ -10,11 +10,14 @@ import {
 	FileJson,
 	FilePlus2,
 	HelpCircle,
+	Maximize,
+	Minimize,
 	MoreHorizontal,
 	PanelLeft,
 	TerminalSquare,
 	Upload,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ThemeMenu } from "@/components/ThemeMenu";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +37,10 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+	type KeyboardShortcut,
+	useKeyboardShortcuts,
+} from "@/hooks/useKeyboardShortcuts";
 import { useLayoutStore, type WorkbenchView } from "@/modules/layout/store";
 
 interface WorkbenchHeaderProps {
@@ -108,6 +115,41 @@ export function WorkbenchHeader({
 }: WorkbenchHeaderProps) {
 	const { showChat, showConsole, setChatVisible, toggleConsole } =
 		useLayoutStore();
+	const [isFullscreen, setIsFullscreen] = useState(false);
+	const toggleFullscreen = useCallback(() => {
+		const request = document.fullscreenElement
+			? document.exitFullscreen?.bind(document)
+			: document.documentElement.requestFullscreen?.bind(
+					document.documentElement,
+				);
+		if (request) void request().catch(() => undefined);
+	}, []);
+	const fullscreenShortcuts = useMemo<KeyboardShortcut[]>(
+		() => [
+			{
+				key: "f",
+				ctrlKey: true,
+				metaKey: true,
+				shiftKey: false,
+				altKey: false,
+				action: toggleFullscreen,
+			},
+		],
+		[toggleFullscreen],
+	);
+
+	useEffect(() => {
+		const syncFullscreenState = () => {
+			setIsFullscreen(Boolean(document.fullscreenElement));
+		};
+
+		syncFullscreenState();
+		document.addEventListener("fullscreenchange", syncFullscreenState);
+		return () => {
+			document.removeEventListener("fullscreenchange", syncFullscreenState);
+		};
+	}, []);
+	useKeyboardShortcuts(fullscreenShortcuts);
 
 	return (
 		<header className="flex h-10 w-full shrink-0 items-center gap-2 border-b border-border-primary bg-bg-primary px-3 text-fg-primary">
@@ -211,6 +253,17 @@ export function WorkbenchHeader({
 									)}
 									<span>⌘2</span>
 								</DropdownMenuShortcut>
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={toggleFullscreen}>
+								{isFullscreen ? (
+									<Minimize className="h-4 w-4" />
+								) : (
+									<Maximize className="h-4 w-4" />
+								)}
+								<span>
+									{isFullscreen ? "Exit Full Screen" : "Enter Full Screen"}
+								</span>
+								<DropdownMenuShortcut>⌃⌘F</DropdownMenuShortcut>
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={onStartTour}>
