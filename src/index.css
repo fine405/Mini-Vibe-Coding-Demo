@@ -490,6 +490,10 @@ textarea {
 	body {
 		@apply bg-background text-foreground;
 	}
+	button:focus,
+	button:focus-visible {
+		outline: none;
+	}
 	html {
 		@apply font-sans;
 	}
