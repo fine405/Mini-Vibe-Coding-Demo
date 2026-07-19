@@ -19,6 +19,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DrizzleThemeAudio } from "@/modules/theme/DrizzleThemeAudio";
+import { DrizzleThemeCanvas } from "@/modules/theme/DrizzleThemeCanvas";
 import { SnowThemeAudio } from "@/modules/theme/SnowThemeAudio";
 import { SnowThemeCanvas } from "@/modules/theme/SnowThemeCanvas";
 import { SummerThemeMedia } from "@/modules/theme/SummerThemeMedia";
@@ -41,7 +42,6 @@ const THEME_OPTIONS: Array<{
 		label: "Drizzle",
 		shortcut: "R",
 		icon: CloudRain,
-		pending: true,
 	},
 	{
 		mode: "snow",
@@ -113,6 +113,7 @@ export function ThemeMenu() {
 			<ThemeNoiseTexture />
 			<SummerThemeMedia />
 			<DrizzleThemeAudio />
+			<DrizzleThemeCanvas />
 			<SnowThemeAudio />
 			<SnowThemeCanvas />
 			<DropdownMenu>

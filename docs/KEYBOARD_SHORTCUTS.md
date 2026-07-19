@@ -20,7 +20,7 @@
 - **D** - Day
 - **N** - Night
 - **S** - Summer (leaf shadows and forest ambience)
-- **R** - Drizzle (rain ambience)
+- **R** - Drizzle (fullscreen rain with bottom-edge splashes, storm glass palette, and rain ambience)
 - **B** - Breeze (effect coming soon)
 - **W** - Snow (3D crystal snowfall, wintry blue palette, and piano ambience)
 

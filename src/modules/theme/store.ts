@@ -26,7 +26,7 @@ const getSystemTheme = (): ResolvedTheme => {
 };
 
 const resolveTheme = (mode: ThemeMode): ResolvedTheme =>
-	mode === "night" ? "dark" : "light";
+	mode === "night" || mode === "drizzle" ? "dark" : "light";
 
 const getRandomMode = (): ThemeMode =>
 	THEME_MODES[Math.floor(Math.random() * THEME_MODES.length)] ?? "night";

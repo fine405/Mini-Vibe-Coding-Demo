@@ -147,6 +147,148 @@
 	background-attachment: fixed;
 }
 
+/*
+ * Drizzle theme: "storm glass" — classic glassmorphism over a stormy
+ * backdrop lit by a break in the clouds.
+ *
+ * The glass contract, per surface:
+ * - translucency: every panel lets the storm's colors bleed through
+ *   (whites at 0.08–0.14 alpha, or a 0.70 dark equivalent for big panes);
+ * - edge: a thin 1px semi-transparent white border (0.24 alpha);
+ * - depth: floating surfaces cast soft, wide, layered shadows;
+ * - blur: backdrop-filter blur(16px) frosts surfaces that float over
+ *   detailed content (overlays, content cards). Edge-to-edge layout panes
+ *   sit directly over the smooth cloud gradient, where blur is
+ *   imperceptible — they read as glass through translucency alone, and
+ *   skipping their blur avoids making them containing blocks for the
+ *   fixed-position theme overlays (rain canvas, noise texture).
+ *
+ * Distinct from Night on purpose: Night is flat pure black, while Drizzle
+ * is slate-blue storm tones, luminous cloud glow, frosted panels, and a
+ * single amber accent (the warm chart line in classic weather dashboards).
+ * Resolves dark so light text sits on the storm.
+ */
+:root[data-mode="drizzle"] {
+	/* App surfaces are translucent: the storm bleeds through every panel. */
+	--app-bg-primary: rgb(18 24 31 / 0.7);
+	--app-bg-secondary: rgb(255 255 255 / 0.08);
+	--app-bg-tertiary: rgb(255 255 255 / 0.14);
+	--background: #141a21;
+
+	--app-fg-primary: #e8eef3;
+	--app-fg-secondary: #aeb9c4;
+	--app-fg-muted: #82909c;
+
+	--app-border-primary: rgb(255 255 255 / 0.24);
+	--app-border-secondary: rgb(255 255 255 / 0.12);
+
+	--app-accent-hover: #e2b273;
+
+	--foreground: #e8eef3;
+	--card: rgb(255 255 255 / 0.12);
+	--card-foreground: #e8eef3;
+	--popover: rgb(22 29 38 / 0.84);
+	--popover-foreground: #e8eef3;
+	--primary: #e8eef3;
+	--primary-foreground: #17202a;
+	--secondary: rgb(255 255 255 / 0.12);
+	--secondary-foreground: #e8eef3;
+	--muted: rgb(255 255 255 / 0.1);
+	--muted-foreground: #82909c;
+	--accent: #d9a05b;
+	--accent-foreground: #241a0c;
+	--border: rgb(255 255 255 / 0.22);
+	--input: rgb(255 255 255 / 0.24);
+	--ring: #d9a05b;
+}
+
+/*
+ * Frosted blur for surfaces floating over detailed content: overlays and
+ * content cards (glassmorphism skins any surface, not just controls).
+ */
+:root[data-mode="drizzle"]
+	:is(
+		.bg-card,
+		[data-slot="dropdown-menu-content"],
+		[data-slot="dropdown-menu-sub-content"],
+		[data-slot="dialog-content"],
+		[data-slot="select-content"],
+		[data-slot="hover-card-content"],
+		[data-slot="command"]
+	) {
+	backdrop-filter: blur(16px) saturate(1.35);
+	-webkit-backdrop-filter: blur(16px) saturate(1.35);
+}
+
+/* Layered floating depth: soft, wide shadows under glass surfaces. */
+:root[data-mode="drizzle"]
+	:is(
+		.bg-card,
+		[data-slot="dropdown-menu-content"],
+		[data-slot="dropdown-menu-sub-content"],
+		[data-slot="dialog-content"],
+		[data-slot="select-content"],
+		[data-slot="hover-card-content"],
+		[data-slot="command"]
+	) {
+	box-shadow:
+		0 16px 48px rgb(2 6 12 / 0.42),
+		0 3px 12px rgb(2 6 12 / 0.28);
+}
+
+/*
+ * Reduced-transparency fallback: swap the translucency for solid storm
+ * slate and drop all backdrop blur, keeping text contrast identical.
+ */
+@media (prefers-reduced-transparency: reduce) {
+	:root[data-mode="drizzle"] {
+		--app-bg-primary: #151c24;
+		--app-bg-secondary: #242d38;
+		--app-bg-tertiary: #2f3a46;
+		--card: #212b36;
+		--popover: #1c252f;
+		--secondary: #2f3a46;
+		--muted: #29333e;
+	}
+
+	:root[data-mode="drizzle"]
+		:is(
+			.bg-card,
+			[data-slot="dropdown-menu-content"],
+			[data-slot="dropdown-menu-sub-content"],
+			[data-slot="dialog-content"],
+			[data-slot="select-content"],
+			[data-slot="hover-card-content"],
+			[data-slot="command"]
+		) {
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
+}
+
+/*
+ * Storm clouds built from layered gradients: a bright break in the cloud
+ * deck up high, darker masses low, over a slate-blue base. Kept vivid
+ * enough for its colors to read through the translucent panels.
+ */
+:root[data-mode="drizzle"] body {
+	background-color: #12171e;
+	background-image:
+		radial-gradient(
+			115% 85% at 76% -10%,
+			rgb(196 214 232 / 0.44),
+			transparent 58%
+		),
+		radial-gradient(
+			80% 60% at 12% 18%,
+			rgb(126 140 154 / 0.18),
+			transparent 62%
+		),
+		radial-gradient(130% 90% at 50% 115%, rgb(52 63 76 / 0.5), transparent 58%),
+		linear-gradient(to bottom, #1b222c, #12171e);
+	background-attachment: fixed;
+}
+
 a {
 	font-weight: 500;
 	color: #646cff;

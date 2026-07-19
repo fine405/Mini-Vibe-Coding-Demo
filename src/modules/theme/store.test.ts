@@ -88,7 +88,7 @@ describe("theme store", () => {
 		["day", "light"],
 		["night", "dark"],
 		["summer", "light"],
-		["drizzle", "light"],
+		["drizzle", "dark"],
 		["breeze", "light"],
 		["snow", "light"],
 	])(
