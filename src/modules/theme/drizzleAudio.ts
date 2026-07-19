@@ -24,20 +24,29 @@ export interface DrizzleVisualState {
 	lightning: number;
 	/** Visible channel reserved for the weaker return stroke after sheet lightning. */
 	bolt: number;
+	/** Downward progress of the faint stepped leader immediately before a return stroke. */
+	leaderProgress: number;
+	leaderStrength: number;
+	/** Stable geometry seed for one discharge; changes between audio loops. */
+	strikeSeed: number;
 }
 
 const DRIZZLE_LIGHTNING_FLASHES = [
-	{ timeSeconds: 12.08, strength: 1, boltStrength: 0 },
-	{ timeSeconds: 12.34, strength: 0.48, boltStrength: 1 },
-	{ timeSeconds: 22.38, strength: 0.86, boltStrength: 0 },
-	{ timeSeconds: 22.62, strength: 0.38, boltStrength: 0.76 },
-	{ timeSeconds: 26.08, strength: 1, boltStrength: 0 },
-	{ timeSeconds: 26.34, strength: 0.52, boltStrength: 0.9 },
-	{ timeSeconds: 31.8, strength: 0.45, boltStrength: 0 },
-	{ timeSeconds: 44.98, strength: 0.94, boltStrength: 0 },
-	{ timeSeconds: 45.25, strength: 0.42, boltStrength: 0.84 },
-	{ timeSeconds: 52.7, strength: 0.52, boltStrength: 0.28 },
+	{ timeSeconds: 12.08, strength: 1, boltStrength: 0, strikeSeed: 0.17 },
+	{ timeSeconds: 12.34, strength: 0.48, boltStrength: 1, strikeSeed: 0.17 },
+	{ timeSeconds: 22.38, strength: 0.86, boltStrength: 0, strikeSeed: 0.71 },
+	{ timeSeconds: 22.62, strength: 0.38, boltStrength: 0.76, strikeSeed: 0.71 },
+	{ timeSeconds: 26.08, strength: 1, boltStrength: 0, strikeSeed: 0.42 },
+	{ timeSeconds: 26.34, strength: 0.52, boltStrength: 0.9, strikeSeed: 0.42 },
+	{ timeSeconds: 31.8, strength: 0.45, boltStrength: 0, strikeSeed: 0.88 },
+	{ timeSeconds: 44.98, strength: 0.94, boltStrength: 0, strikeSeed: 0.59 },
+	{ timeSeconds: 45.25, strength: 0.42, boltStrength: 0.84, strikeSeed: 0.59 },
+	{ timeSeconds: 52.7, strength: 0.52, boltStrength: 0.28, strikeSeed: 0.93 },
 ] as const;
+
+const BOLT_LEADER_SECONDS = 0.22;
+const BOLT_VISIBLE_SECONDS = 0.52;
+const GOLDEN_RATIO_FRACTION = 0.61803398875;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number): number => {
@@ -66,33 +75,88 @@ const getThunderEnvelope = (
 	return Math.max(rangeEnvelope, wrapRelease);
 };
 
+const getFlashPulse = (elapsed: number): number => {
+	const attackSeconds = 0.045;
+	const decaySeconds = 0.16;
+	if (elapsed < -attackSeconds || elapsed > 0.6) return 0;
+	return elapsed < 0
+		? smoothstep(1 + elapsed / attackSeconds)
+		: Math.exp(-elapsed / decaySeconds) * (1 - smoothstep(elapsed / 0.6));
+};
+
 const getFlashEnvelope = (
 	timeSeconds: number,
 	getStrength: (flash: (typeof DRIZZLE_LIGHTNING_FLASHES)[number]) => number,
 ): number => {
-	const attackSeconds = 0.045;
-	const decaySeconds = 0.16;
 	return DRIZZLE_LIGHTNING_FLASHES.reduce((strongest, flash) => {
 		const elapsed = timeSeconds - flash.timeSeconds;
-		if (elapsed < -attackSeconds || elapsed > 0.6) return strongest;
-		const pulse =
-			elapsed < 0
-				? smoothstep(1 + elapsed / attackSeconds)
-				: Math.exp(-elapsed / decaySeconds) * (1 - smoothstep(elapsed / 0.6));
-		return Math.max(strongest, getStrength(flash) * pulse);
+		return Math.max(strongest, getStrength(flash) * getFlashPulse(elapsed));
 	}, 0);
 };
 
 const getLightningEnvelope = (timeSeconds: number): number =>
 	getFlashEnvelope(timeSeconds, (flash) => flash.strength);
 
-const getBoltEnvelope = (timeSeconds: number): number =>
-	getFlashEnvelope(timeSeconds, (flash) => flash.boltStrength);
+const getLightningStrikeSeed = (timeSeconds: number, loopIndex: number) => {
+	let strongestFlash = 0;
+	let strikeSeed = 0;
+	for (const flash of DRIZZLE_LIGHTNING_FLASHES) {
+		const strength =
+			flash.strength * getFlashPulse(timeSeconds - flash.timeSeconds);
+		if (strength <= strongestFlash) continue;
+		strongestFlash = strength;
+		strikeSeed = (flash.strikeSeed + loopIndex * GOLDEN_RATIO_FRACTION) % 1;
+	}
+	return strikeSeed;
+};
+
+const getBoltVisualState = (timeSeconds: number, loopIndex: number) => {
+	let strongestActivity = 0;
+	let bolt = 0;
+	let leaderProgress = 0;
+	let leaderStrength = 0;
+	let strikeSeed = 0;
+
+	for (const flash of DRIZZLE_LIGHTNING_FLASHES) {
+		if (flash.boltStrength <= 0) continue;
+		const elapsed = timeSeconds - flash.timeSeconds;
+		if (elapsed < -BOLT_LEADER_SECONDS || elapsed > BOLT_VISIBLE_SECONDS) {
+			continue;
+		}
+
+		const nextLeaderProgress =
+			elapsed < 0
+				? smoothstep((elapsed + BOLT_LEADER_SECONDS) / BOLT_LEADER_SECONDS)
+				: 1;
+		const nextLeaderStrength =
+			elapsed < 0 ? flash.boltStrength * (0.35 + 0.65 * nextLeaderProgress) : 0;
+		const returnAttackSeconds = 0.012;
+		const nextBolt =
+			elapsed < -returnAttackSeconds
+				? 0
+				: flash.boltStrength *
+					(elapsed < 0
+						? smoothstep(1 + elapsed / returnAttackSeconds)
+						: Math.exp(-elapsed / 0.11) *
+							(1 - smoothstep(elapsed / BOLT_VISIBLE_SECONDS)));
+		const activity = Math.max(nextBolt, nextLeaderStrength * 0.18);
+		if (activity <= strongestActivity) continue;
+
+		strongestActivity = activity;
+		bolt = nextBolt;
+		leaderProgress = nextLeaderProgress;
+		leaderStrength = nextLeaderStrength;
+		strikeSeed = (flash.strikeSeed + loopIndex * GOLDEN_RATIO_FRACTION) % 1;
+	}
+
+	return { bolt, leaderProgress, leaderStrength, strikeSeed };
+};
 
 export const getDrizzleVisualState = (
 	timeSeconds: number,
 ): DrizzleVisualState => {
 	const elapsedTime = Math.max(0, timeSeconds);
+	const loopIndex = Math.floor(elapsedTime / DRIZZLE_AUDIO_LOOP_SECONDS);
 	const normalizedTime =
 		((elapsedTime % DRIZZLE_AUDIO_LOOP_SECONDS) + DRIZZLE_AUDIO_LOOP_SECONDS) %
 		DRIZZLE_AUDIO_LOOP_SECONDS;
@@ -106,7 +170,12 @@ export const getDrizzleVisualState = (
 		elapsedTime >= DRIZZLE_AUDIO_LOOP_SECONDS,
 	);
 	const lightning = getLightningEnvelope(normalizedTime);
-	const bolt = getBoltEnvelope(normalizedTime);
+	const boltVisual = getBoltVisualState(normalizedTime, loopIndex);
+	const hasVisibleDischarge =
+		boltVisual.bolt > 0 || boltVisual.leaderStrength > 0;
+	const strikeSeed = hasVisibleDischarge
+		? boltVisual.strikeSeed
+		: getLightningStrikeSeed(normalizedTime, loopIndex);
 
 	return {
 		intensity: Math.min(
@@ -116,7 +185,8 @@ export const getDrizzleVisualState = (
 		windBoost: 1 + thunder * 0.22,
 		thunder,
 		lightning,
-		bolt,
+		...boltVisual,
+		strikeSeed,
 	};
 };
 

@@ -40,6 +40,9 @@ const FRAGMENT_SHADER = /* glsl */ `
 	uniform float uThunder;
 	uniform float uLightning;
 	uniform float uBolt;
+	uniform float uLeaderProgress;
+	uniform float uLeaderStrength;
+	uniform float uStrikeSeed;
 
 	float hash21(vec2 p) {
 		p = fract(p * vec2(123.34, 456.21));
@@ -69,28 +72,81 @@ const FRAGMENT_SHADER = /* glsl */ `
 		return value;
 	}
 
-	float segmentDistance(vec2 p, vec2 a, vec2 b) {
-		vec2 pa = p - a;
-		vec2 ba = b - a;
-		float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-		return length(pa - ba * h);
+	float centeredNoise(vec2 p) {
+		return valueNoise(p) * 2.0 - 1.0;
 	}
 
-	float lightningDistance(vec2 p) {
-		vec2 p0 = vec2(0.000, 0.98);
-		vec2 p1 = vec2(-0.018, 0.82);
-		vec2 p2 = vec2(0.012, 0.68);
-		vec2 p3 = vec2(-0.010, 0.53);
-		vec2 p4 = vec2(0.024, 0.37);
-		vec2 p5 = vec2(0.014, 0.18);
-		float d = segmentDistance(p, p0, p1);
-		d = min(d, segmentDistance(p, p1, p2));
-		d = min(d, segmentDistance(p, p2, p3));
-		d = min(d, segmentDistance(p, p3, p4));
-		d = min(d, segmentDistance(p, p4, p5));
-		d = min(d, segmentDistance(p, p2, p2 + vec2(-0.10, -0.09)));
-		d = min(d, segmentDistance(p, p3, p3 + vec2(0.085, -0.075)));
-		return d;
+	float dischargeOffset(float y, float seed) {
+		float broad = centeredNoise(vec2(y * 2.4 + seed * 9.1, seed * 17.3));
+		float bend = centeredNoise(vec2(y * 7.7 - seed * 5.4, seed * 31.7));
+		float kink = centeredNoise(vec2(y * 22.6 + seed * 13.2, seed * 47.1));
+		float filament = centeredNoise(vec2(y * 61.0, seed * 79.3));
+		return broad * 0.075 + bend * 0.045 + kink * 0.025 + filament * 0.009;
+	}
+
+	vec3 glowLayers(float distanceToChannel, float pixelSize, float energy) {
+		float core = exp(-distanceToChannel / (pixelSize * 0.85));
+		float sheath = exp(-distanceToChannel / (pixelSize * 4.5));
+		float corona = exp(-distanceToChannel / (pixelSize * 24.0));
+		return vec3(core, sheath, corona) * energy;
+	}
+
+	vec3 dischargeField(vec2 uv, float aspect, float pixelSize) {
+		float strikeX =
+			0.5 + (hash21(vec2(uStrikeSeed * 19.7, uStrikeSeed + 3.1)) - 0.5) * 0.34;
+		vec2 p = vec2((uv.x - strikeX) * aspect, uv.y);
+		float leaderStep = floor(clamp(uLeaderProgress, 0.0, 1.0) * 11.0) / 11.0;
+		float leaderFront = mix(0.985, 0.085, leaderStep);
+		float leaderMask = smoothstep(
+			leaderFront - pixelSize * 1.5,
+			leaderFront + pixelSize * 1.5,
+			uv.y
+		);
+		float returnFlicker =
+			0.92 +
+			0.08 * hash21(vec2(floor(uTime * 90.0), uStrikeSeed * 113.0));
+		float channelEnergy = max(
+			uLeaderStrength * leaderMask * 0.11,
+			uBolt * returnFlicker
+		);
+		float verticalMask = smoothstep(0.055, 0.11, uv.y);
+		float trunkX = dischargeOffset(uv.y, uStrikeSeed);
+		vec3 field = glowLayers(abs(p.x - trunkX), pixelSize, channelEnergy);
+
+		for (int branchIndex = 0; branchIndex < 5; branchIndex++) {
+			float index = float(branchIndex);
+			float branchSeed = uStrikeSeed * 71.0 + index * 19.17;
+			float originY =
+				0.82 -
+				index * 0.135 +
+				(hash21(vec2(branchSeed, 2.7)) - 0.5) * 0.065;
+			float branchLength =
+				0.09 + hash21(vec2(branchSeed, 8.3)) * 0.15;
+			float branchT = (originY - uv.y) / branchLength;
+			float branchWindow =
+				smoothstep(-0.02, 0.025, branchT) *
+				(1.0 - smoothstep(0.88, 1.0, branchT));
+			float side =
+				hash21(vec2(branchSeed, 13.1)) > 0.5 ? 1.0 : -1.0;
+			float spread = 0.055 + hash21(vec2(branchSeed, 21.9)) * 0.095;
+			float branchPhase = clamp(branchT, 0.0, 1.0);
+			float branchWarp =
+				centeredNoise(vec2(branchT * 12.0, branchSeed)) *
+				0.018 *
+				sin(branchPhase * 3.14159265);
+			float branchX =
+				dischargeOffset(originY, uStrikeSeed) +
+				side * spread * (branchT + branchT * branchT * 0.32) +
+				branchWarp;
+			float taper = mix(0.68, 0.20, branchPhase);
+			float branchEnergy = channelEnergy * branchWindow * taper;
+			field = max(
+				field,
+				glowLayers(abs(p.x - branchX), pixelSize, branchEnergy)
+			);
+		}
+
+		return field * verticalMask;
 	}
 
 	void main() {
@@ -102,24 +158,42 @@ const FRAGMENT_SHADER = /* glsl */ `
 		float density = smoothstep(0.43, 0.77, broad * 0.78 + detail * 0.22);
 		density *= 0.34 + 0.66 * smoothstep(0.04, 0.52, vUv.y);
 
-		float strikeX = 0.52 + 0.13 * sin(uTime * 0.37 + 1.7);
+		float strikeX =
+			0.5 + (hash21(vec2(uStrikeSeed * 19.7, uStrikeSeed + 3.1)) - 0.5) * 0.34;
 		vec2 lightDelta = vec2((vUv.x - strikeX) * aspect, vUv.y - 0.67);
-		float localLight = exp(-dot(lightDelta, lightDelta) * 2.6);
-		float sheetLight = uLightning * localLight * (0.30 + density * 0.70);
-
-		vec2 boltUv = vec2((vUv.x - strikeX) * aspect, vUv.y);
-		float boltDistance = lightningDistance(boltUv);
-		float boltCore = smoothstep(0.0032, 0.0004, boltDistance) * uBolt;
-		float boltAura = exp(-boltDistance * 58.0) * uBolt;
+		float localLight = 1.0 / (1.0 + dot(lightDelta, lightDelta) * 6.5);
+		float sheetLight =
+			uLightning * localLight * clamp(0.10 + density * 1.18, 0.0, 1.0);
+		vec3 discharge = vec3(0.0);
+		if (uBolt > 0.0001 || uLeaderStrength > 0.0001) {
+			discharge = dischargeField(vUv, aspect, 1.0 / uResolution.y);
+		}
+		float boltCore = clamp(discharge.x, 0.0, 1.0);
+		float boltSheath = clamp(discharge.y, 0.0, 1.0);
+		float boltCorona = clamp(discharge.z, 0.0, 1.0);
 
 		vec3 darkCloud = vec3(0.055, 0.074, 0.100);
 		vec3 litCloud = vec3(0.72, 0.84, 0.98);
-		float exposure = clamp(sheetLight * 1.45 + boltAura * 0.85, 0.0, 1.0);
+		float exposure = clamp(
+			sheetLight * 1.55 + boltSheath * 0.52 + boltCorona * 0.20,
+			0.0,
+			1.0
+		);
 		vec3 color = mix(darkCloud, litCloud, exposure);
-		color = mix(color, vec3(0.94, 0.97, 1.0), boltCore);
+		float electricLight = clamp(
+			boltSheath * 0.86 + boltCorona * 0.18,
+			0.0,
+			1.0
+		);
+		color = mix(color, vec3(0.68, 0.82, 1.0), electricLight);
+		color = mix(color, vec3(1.0), clamp(boltCore * 1.6, 0.0, 1.0));
 
 		float cloudAlpha = density * (0.075 + uThunder * 0.035);
-		float flashAlpha = sheetLight * 0.48 + boltAura * 0.24 + boltCore * 0.76;
+		float flashAlpha =
+			sheetLight * 0.50 +
+			boltCorona * 0.16 +
+			boltSheath * 0.38 +
+			boltCore * 0.82;
 		gl_FragColor = vec4(color, clamp(cloudAlpha + flashAlpha, 0.0, 0.9));
 	}
 `;
@@ -168,6 +242,9 @@ export const createDrizzleStormScene = (
 			uThunder: { value: 0 },
 			uLightning: { value: 0 },
 			uBolt: { value: 0 },
+			uLeaderProgress: { value: 0 },
+			uLeaderStrength: { value: 0 },
+			uStrikeSeed: { value: 0 },
 		},
 	});
 	const mesh = new Mesh(geometry, material);
@@ -182,6 +259,9 @@ export const createDrizzleStormScene = (
 		material.uniforms.uThunder.value = visual.thunder;
 		material.uniforms.uLightning.value = visual.lightning;
 		material.uniforms.uBolt.value = visual.bolt;
+		material.uniforms.uLeaderProgress.value = visual.leaderProgress;
+		material.uniforms.uLeaderStrength.value = visual.leaderStrength;
+		material.uniforms.uStrikeSeed.value = visual.strikeSeed;
 		renderer.render(scene, camera);
 	};
 
@@ -199,6 +279,8 @@ export const createDrizzleStormScene = (
 			material.uniforms.uThunder.value = 0;
 			material.uniforms.uLightning.value = 0;
 			material.uniforms.uBolt.value = 0;
+			material.uniforms.uLeaderProgress.value = 0;
+			material.uniforms.uLeaderStrength.value = 0;
 			renderer.render(scene, camera);
 		},
 		resize: (nextWidth: number, nextHeight: number) => {

@@ -65,7 +65,11 @@ describe("DrizzleThemeAudio", () => {
 		const quiet = getDrizzleVisualState(20);
 		const thunder = getDrizzleVisualState(30);
 		const primaryFlash = getDrizzleVisualState(12.08);
+		const steppedLeader = getDrizzleVisualState(12.2);
 		const returnFlash = getDrizzleVisualState(12.34);
+		const nextLoopReturnFlash = getDrizzleVisualState(
+			DRIZZLE_AUDIO_LOOP_SECONDS + 12.34,
+		);
 
 		expect(intro.intensity).toBeGreaterThan(0.3);
 		expect(settled.intensity).toBeGreaterThan(0.85);
@@ -75,6 +79,13 @@ describe("DrizzleThemeAudio", () => {
 		expect(returnFlash.lightning).toBeGreaterThan(0.35);
 		expect(primaryFlash.bolt).toBe(0);
 		expect(returnFlash.bolt).toBeGreaterThan(0.8);
+		expect(primaryFlash.strikeSeed).toBe(returnFlash.strikeSeed);
+		expect(steppedLeader.leaderProgress).toBeGreaterThan(0.25);
+		expect(steppedLeader.leaderProgress).toBeLessThan(0.75);
+		expect(steppedLeader.leaderStrength).toBeGreaterThan(0);
+		expect(steppedLeader.bolt).toBe(0);
+		expect(returnFlash.leaderStrength).toBe(0);
+		expect(returnFlash.strikeSeed).not.toBe(nextLoopReturnFlash.strikeSeed);
 		expect(quiet.lightning).toBe(0);
 	});
 
