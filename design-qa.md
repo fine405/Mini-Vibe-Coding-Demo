@@ -1,3 +1,58 @@
+# Nested Dropdown Submenu Design QA
+
+- Source visual truth: `/var/folders/nn/272k0ds16mq_7vpy9jn7xrp80000gn/T/codex-clipboard-9a9c5761-f951-4504-b68d-a5e3f9296388.png`
+- Implementation screenshot: `/tmp/mini-lovable-submenu-night.png`
+- Normalized menu crop: `/tmp/mini-lovable-submenu-night-crop.png`
+- Combined comparison: `/tmp/mini-lovable-submenu-comparison.png` (left: source at 50%; right: implementation)
+- Compact boundary capture: `/tmp/mini-lovable-submenu-compact.png`
+- Viewports: 1280 × 720 for the primary comparison; 700 × 160 for collision-boundary verification
+- State: Night theme, More actions open, Import submenu expanded; compact capture uses Export expanded near the lower edge
+
+## Full-view comparison evidence
+
+The source is a 2× component crop rather than a full application viewport, so it was normalized to 50% and compared with the complete rendered menu region at the equivalent 1× size. The primary menu remains 208 × 194 px with the same seven actions, separators, icon hierarchy, active-row treatment, corner radius, and shadow rhythm. The implementation additionally shows the now-working submenu to the left because the trigger is adjacent to the right viewport edge.
+
+## Focused region comparison evidence
+
+The combined comparison is already a focused, readable menu-region comparison: item text, shortcuts, icons, separators, active state, and submenu alignment are all visible at the equivalent scale. A smaller crop would remove context needed to verify the submenu anchor and edge flip, so no additional focused crop was needed.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing Geist UI typography, 14 px menu text, shortcut sizing, line height, and truncation behavior are unchanged. Both submenu labels remain single-line and readable.
+- Spacing and layout rhythm: the root menu stays 208 × 194 px. The submenu is 176 × 64 px, opens with a 4 px side offset, aligns to its trigger, and remains independent of the root menu's scroll container.
+- Colors and visual tokens: the implementation continues to use the active product theme tokens. The reference's dark-slate surface and the current Night theme's black surface differ slightly, but changing theme tokens was outside this behavioral fix and would create unrelated visual drift.
+- Image quality and asset fidelity: the target contains no raster content besides the screenshot itself. Existing Lucide icons remain unchanged; no placeholder, custom SVG, or generated asset was introduced.
+- Copy and content: root-menu copy matches the source. Import JSON, Import ZIP, Export as JSON, and Export as ZIP are the existing product actions and are unchanged.
+
+## Primary interactions and console
+
+- Hovering Import and Export opens their nested actions outside the root menu's clipping container.
+- At the right viewport edge Radix resolves the submenu to `data-side="left"`; both menu surfaces remain fully visible.
+- At 700 × 160, the lower submenu resolves to `y=88`, `bottom=152`, preserving the configured 8 px viewport collision padding.
+- The open state reports the existing 100 ms `enter` animation; closing reports the 100 ms `exit` animation before unmount.
+- The submenu remains keyboard-capable through the existing Radix primitive; no roles or focus behavior were replaced.
+- Browser console errors and warnings after the verified interaction flow: none.
+
+## Comparison history
+
+### Pass 1
+
+- Earlier finding: no P0/P1/P2 visual mismatch after the behavioral fix. The original functional defect was separately reproduced by a regression test showing the submenu nested inside the root menu's clipped scrolling surface.
+- Fix made before comparison: render submenus through a portal, keep directional enter/exit motion, and apply 8 px collision padding plus available-height scrolling.
+- Post-fix evidence: the normalized primary comparison shows the submenu anchored beside the active row; the compact capture proves lower-edge avoidance; runtime geometry proves the portal and left-side flip.
+
+## Findings
+
+No remaining P0, P1, or P2 issues.
+
+## Follow-up polish
+
+- [P3] The supplied reference and the current Night theme use slightly different dark-surface values. This is an existing theme difference and is intentionally unchanged for a surgical interaction fix.
+
+final result: passed
+
+---
+
 # Archived Design QA Reports
 
 +# Design QA

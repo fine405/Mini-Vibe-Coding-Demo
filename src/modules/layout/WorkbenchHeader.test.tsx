@@ -88,6 +88,28 @@ describe("WorkbenchHeader", () => {
 		expect(consoleItem).toHaveTextContent("⌘2");
 	});
 
+	it("opens nested actions in a portal so they are not clipped by the parent menu", async () => {
+		const user = userEvent.setup();
+		render(<WorkbenchHeader />);
+
+		await user.click(screen.getByRole("button", { name: "More actions" }));
+		const parentMenu = screen
+			.getByRole("menuitem", { name: /^import$/i })
+			.closest<HTMLDivElement>('[data-slot="dropdown-menu-content"]');
+
+		await user.hover(screen.getByRole("menuitem", { name: /^import$/i }));
+
+		const importJsonItem = await screen.findByRole("menuitem", {
+			name: /import json/i,
+		});
+		const nestedMenu = importJsonItem.closest<HTMLDivElement>(
+			'[data-slot="dropdown-menu-sub-content"]',
+		);
+		expect(parentMenu).toBeInTheDocument();
+		expect(nestedMenu).toBeInTheDocument();
+		expect(parentMenu).not.toContainElement(nestedMenu);
+	});
+
 	it("toggles the console from the more menu", async () => {
 		const user = userEvent.setup();
 		render(<WorkbenchHeader />);
