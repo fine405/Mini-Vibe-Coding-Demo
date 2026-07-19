@@ -4,6 +4,7 @@ import { DrizzleThemeAudio } from "@/modules/theme/DrizzleThemeAudio";
 import {
 	DRIZZLE_AUDIO_VOLUME,
 	DRIZZLE_THUNDER_RANGES,
+	getDrizzleVisualState,
 } from "@/modules/theme/drizzleAudio";
 import { useThemeStore } from "@/modules/theme/store";
 
@@ -54,6 +55,23 @@ describe("DrizzleThemeAudio", () => {
 			{ startSeconds: 26, endSeconds: 38, truncatedByClip: false },
 			{ startSeconds: 44.9, endSeconds: 60, truncatedByClip: true },
 		]);
+	});
+
+	it("maps the audio timeline to a fuller rain entrance and visible lightning", () => {
+		const intro = getDrizzleVisualState(0);
+		const settled = getDrizzleVisualState(8);
+		const quiet = getDrizzleVisualState(20);
+		const thunder = getDrizzleVisualState(30);
+		const primaryFlash = getDrizzleVisualState(12.08);
+		const returnFlash = getDrizzleVisualState(12.34);
+
+		expect(intro.intensity).toBeGreaterThan(0.3);
+		expect(settled.intensity).toBeGreaterThan(0.85);
+		expect(thunder.thunder).toBeGreaterThan(0.9);
+		expect(thunder.windBoost).toBeGreaterThan(quiet.windBoost);
+		expect(primaryFlash.lightning).toBeGreaterThan(0.9);
+		expect(returnFlash.lightning).toBeGreaterThan(0.35);
+		expect(quiet.lightning).toBe(0);
 	});
 
 	it("retries blocked Drizzle audio on the next interaction", async () => {

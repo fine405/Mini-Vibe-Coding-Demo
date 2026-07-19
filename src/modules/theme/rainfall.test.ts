@@ -8,6 +8,7 @@ import {
 	getLayerDropCounts,
 	getRainWindAt,
 	MAX_SPRAY_COUNT,
+	NEAR_SPLASH_CHANCE,
 	RAIN_GRAVITY,
 	RAIN_LAYER_CONFIG,
 	RAIN_WIND_RANGE,
@@ -16,16 +17,34 @@ import {
 } from "@/modules/theme/rainfall";
 
 const steady = (value: number) => () => value;
+const sequence = (...values: number[]) => {
+	let index = 0;
+	return () => values[index++] ?? values.at(-1) ?? 0.5;
+};
 
 describe("rainfall simulation", () => {
 	it("scales the drop count with viewport area within hard bounds", () => {
-		expect(getDropCount(320, 480)).toBe(240);
-		expect(getDropCount(8000, 4000)).toBe(640);
+		expect(getDropCount(320, 480)).toBe(88);
+		expect(getDropCount(1280, 720)).toBe(177);
+		expect(getDropCount(8000, 4000)).toBe(360);
 		const total = getDropCount(2000, 1200);
 		const counts = getLayerDropCounts(total);
 		expect(counts.far + counts.mid + counts.near).toBe(total);
 		expect(counts.far).toBeGreaterThan(counts.mid);
 		expect(counts.mid).toBeGreaterThan(counts.near);
+	});
+
+	it("keeps the foreground restrained while allowing larger rain streaks", () => {
+		expect(RAIN_LAYER_CONFIG.near.share).toBeLessThanOrEqual(0.08);
+		for (const config of Object.values(RAIN_LAYER_CONFIG)) {
+			expect(config.streakLength[1]).toBeLessThanOrEqual(22);
+		}
+	});
+
+	it("uses a faster fall speed in every depth layer", () => {
+		expect(RAIN_LAYER_CONFIG.far.speed[0]).toBeGreaterThanOrEqual(210);
+		expect(RAIN_LAYER_CONFIG.mid.speed[0]).toBeGreaterThanOrEqual(360);
+		expect(RAIN_LAYER_CONFIG.near.speed[0]).toBeGreaterThanOrEqual(560);
 	});
 
 	it("spawns bound drops scattered across the whole viewport", () => {
@@ -44,8 +63,24 @@ describe("rainfall simulation", () => {
 			expect(drop.speed).toBeLessThanOrEqual(config.speed[1]);
 			expect(drop.alpha).toBeGreaterThanOrEqual(config.alpha[0]);
 			expect(drop.alpha).toBeLessThanOrEqual(config.alpha[1]);
+			expect(drop.streakLength).toBeGreaterThanOrEqual(config.streakLength[0]);
+			expect(drop.streakLength).toBeLessThanOrEqual(config.streakLength[1]);
 			expect(drop.age).toBe(0);
 		}
+	});
+
+	it("ramps the active population toward the requested rain intensity", () => {
+		const state = createRainfall(1280, 720, steady(0.5), 0.2);
+		expect(state.drops).toHaveLength(getDropCount(1280, 720, 0.2));
+
+		for (let i = 0; i < 8 * 60; i++) {
+			stepRainfall(state, 1 / 60, steady(0.5), {
+				intensity: 0.78,
+				windBoost: 1,
+			});
+		}
+
+		expect(state.drops).toHaveLength(getDropCount(1280, 720, 0.78));
 	});
 
 	it("keeps the gusting wind inside its published range", () => {
@@ -90,7 +125,7 @@ describe("rainfall simulation", () => {
 		drop.speed = 100;
 
 		// Small enough dt that freshly ejected spray is still moving up.
-		stepRainfall(state, 0.005, steady(0.5));
+		stepRainfall(state, 0.005, steady(0));
 
 		expect(state.rings.length).toBeGreaterThan(0);
 		const ring = state.rings[0];
@@ -113,6 +148,21 @@ describe("rainfall simulation", () => {
 		expect(drop.age).toBe(0);
 	});
 
+	it("reserves visible bottom-edge splashes for the near layer", () => {
+		expect(NEAR_SPLASH_CHANCE).toBeGreaterThanOrEqual(0.25);
+		expect(NEAR_SPLASH_CHANCE).toBeLessThanOrEqual(0.35);
+		const state = createRainfall(200, 100, steady(0.5));
+		const farDrop = state.drops.find((drop) => drop.layer === "far");
+		expect(farDrop).toBeDefined();
+		if (!farDrop) return;
+
+		farDrop.y = state.height - 1;
+		stepRainfall(state, 0.01, steady(0));
+
+		expect(state.sprays).toHaveLength(0);
+		expect(state.rings).toHaveLength(0);
+	});
+
 	it("accelerates spray droplets with gravity and retires them at the ground", () => {
 		const state = createRainfall(200, 100, steady(0.5));
 		const drop = state.drops.find((d) => d.layer === "near");
@@ -120,7 +170,7 @@ describe("rainfall simulation", () => {
 		if (!drop) return;
 		drop.y = 99.5;
 		drop.speed = 100;
-		stepRainfall(state, 0.01, steady(0.5));
+		stepRainfall(state, 0.01, sequence(0, 0.5));
 
 		const spray = state.sprays[0];
 		expect(spray).toBeDefined();
@@ -150,7 +200,7 @@ describe("rainfall simulation", () => {
 		if (!drop) return;
 		drop.y = 99.5;
 		drop.speed = 100;
-		stepRainfall(state, 0.01, steady(0.5));
+		stepRainfall(state, 0.01, steady(0));
 		expect(state.rings.length).toBeGreaterThan(0);
 
 		// Park every drop far above the ground so no new splashes appear.
@@ -164,7 +214,7 @@ describe("rainfall simulation", () => {
 		const state = createRainfall(1440, 900, steady(0.5));
 		for (const drop of state.drops) drop.y = state.height - 1;
 
-		stepRainfall(state, 0.01, steady(0.5));
+		stepRainfall(state, 0.01, steady(0));
 
 		expect(state.sprays.length).toBeLessThanOrEqual(MAX_SPRAY_COUNT);
 		expect(state.sprays.length).toBeGreaterThan(0);

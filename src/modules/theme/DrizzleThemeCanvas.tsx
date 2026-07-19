@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { getDrizzleAudioTime } from "@/modules/theme/drizzleAudio";
 import type { RainSceneHandle } from "@/modules/theme/rainScene2d";
 import { useThemeStore } from "@/modules/theme/store";
 
@@ -41,7 +42,7 @@ export function DrizzleThemeCanvas() {
 			if (!scene) return;
 			const dt = last === 0 ? 0 : (now - last) / 1000;
 			last = now;
-			scene.update(dt);
+			scene.update(dt, getDrizzleAudioTime());
 			frame = window.requestAnimationFrame(tick);
 		};
 

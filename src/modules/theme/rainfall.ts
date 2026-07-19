@@ -5,21 +5,18 @@
  * physics can be unit-tested in jsdom. Coordinates are CSS pixels with the
  * origin at the top-left and +y pointing down.
  *
- * The look targets a real-world drizzle rather than a storm, referencing the
+ * The look targets steady light rain rather than a storm, referencing the
  * rainfall feel of https://www.shadertoy.com/view/ltffzl without its
  * glass-pane refraction:
  *
- * - Drops stay at terminal velocity (drizzle reaches it within centimeters
- *   of fall), scaled by depth layer: ~1.3–2.1 m/s for the near layer, which
- *   matches the measured 0.7–2 m/s range of sub-0.5mm drizzle drops.
+ * - Drops stay at terminal velocity, scaled by depth layer: ~1.9–2.7 m/s for
+ *   the near layer so the picture carries the weight of the rain recording.
  * - Wind is a slowly gusting global field; drizzle drops are light enough to
  *   follow gusts almost immediately, plus a small per-drop turbulence so
  *   streaks are not perfectly parallel.
- * - Impacts on the bottom edge obey splash physics at drizzle scale: a few
- *   secondary droplets ejected near-vertical at a fraction of the impact
- *   speed, then purely ballistic under gravity (apex only a few pixels), and
- *   a small crown ring that expands and fades in ~0.2s. Restrained by
- *   design — drizzle Weber numbers are low, so splashes stay tiny.
+ * - Only a small fraction of near-camera impacts splash at the bottom edge.
+ *   Their secondary droplets stay ballistic and tiny; far and mid layers
+ *   recycle silently so the viewport edge does not read as a hard surface.
  */
 
 export type RainLayer = "far" | "mid" | "near";
@@ -40,6 +37,8 @@ export interface Raindrop {
 	turbulencePhase: number;
 	/** Base streak opacity for this drop. */
 	alpha: number;
+	/** Visible motion-blur length in CSS pixels. */
+	streakLength: number;
 	/** Seconds since spawn, drives the fade-in. */
 	age: number;
 }
@@ -74,6 +73,14 @@ export interface RainfallState {
 	drops: Raindrop[];
 	sprays: SprayDroplet[];
 	rings: SplashRing[];
+	spawnAccumulator: number;
+}
+
+export interface RainfallControls {
+	/** Normalized active population requested by the audio timeline. */
+	intensity: number;
+	/** Restrained multiplier used during thunder ranges. */
+	windBoost: number;
 }
 
 interface RainLayerConfig {
@@ -83,6 +90,8 @@ interface RainLayerConfig {
 	speed: [min: number, max: number];
 	/** Streak opacity range. */
 	alpha: [min: number, max: number];
+	/** Visible motion-blur length range in px. */
+	streakLength: [min: number, max: number];
 	/** Stroke width of a streak in px. */
 	strokeWidth: number;
 	/** How strongly the global wind pushes this layer. */
@@ -91,37 +100,55 @@ interface RainLayerConfig {
 
 export const RAIN_LAYER_CONFIG: Record<RainLayer, RainLayerConfig> = {
 	far: {
-		share: 0.45,
-		speed: [170, 260],
-		alpha: [0.1, 0.16],
-		strokeWidth: 0.7,
+		share: 0.56,
+		speed: [220, 340],
+		alpha: [0.1, 0.17],
+		streakLength: [7, 12],
+		strokeWidth: 0.68,
 		windFactor: 0.5,
 	},
 	mid: {
-		share: 0.35,
-		speed: [280, 420],
-		alpha: [0.16, 0.26],
-		strokeWidth: 0.9,
+		share: 0.36,
+		speed: [380, 560],
+		alpha: [0.17, 0.27],
+		streakLength: [11, 18],
+		strokeWidth: 0.92,
 		windFactor: 0.75,
 	},
 	near: {
-		share: 0.2,
-		speed: [420, 620],
-		alpha: [0.24, 0.38],
-		strokeWidth: 1.2,
+		share: 0.08,
+		speed: [580, 820],
+		alpha: [0.22, 0.34],
+		streakLength: [15, 22],
+		strokeWidth: 1.15,
 		windFactor: 1,
 	},
 };
 
-/** Drop count scales with viewport area, capped for performance. */
-export const MIN_DROP_COUNT = 240;
-export const MAX_DROP_COUNT = 640;
+/** Maximum population scales with viewport area; intensity selects a subset. */
+export const MIN_DROP_COUNT = 88;
+export const MAX_DROP_COUNT = 360;
+const MIN_ACTIVE_DROP_COUNT = 24;
 
-export const getDropCount = (width: number, height: number): number =>
-	Math.min(
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+export const getDropCount = (
+	width: number,
+	height: number,
+	intensity = 1,
+): number => {
+	const maximum = Math.min(
 		MAX_DROP_COUNT,
-		Math.max(MIN_DROP_COUNT, Math.round((width * height) / 5500)),
+		Math.max(MIN_DROP_COUNT, Math.round((width * height) / 5200)),
 	);
+	return Math.min(
+		maximum,
+		Math.max(
+			Math.min(MIN_ACTIVE_DROP_COUNT, maximum),
+			Math.round(maximum * clamp01(intensity)),
+		),
+	);
+};
 
 export const getLayerDropCounts = (
 	total: number,
@@ -136,9 +163,9 @@ export const getLayerDropCounts = (
  * meandering; drizzle air is near calm, so the range is modest.
  */
 export const getRainWindAt = (time: number): number =>
-	10 + 16 * Math.sin(0.07 * time + 0.6) + 7 * Math.sin(0.023 * time);
+	24 + 18 * Math.sin(0.07 * time + 0.6) + 8 * Math.sin(0.023 * time);
 
-export const RAIN_WIND_RANGE: readonly [min: number, max: number] = [-16, 34];
+export const RAIN_WIND_RANGE: readonly [min: number, max: number] = [-2, 50];
 
 /** 9.81 m/s² at the ~300 px/m near-layer scale, in px/s². */
 export const RAIN_GRAVITY = 2940;
@@ -151,12 +178,15 @@ export const EJECT_SPEED_FRACTION: readonly [min: number, max: number] = [
 /** Half-angle of the ejection cone around the vertical, in radians. */
 export const EJECT_SPREAD_RADIANS = 0.5;
 
-/** Splash crowns live briefly; drizzle impacts are gentle. */
-export const RING_LIFETIME_SECONDS = 0.22;
+/** Splash crowns live briefly; light-rain impacts remain small. */
+export const RING_LIFETIME_SECONDS = 0.28;
 
 /** Hard bounds on live splash particles to keep the frame cheap. */
-export const MAX_SPRAY_COUNT = 220;
-export const MAX_RING_COUNT = 80;
+export const MAX_SPRAY_COUNT = 90;
+export const MAX_RING_COUNT = 36;
+
+/** Some near-camera impacts make a visible splash at the bottom edge. */
+export const NEAR_SPLASH_CHANCE = 0.3;
 
 const rand = (
 	random: () => number,
@@ -175,6 +205,7 @@ const randomizeDrop = (
 	drop.layer = layer;
 	drop.speed = rand(random, config.speed);
 	drop.alpha = rand(random, config.alpha);
+	drop.streakLength = rand(random, config.streakLength);
 	drop.windSusceptibility = rand(random, [0.75, 1.1]);
 	drop.turbulenceAmplitude = rand(random, [3, 10]);
 	drop.turbulenceFrequency = rand(random, [0.4, 1]);
@@ -192,9 +223,10 @@ const createDrop = (
 	width: number,
 	height: number,
 	random: () => number,
+	scatterVertically = true,
 ): Raindrop => {
 	const drop = {} as Raindrop;
-	randomizeDrop(drop, layer, width, height, random, true);
+	randomizeDrop(drop, layer, width, height, random, scatterVertically);
 	return drop;
 };
 
@@ -202,15 +234,24 @@ export const createRainfall = (
 	width: number,
 	height: number,
 	random: () => number = Math.random,
+	intensity = 1,
 ): RainfallState => {
-	const counts = getLayerDropCounts(getDropCount(width, height));
+	const counts = getLayerDropCounts(getDropCount(width, height, intensity));
 	const drops: Raindrop[] = [];
 	for (const layer of ["far", "mid", "near"] as const) {
 		for (let i = 0; i < counts[layer]; i++) {
 			drops.push(createDrop(layer, width, height, random));
 		}
 	}
-	return { width, height, time: 0, drops, sprays: [], rings: [] };
+	return {
+		width,
+		height,
+		time: 0,
+		drops,
+		sprays: [],
+		rings: [],
+		spawnAccumulator: 0,
+	};
 };
 
 /**
@@ -226,7 +267,7 @@ const spawnSplash = (
 	random: () => number,
 ): void => {
 	const config = RAIN_LAYER_CONFIG[drop.layer];
-	const dropletCount = drop.layer === "far" ? 1 : 2 + Math.round(random());
+	const dropletCount = 2 + Math.round(random());
 
 	for (let i = 0; i < dropletCount; i++) {
 		const angle = (random() * 2 - 1) * EJECT_SPREAD_RADIANS;
@@ -241,7 +282,7 @@ const spawnSplash = (
 			vy,
 			age: 0,
 			lifetime,
-			alpha: Math.min(0.55, drop.alpha * 1.6),
+			alpha: Math.min(0.42, drop.alpha * 1.45),
 			size: config.strokeWidth,
 		});
 	}
@@ -252,7 +293,7 @@ const spawnSplash = (
 		age: 0,
 		lifetime: RING_LIFETIME_SECONDS,
 		maxRadius: getCrownRadius(drop.speed),
-		alpha: Math.min(0.5, drop.alpha * 1.4),
+		alpha: Math.min(0.36, drop.alpha * 1.3),
 	});
 
 	// Shed the oldest particles when the caps are exceeded.
@@ -270,12 +311,52 @@ export const stepRainfall = (
 	state: RainfallState,
 	dt: number,
 	random: () => number = Math.random,
+	controls: RainfallControls = { intensity: 1, windBoost: 1 },
 ): void => {
 	if (dt <= 0) return;
 	state.time += dt;
-	const wind = getRainWindAt(state.time);
+	const targetCount = getDropCount(
+		state.width,
+		state.height,
+		controls.intensity,
+	);
+	const targetLayerCounts = getLayerDropCounts(targetCount);
+	const currentLayerCounts = state.drops.reduce<Record<RainLayer, number>>(
+		(counts, drop) => {
+			counts[drop.layer] += 1;
+			return counts;
+		},
+		{ far: 0, mid: 0, near: 0 },
+	);
 
-	for (const drop of state.drops) {
+	const spawnRate = getDropCount(state.width, state.height) * 0.32;
+	state.spawnAccumulator += spawnRate * dt;
+	while (state.drops.length < targetCount && state.spawnAccumulator >= 1) {
+		let nextLayer: RainLayer = "far";
+		let largestDeficit = Number.NEGATIVE_INFINITY;
+		for (const layer of ["far", "mid", "near"] as const) {
+			const deficit = targetLayerCounts[layer] - currentLayerCounts[layer];
+			if (deficit > largestDeficit) {
+				largestDeficit = deficit;
+				nextLayer = layer;
+			}
+		}
+		state.drops.push(
+			createDrop(nextLayer, state.width, state.height, random, false),
+		);
+		currentLayerCounts[nextLayer] += 1;
+		state.spawnAccumulator -= 1;
+	}
+	if (state.drops.length >= targetCount) {
+		state.spawnAccumulator = Math.min(state.spawnAccumulator, 1);
+	}
+
+	const wind =
+		getRainWindAt(state.time) *
+		Math.min(1.2, Math.max(0.8, controls.windBoost));
+
+	for (let index = state.drops.length - 1; index >= 0; index--) {
+		const drop = state.drops[index];
 		const config = RAIN_LAYER_CONFIG[drop.layer];
 		drop.age += dt;
 
@@ -286,9 +367,15 @@ export const stepRainfall = (
 		drop.x += drop.vx * dt;
 		drop.y += drop.speed * dt;
 
-		// Impact on the bottom edge: splash, then recycle above the top.
+		// Near drops occasionally splash; surplus drops retire at the bottom.
 		if (drop.y >= state.height) {
-			spawnSplash(state, drop, random);
+			if (drop.layer === "near" && random() < NEAR_SPLASH_CHANCE) {
+				spawnSplash(state, drop, random);
+			}
+			if (state.drops.length > targetCount) {
+				state.drops.splice(index, 1);
+				continue;
+			}
 			randomizeDrop(drop, drop.layer, state.width, state.height, random, false);
 			continue;
 		}

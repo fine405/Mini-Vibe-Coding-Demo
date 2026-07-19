@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import {
 	DRIZZLE_AUDIO_SRC,
 	DRIZZLE_AUDIO_VOLUME,
+	registerDrizzleAudio,
 } from "@/modules/theme/drizzleAudio";
 import { useThemeStore } from "@/modules/theme/store";
 
@@ -20,6 +21,12 @@ export function DrizzleThemeAudio() {
 	const isDrizzleRef = useRef(false);
 	const audioBlockedRef = useRef(false);
 	const isDrizzle = mode === "drizzle";
+
+	useEffect(() => {
+		const audio = audioRef.current;
+		if (!audio) return;
+		return registerDrizzleAudio(audio);
+	}, []);
 
 	useEffect(() => {
 		const audio = audioRef.current;
