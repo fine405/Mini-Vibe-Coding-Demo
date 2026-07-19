@@ -117,11 +117,9 @@ describe("WorkbenchHeader", () => {
 		expect(nightItem).toHaveTextContent("N");
 		expect(summerItem).toHaveTextContent("S");
 		expect(summerItem.querySelector(".lucide-leaf")).toBeInTheDocument();
-		expect(drizzleItem).toHaveTextContent("R");
-		expect(drizzleItem).not.toHaveTextContent("Soon");
+		expect(drizzleItem).toHaveTextContent("SoonR");
 		expect(breezeItem).toHaveTextContent("SoonB");
-		expect(snowItem).toHaveTextContent("W");
-		expect(snowItem).not.toHaveTextContent("Soon");
+		expect(snowItem).toHaveTextContent("SoonW");
 		expect(snowItem.querySelector(".lucide-snowflake")).toBeInTheDocument();
 		expect(screen.getAllByRole("menuitemradio").at(-1)).toBe(breezeItem);
 		expect(nightItem).toHaveAttribute("aria-checked", "true");

@@ -41,12 +41,14 @@ const THEME_OPTIONS: Array<{
 		label: "Drizzle",
 		shortcut: "R",
 		icon: CloudRain,
+		pending: true,
 	},
 	{
 		mode: "snow",
 		label: "Snow",
 		shortcut: "W",
 		icon: Snowflake,
+		pending: true,
 	},
 	{
 		mode: "breeze",
