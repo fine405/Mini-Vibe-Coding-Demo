@@ -1,13 +1,20 @@
+import { motion } from "framer-motion";
 import { ArrowRightIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 import { Suggestion } from "@/components/ai-elements/suggestion";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
 	type ChatSuggestion,
 	SUGGESTION_GROUPS,
 	type SuggestionTab,
 } from "@/modules/chat/suggestion-prompts";
+
+const SUGGESTION_TABS: Array<{ id: SuggestionTab; label: string }> = [
+	{ id: "starter", label: "Starter" },
+	{ id: "generative-ui", label: "Generative UI" },
+];
 
 const SUGGESTIONS_PER_BATCH = 3;
 
@@ -82,24 +89,46 @@ export function ChatSuggestions({
 	};
 
 	return (
-		<Tabs
-			className="mt-3 gap-3"
-			onValueChange={(value) => {
-				if (value === "starter" || value === "generative-ui") {
-					setTab(value);
-				}
-			}}
-			value={tab}
-		>
+		<Tabs className="mt-3 gap-3" value={tab}>
 			<div className="flex items-center justify-between gap-2">
-				<TabsList aria-label="Suggestion categories" className="h-8">
-					<TabsTrigger className="px-3 text-xs" value="starter">
-						Starter
-					</TabsTrigger>
-					<TabsTrigger className="px-3 text-xs" value="generative-ui">
-						Generative UI
-					</TabsTrigger>
-				</TabsList>
+				<div
+					aria-label="Suggestion categories"
+					className="flex items-center gap-0.5 rounded-lg bg-bg-secondary p-0.5"
+					role="tablist"
+				>
+					{SUGGESTION_TABS.map((suggestionTab) => {
+						const active = tab === suggestionTab.id;
+						return (
+							<button
+								aria-selected={active}
+								className={cn(
+									"relative flex h-6 items-center rounded-md px-2.5 text-xs font-medium transition-colors",
+									active
+										? "text-fg-primary"
+										: "text-fg-muted hover:text-fg-secondary",
+								)}
+								data-state={active ? "active" : "inactive"}
+								key={suggestionTab.id}
+								onClick={() => setTab(suggestionTab.id)}
+								role="tab"
+								type="button"
+							>
+								{active && (
+									<motion.span
+										className="absolute inset-0 rounded-md bg-bg-primary shadow-sm"
+										layoutId="chat-suggestion-tab-pill"
+										transition={{
+											type: "spring",
+											bounce: 0.2,
+											duration: 0.4,
+										}}
+									/>
+								)}
+								<span className="relative z-10">{suggestionTab.label}</span>
+							</button>
+						);
+					})}
+				</div>
 				<Button
 					aria-label={`Refresh ${refreshLabel} suggestions`}
 					onClick={refresh}
@@ -112,23 +141,24 @@ export function ChatSuggestions({
 				</Button>
 			</div>
 
-			<TabsContent value="starter">
-				<SuggestionList
-					disabled={disabled}
-					onSelect={onSelect}
-					suggestions={visibleSuggestions("starter", batches.starter)}
-				/>
-			</TabsContent>
-			<TabsContent value="generative-ui">
-				<SuggestionList
-					disabled={disabled}
-					onSelect={onSelect}
-					suggestions={visibleSuggestions(
-						"generative-ui",
-						batches["generative-ui"],
-					)}
-				/>
-			</TabsContent>
+			{SUGGESTION_TABS.map((suggestionTab) => (
+				<TabsContent key={suggestionTab.id} value={suggestionTab.id}>
+					{/* Keying by batch replays the entrance animation on refresh. */}
+					<div
+						className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
+						key={batches[suggestionTab.id]}
+					>
+						<SuggestionList
+							disabled={disabled}
+							onSelect={onSelect}
+							suggestions={visibleSuggestions(
+								suggestionTab.id,
+								batches[suggestionTab.id],
+							)}
+						/>
+					</div>
+				</TabsContent>
+			))}
 		</Tabs>
 	);
 }
