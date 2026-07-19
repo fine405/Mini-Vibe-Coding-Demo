@@ -246,7 +246,8 @@ describe("ChangeSetReview", () => {
 		const applyButton = await screen.findByRole("button", {
 			name: "Apply selected",
 		});
-		expect(applyButton).toHaveClass("from-blue-600", "to-violet-600");
+		expect(applyButton).toHaveClass("bg-primary", "text-primary-foreground");
+		expect(applyButton).not.toHaveClass("bg-gradient-to-r");
 		await user.click(applyButton);
 		const regenerate = await screen.findByRole("button", {
 			name: "Regenerate from current workspace",
