@@ -2,6 +2,8 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DrizzleThemeAudio } from "@/modules/theme/DrizzleThemeAudio";
 import {
+	createDrizzleLoopClock,
+	DRIZZLE_AUDIO_LOOP_SECONDS,
 	DRIZZLE_AUDIO_VOLUME,
 	DRIZZLE_THUNDER_RANGES,
 	getDrizzleVisualState,
@@ -28,7 +30,7 @@ describe("DrizzleThemeAudio", () => {
 
 		expect(audio).not.toBeNull();
 		expect(audio).toHaveAttribute("loop");
-		expect(audio).toHaveAttribute("preload", "none");
+		expect(audio).toHaveAttribute("preload", "auto");
 		expect(audio).toHaveAttribute("src", "/themes/drizzle-rain.mp3");
 		expect(audio).toHaveProperty("volume", DRIZZLE_AUDIO_VOLUME);
 
@@ -53,7 +55,7 @@ describe("DrizzleThemeAudio", () => {
 			{ startSeconds: 12, endSeconds: 17.4, truncatedByClip: false },
 			{ startSeconds: 22.3, endSeconds: 25, truncatedByClip: false },
 			{ startSeconds: 26, endSeconds: 38, truncatedByClip: false },
-			{ startSeconds: 44.9, endSeconds: 60, truncatedByClip: true },
+			{ startSeconds: 44.9, endSeconds: 60.03, truncatedByClip: true },
 		]);
 	});
 
@@ -72,6 +74,31 @@ describe("DrizzleThemeAudio", () => {
 		expect(primaryFlash.lightning).toBeGreaterThan(0.9);
 		expect(returnFlash.lightning).toBeGreaterThan(0.35);
 		expect(quiet.lightning).toBe(0);
+	});
+
+	it("keeps the visual timeline continuous when the audio loop wraps", () => {
+		const firstEntrance = getDrizzleVisualState(0);
+		const beforeWrap = getDrizzleVisualState(
+			DRIZZLE_AUDIO_LOOP_SECONDS - 0.001,
+		);
+		const afterWrap = getDrizzleVisualState(DRIZZLE_AUDIO_LOOP_SECONDS);
+		const nextLoopFlash = getDrizzleVisualState(
+			DRIZZLE_AUDIO_LOOP_SECONDS + 12.08,
+		);
+
+		expect(afterWrap.intensity).toBeCloseTo(beforeWrap.intensity, 2);
+		expect(afterWrap.windBoost).toBeCloseTo(beforeWrap.windBoost, 2);
+		expect(afterWrap.thunder).toBeCloseTo(beforeWrap.thunder, 2);
+		expect(afterWrap.intensity).toBeGreaterThan(firstEntrance.intensity);
+		expect(nextLoopFlash.lightning).toBeGreaterThan(0.9);
+	});
+
+	it("unwraps the resetting audio clock without moving animation time backward", () => {
+		const clock = createDrizzleLoopClock();
+
+		expect(clock.getTime(59.9)).toBe(59.9);
+		expect(clock.getTime(0.03)).toBeCloseTo(60.06, 5);
+		expect(clock.getTime(1.2)).toBeCloseTo(61.23, 5);
 	});
 
 	it("retries blocked Drizzle audio on the next interaction", async () => {

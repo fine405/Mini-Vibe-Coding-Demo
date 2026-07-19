@@ -12,6 +12,7 @@
  */
 
 import {
+	createDrizzleLoopClock,
 	type DrizzleVisualState,
 	getDrizzleVisualState,
 } from "@/modules/theme/drizzleAudio";
@@ -157,6 +158,7 @@ export const createRainScene = (
 
 	let visual = getDrizzleVisualState(0);
 	let fallbackTimelineTime = 0;
+	const audioLoopClock = createDrizzleLoopClock();
 	let state = createRainfall(width, height, random, visual.intensity);
 
 	const applySize = () => {
@@ -174,7 +176,11 @@ export const createRainScene = (
 		update: (dt: number, audioTime: number | null = null) => {
 			const safeDt = Math.min(0.05, Math.max(0, dt));
 			fallbackTimelineTime += safeDt;
-			visual = getDrizzleVisualState(audioTime ?? fallbackTimelineTime);
+			const timelineTime =
+				audioTime === null
+					? fallbackTimelineTime
+					: audioLoopClock.getTime(audioTime);
+			visual = getDrizzleVisualState(timelineTime);
 			stepRainfall(state, safeDt, random, visual);
 			draw(ctx, state, visual);
 		},

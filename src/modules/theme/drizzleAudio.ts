@@ -1,13 +1,19 @@
 export const DRIZZLE_AUDIO_SRC = "/themes/drizzle-rain.mp3";
 export const DRIZZLE_AUDIO_VOLUME = 0.5;
-const DRIZZLE_AUDIO_LOOP_SECONDS = 60;
+/** Rounded from the encoded asset duration (60.029388s). */
+export const DRIZZLE_AUDIO_LOOP_SECONDS = 60.03;
 const DRIZZLE_INTRO_SECONDS = 4;
+const TAU = Math.PI * 2;
 
 export const DRIZZLE_THUNDER_RANGES = [
 	{ startSeconds: 12, endSeconds: 17.4, truncatedByClip: false },
 	{ startSeconds: 22.3, endSeconds: 25, truncatedByClip: false },
 	{ startSeconds: 26, endSeconds: 38, truncatedByClip: false },
-	{ startSeconds: 44.9, endSeconds: 60, truncatedByClip: true },
+	{
+		startSeconds: 44.9,
+		endSeconds: DRIZZLE_AUDIO_LOOP_SECONDS,
+		truncatedByClip: true,
+	},
 ] as const;
 
 export interface DrizzleVisualState {
@@ -37,9 +43,12 @@ const smoothstep = (value: number): number => {
 	return t * t * (3 - 2 * t);
 };
 
-const getThunderEnvelope = (timeSeconds: number): number => {
+const getThunderEnvelope = (
+	timeSeconds: number,
+	carryPreviousLoop: boolean,
+): number => {
 	const edgeSeconds = 1;
-	return DRIZZLE_THUNDER_RANGES.reduce((strongest, range) => {
+	const rangeEnvelope = DRIZZLE_THUNDER_RANGES.reduce((strongest, range) => {
 		if (timeSeconds < range.startSeconds || timeSeconds > range.endSeconds) {
 			return strongest;
 		}
@@ -49,6 +58,10 @@ const getThunderEnvelope = (timeSeconds: number): number => {
 			: smoothstep((range.endSeconds - timeSeconds) / edgeSeconds);
 		return Math.max(strongest, Math.min(attack, release));
 	}, 0);
+	const wrapRelease = carryPreviousLoop
+		? 1 - smoothstep(timeSeconds / edgeSeconds)
+		: 0;
+	return Math.max(rangeEnvelope, wrapRelease);
 };
 
 const getLightningEnvelope = (timeSeconds: number): number => {
@@ -68,17 +81,19 @@ const getLightningEnvelope = (timeSeconds: number): number => {
 export const getDrizzleVisualState = (
 	timeSeconds: number,
 ): DrizzleVisualState => {
+	const elapsedTime = Math.max(0, timeSeconds);
 	const normalizedTime =
-		((Math.max(0, timeSeconds) % DRIZZLE_AUDIO_LOOP_SECONDS) +
-			DRIZZLE_AUDIO_LOOP_SECONDS) %
+		((elapsedTime % DRIZZLE_AUDIO_LOOP_SECONDS) + DRIZZLE_AUDIO_LOOP_SECONDS) %
 		DRIZZLE_AUDIO_LOOP_SECONDS;
-	const entrance =
-		0.4 + 0.6 * smoothstep(normalizedTime / DRIZZLE_INTRO_SECONDS);
+	const entrance = 0.4 + 0.6 * smoothstep(elapsedTime / DRIZZLE_INTRO_SECONDS);
 	const breathing =
 		0.88 +
-		0.045 * Math.sin(normalizedTime * 0.36) +
-		0.03 * Math.sin(normalizedTime * 0.13 + 1.1);
-	const thunder = getThunderEnvelope(normalizedTime);
+		0.045 * Math.sin((TAU * normalizedTime) / 15) +
+		0.03 * Math.sin((TAU * normalizedTime) / 30 + 1.1);
+	const thunder = getThunderEnvelope(
+		normalizedTime,
+		elapsedTime >= DRIZZLE_AUDIO_LOOP_SECONDS,
+	);
 	const lightning = getLightningEnvelope(normalizedTime);
 
 	return {
@@ -89,6 +104,27 @@ export const getDrizzleVisualState = (
 		windBoost: 1 + thunder * 0.22,
 		thunder,
 		lightning,
+	};
+};
+
+export interface DrizzleLoopClock {
+	getTime: (audioTime: number) => number;
+}
+
+/** Converts the audio element's resetting currentTime into monotonic time. */
+export const createDrizzleLoopClock = (): DrizzleLoopClock => {
+	let lastAudioTime: number | null = null;
+	let loopOffset = 0;
+
+	return {
+		getTime: (audioTime: number) => {
+			const safeAudioTime = Math.max(0, audioTime);
+			if (lastAudioTime !== null && safeAudioTime < lastAudioTime - 1) {
+				loopOffset += DRIZZLE_AUDIO_LOOP_SECONDS;
+			}
+			lastAudioTime = safeAudioTime;
+			return loopOffset + safeAudioTime;
+		},
 	};
 };
 

@@ -73,7 +73,7 @@ export function DrizzleThemeAudio() {
 			aria-hidden="true"
 			hidden
 			loop
-			preload="none"
+			preload="auto"
 			ref={audioRef}
 			src={DRIZZLE_AUDIO_SRC}
 		/>
