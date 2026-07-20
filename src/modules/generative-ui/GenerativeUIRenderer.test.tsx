@@ -284,6 +284,69 @@ describe("GenerativeUIRenderer", () => {
 		);
 	});
 
+	it("uses the json-render visual rhythm for generated surfaces", () => {
+		const spec: Spec = {
+			root: "card",
+			elements: {
+				card: {
+					type: "Card",
+					props: { title: "Team Performance" },
+					children: ["metric", "table", "button"],
+				},
+				metric: {
+					type: "Metric",
+					props: {
+						label: "Weekly Revenue",
+						value: "$12,400",
+						trend: "up",
+						detail: "+18%",
+					},
+					children: [],
+				},
+				table: {
+					type: "DataTable",
+					props: {
+						columns: [{ key: "name", label: "Name" }],
+						data: [{ name: "Render" }],
+					},
+					children: [],
+				},
+				button: {
+					type: "Button",
+					props: { label: "View report", variant: "outline" },
+					children: [],
+				},
+			},
+		};
+
+		const { container } = render(<GenerativeUIRenderer spec={spec} />);
+
+		expect(container.querySelector('[data-slot="generative-ui"]')).toHaveClass(
+			"generative-ui",
+			"rounded-xl",
+			"bg-background",
+			"p-4",
+		);
+		expect(screen.getByText("Team Performance").closest("section")).toHaveClass(
+			"rounded-xl",
+			"p-5",
+			"shadow-sm",
+		);
+		expect(screen.getByText("Weekly Revenue").parentElement).toHaveClass(
+			"space-y-1",
+		);
+		expect(screen.getByLabelText("up trend").parentElement).toHaveClass(
+			"text-emerald-600",
+		);
+		expect(screen.getByRole("row", { name: "Render" })).toHaveClass(
+			"hover:bg-muted/50",
+		);
+		expect(screen.getByRole("button", { name: "View report" })).toHaveClass(
+			"h-9",
+			"rounded-md",
+		);
+	});
+
 	it("renders the approved financial chart components with normalized comparison data", () => {
 		const { unmount } = render(
 			<GenerativeUIRenderer spec={financialDashboardSpec} />,

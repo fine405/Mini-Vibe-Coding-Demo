@@ -637,3 +637,44 @@ textarea {
 		@apply font-sans;
 	}
 }
+
+/*
+ * Generated interfaces follow json-render's neutral canvas and card palette
+ * without changing the rest of the workbench theme. Seasonal themes keep their
+ * own product-specific surfaces.
+ */
+:root[data-mode="day"] .generative-ui {
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.1 0 0);
+	--card: oklch(0.98 0 0);
+	--card-foreground: oklch(0.1 0 0);
+	--popover: oklch(0.98 0 0);
+	--popover-foreground: oklch(0.1 0 0);
+	--primary: oklch(0.1 0 0);
+	--primary-foreground: oklch(1 0 0);
+	--secondary: oklch(0.92 0 0);
+	--secondary-foreground: oklch(0.1 0 0);
+	--muted: oklch(0.92 0 0);
+	--muted-foreground: oklch(0.45 0 0);
+	--border: oklch(0.85 0 0);
+	--input: oklch(0.85 0 0);
+	--ring: oklch(0.6 0 0);
+}
+
+:root[data-mode="night"] .generative-ui {
+	--background: oklch(0 0 0);
+	--foreground: oklch(0.98 0 0);
+	--card: oklch(0.08 0 0);
+	--card-foreground: oklch(0.98 0 0);
+	--popover: oklch(0.08 0 0);
+	--popover-foreground: oklch(0.98 0 0);
+	--primary: oklch(0.98 0 0);
+	--primary-foreground: oklch(0 0 0);
+	--secondary: oklch(0.15 0 0);
+	--secondary-foreground: oklch(0.98 0 0);
+	--muted: oklch(0.15 0 0);
+	--muted-foreground: oklch(0.6 0 0);
+	--border: oklch(0.25 0 0);
+	--input: oklch(0.25 0 0);
+	--ring: oklch(0.4 0 0);
+}

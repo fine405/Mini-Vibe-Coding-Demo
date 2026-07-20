@@ -10,14 +10,14 @@ import {
 	CircleX,
 	Minus,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import {
+	Area,
+	AreaChart,
 	Bar,
 	BarChart,
 	CartesianGrid,
 	Legend,
-	Line,
-	LineChart,
 	ResponsiveContainer,
 	Tooltip,
 	XAxis,
@@ -53,7 +53,7 @@ import { validateMermaidSource } from "@/modules/generative-ui/mermaid-policy";
 const gapClasses = {
 	sm: "gap-2",
 	md: "gap-3",
-	lg: "gap-5",
+	lg: "gap-4",
 } as const;
 
 const alignClasses = {
@@ -77,11 +77,13 @@ const textAlignClasses = {
 } as const;
 
 const cardToneClasses = {
-	neutral: "border-border bg-card",
-	info: "border-blue-500/30 bg-blue-500/5",
-	success: "border-emerald-500/30 bg-emerald-500/5",
-	warning: "border-amber-500/30 bg-amber-500/5",
-	danger: "border-destructive/30 bg-destructive/5",
+	neutral: "border-border bg-card text-card-foreground",
+	info: "border-blue-200 bg-blue-50 text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-50",
+	success:
+		"border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-50",
+	warning:
+		"border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-50",
+	danger: "border-destructive/40 bg-destructive/10 text-destructive",
 } as const;
 
 const textToneClasses = {
@@ -93,18 +95,19 @@ const textToneClasses = {
 } as const;
 
 const chartColors = [
-	"var(--chart-1)",
+	"var(--primary)",
 	"var(--chart-2)",
 	"var(--chart-3)",
 	"var(--chart-4)",
 ];
+const CHART_MARGIN = { bottom: 0, left: 24, right: 24, top: 8 } as const;
 
 const RSI_REFERENCE_LINES = [30, 70];
 const ZERO_REFERENCE_LINE = [0];
 
 function InvalidComponent({ name }: { name: string }) {
 	return (
-		<div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+		<div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
 			{name} could not be rendered.
 		</div>
 	);
@@ -115,7 +118,7 @@ function MermaidDiagram({ code, title }: { code: string; title?: string }) {
 	if (!validation.ok) {
 		return (
 			<div
-				className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+				className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
 				role="alert"
 			>
 				{validation.reason}
@@ -124,8 +127,10 @@ function MermaidDiagram({ code, title }: { code: string; title?: string }) {
 	}
 
 	return (
-		<div className="min-w-0 overflow-hidden rounded-md border border-border bg-background p-3">
-			{title ? <p className="mb-2 text-sm font-medium">{title}</p> : null}
+		<div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm">
+			{title ? (
+				<p className="mb-3 text-sm font-medium tracking-tight">{title}</p>
+			) : null}
 			<div className="relative">
 				<MermaidDownloadMenu code={validation.source} />
 				<MessageResponse controls={{ mermaid: { download: false } }}>
@@ -146,7 +151,7 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 			const align = parsed.data.align ?? "stretch";
 			return (
 				<div
-					className={`flex min-w-0 ${direction === "horizontal" ? "flex-row flex-wrap" : "flex-col"} ${gapClasses[gap]} ${alignClasses[align]}`}
+					className={`flex min-w-0 ${direction === "horizontal" ? "flex-row flex-wrap" : "w-full flex-col"} ${gapClasses[gap]} ${alignClasses[align]}`}
 				>
 					{children}
 				</div>
@@ -171,17 +176,27 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 			const tone = parsed.data.tone ?? "neutral";
 			return (
 				<section
-					className={`min-w-0 rounded-lg border p-4 ${cardToneClasses[tone]}`}
+					className={`flex min-w-0 flex-col overflow-hidden rounded-xl border p-5 shadow-sm ${cardToneClasses[tone]}`}
 				>
-					{parsed.data.title ? (
-						<h3 className="text-sm font-semibold">{parsed.data.title}</h3>
+					{parsed.data.title || parsed.data.description ? (
+						<header className="mb-4">
+							{parsed.data.title ? (
+								<h3 className="text-lg font-semibold tracking-tight">
+									{parsed.data.title}
+								</h3>
+							) : null}
+							{parsed.data.description ? (
+								<p className="mt-1 text-sm text-muted-foreground">
+									{parsed.data.description}
+								</p>
+							) : null}
+						</header>
 					) : null}
-					{parsed.data.description ? (
-						<p className="mt-1 text-sm text-muted-foreground">
-							{parsed.data.description}
-						</p>
+					{children ? (
+						<div className="flex flex-1 flex-col gap-4 [&>:last-child]:mt-auto">
+							{children}
+						</div>
 					) : null}
-					{children ? <div className="mt-3">{children}</div> : null}
 				</section>
 			);
 		},
@@ -193,14 +208,14 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 			const className = textToneClasses[tone];
 			if (variant === "title") {
 				return (
-					<h2 className={`text-xl font-semibold ${className}`}>
+					<h2 className={`text-2xl font-bold tracking-tight ${className}`}>
 						{parsed.data.content}
 					</h2>
 				);
 			}
 			if (variant === "heading") {
 				return (
-					<h3 className={`text-base font-semibold ${className}`}>
+					<h3 className={`text-xl font-semibold tracking-tight ${className}`}>
 						{parsed.data.content}
 					</h3>
 				);
@@ -211,17 +226,13 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 			if (variant === "code") {
 				return (
 					<code
-						className={`block whitespace-pre-wrap rounded bg-muted px-2 py-1 font-mono text-xs ${className}`}
+						className={`block whitespace-pre-wrap rounded-md bg-muted px-2 py-1 font-mono text-sm ${className}`}
 					>
 						{parsed.data.content}
 					</code>
 				);
 			}
-			return (
-				<p className={`text-sm leading-relaxed ${className}`}>
-					{parsed.data.content}
-				</p>
-			);
+			return <p className={`text-sm ${className}`}>{parsed.data.content}</p>;
 		},
 		Metric: ({ props }) => {
 			const parsed = metricPropsSchema.safeParse(props);
@@ -233,22 +244,31 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 						? ArrowDownRight
 						: Minus;
 			return (
-				<div className="min-w-0 rounded-lg border border-border bg-card p-4">
-					<p className="text-xs font-medium text-muted-foreground">
-						{parsed.data.label}
-					</p>
-					<div className="mt-1 flex items-center gap-2">
-						<span className="truncate text-2xl font-semibold">
+				<div className="min-w-0 space-y-1">
+					<p className="text-sm text-muted-foreground">{parsed.data.label}</p>
+					<div className="flex min-w-0 items-baseline gap-1.5">
+						<span className="truncate text-2xl font-semibold tracking-tight tabular-nums">
 							{parsed.data.value}
 						</span>
 						{parsed.data.trend ? (
-							<TrendIcon
-								aria-label={`${parsed.data.trend} trend`}
-								className="size-4 text-muted-foreground"
-							/>
+							<span
+								className={`inline-flex shrink-0 items-center gap-0.5 text-sm font-medium ${
+									parsed.data.trend === "up"
+										? "text-emerald-600 dark:text-emerald-400"
+										: parsed.data.trend === "down"
+											? "text-red-600 dark:text-red-400"
+											: "text-muted-foreground"
+								}`}
+							>
+								<TrendIcon
+									aria-label={`${parsed.data.trend} trend`}
+									className="size-3.5"
+								/>
+								{parsed.data.detail ? <span>{parsed.data.detail}</span> : null}
+							</span>
 						) : null}
 					</div>
-					{parsed.data.detail ? (
+					{parsed.data.detail && !parsed.data.trend ? (
 						<p className="mt-1 text-xs text-muted-foreground">
 							{parsed.data.detail}
 						</p>
@@ -260,13 +280,13 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 			const parsed = dataTablePropsSchema.safeParse(props);
 			if (!parsed.success) return <InvalidComponent name="DataTable" />;
 			return (
-				<div className="min-w-0 overflow-x-auto rounded-lg border border-border">
-					<table className="w-full text-left text-sm">
-						<thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+				<div className="min-w-0 overflow-x-auto rounded-md border border-border">
+					<table className="w-full caption-bottom text-left text-sm">
+						<thead className="[&_tr]:border-b">
 							<tr>
 								{parsed.data.columns.map((column) => (
 									<th
-										className={`px-3 py-2 font-medium ${textAlignClasses[column.align ?? "left"]}`}
+										className={`h-10 whitespace-nowrap px-2 align-middle font-medium text-foreground ${textAlignClasses[column.align ?? "left"]}`}
 										key={column.key}
 										scope="col"
 									>
@@ -275,13 +295,16 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 								))}
 							</tr>
 						</thead>
-						<tbody className="divide-y divide-border">
+						<tbody className="[&_tr:last-child]:border-0">
 							{parsed.data.data.length > 0 ? (
 								parsed.data.data.map((row, rowIndex) => (
-									<tr key={rowIndex}>
+									<tr
+										className="border-b transition-colors hover:bg-muted/50"
+										key={rowIndex}
+									>
 										{parsed.data.columns.map((column) => (
 											<td
-												className={`px-3 py-2 ${textAlignClasses[column.align ?? "left"]}`}
+												className={`whitespace-nowrap p-2 align-middle ${textAlignClasses[column.align ?? "left"]}`}
 												key={column.key}
 											>
 												{row[column.key] === null ||
@@ -293,9 +316,9 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 									</tr>
 								))
 							) : (
-								<tr>
+								<tr className="border-b">
 									<td
-										className="px-3 py-6 text-center text-muted-foreground"
+										className="p-8 text-center text-muted-foreground"
 										colSpan={parsed.data.columns.length}
 									>
 										{parsed.data.emptyText ?? "No data"}
@@ -308,33 +331,55 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 			);
 		},
 		Chart: ({ props }) => {
+			const chartId = useId().replaceAll(":", "");
 			const parsed = chartPropsSchema.safeParse(props);
 			if (!parsed.success) return <InvalidComponent name="Chart" />;
 			const chartProps = parsed.data;
 			const commonChildren: ReactNode = (
 				<>
-					<CartesianGrid strokeDasharray="3 3" vertical={false} />
-					<XAxis dataKey={chartProps.xKey} tickLine={false} />
-					<YAxis tickLine={false} width={40} />
-					<Tooltip />
-					<Legend />
+					<CartesianGrid stroke="var(--border)" vertical={false} />
+					<XAxis
+						axisLine={false}
+						dataKey={chartProps.xKey}
+						tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+						tickLine={false}
+					/>
+					<YAxis
+						axisLine={false}
+						hide
+						tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+						tickLine={false}
+						width={40}
+					/>
+					<Tooltip
+						contentStyle={{
+							background: "var(--popover)",
+							border: "1px solid var(--border)",
+							borderRadius: "var(--radius)",
+							color: "var(--popover-foreground)",
+						}}
+					/>
+					{chartProps.series.length > 1 ? (
+						<Legend wrapperStyle={{ color: "var(--muted-foreground)" }} />
+					) : null}
 				</>
 			);
 			return (
 				<div
 					aria-label={`${chartProps.type} chart`}
-					className="h-72 min-w-0 rounded-lg border border-border bg-card p-3"
+					className="h-64 min-w-0"
 					data-testid="generative-chart"
 					role="img"
 				>
 					<ResponsiveContainer height="100%" minWidth={0} width="100%">
 						{chartProps.type === "bar" ? (
-							<BarChart data={chartProps.data}>
+							<BarChart data={chartProps.data} margin={CHART_MARGIN}>
 								{commonChildren}
 								{chartProps.series.map((series, index) => (
 									<Bar
 										dataKey={series.key}
 										fill={chartColors[index]}
+										isAnimationActive={false}
 										key={series.key}
 										name={series.label}
 										radius={4}
@@ -342,12 +387,41 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 								))}
 							</BarChart>
 						) : (
-							<LineChart data={chartProps.data}>
+							<AreaChart data={chartProps.data} margin={CHART_MARGIN}>
+								<defs>
+									{chartProps.series.map((series, index) => (
+										<linearGradient
+											id={`${chartId}-${index}`}
+											key={series.key}
+											x1="0"
+											x2="0"
+											y1="0"
+											y2="1"
+										>
+											<stop
+												offset="0%"
+												stopColor={chartColors[index]}
+												stopOpacity={0.18}
+											/>
+											<stop
+												offset="100%"
+												stopColor={chartColors[index]}
+												stopOpacity={0.02}
+											/>
+										</linearGradient>
+									))}
+								</defs>
 								{commonChildren}
 								{chartProps.series.map((series, index) => (
-									<Line
+									<Area
 										dataKey={series.key}
-										dot={false}
+										dot={{
+											fill: chartColors[index],
+											r: 4,
+											strokeWidth: 0,
+										}}
+										fill={`url(#${chartId}-${index})`}
+										isAnimationActive={false}
 										key={series.key}
 										name={series.label}
 										stroke={chartColors[index]}
@@ -355,7 +429,7 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 										type="monotone"
 									/>
 								))}
-							</LineChart>
+							</AreaChart>
 						)}
 					</ResponsiveContainer>
 				</div>
@@ -533,6 +607,7 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 						: (parsed.data.variant ?? "secondary");
 			return (
 				<AppButton
+					className="h-9 rounded-md px-4 py-2"
 					disabled={parsed.data.disabled}
 					onClick={() => emit("press")}
 					type="button"
@@ -563,7 +638,7 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 							>
 								<StatusIcon
 									aria-label={item.status ?? "upcoming"}
-									className={`absolute -left-[1.68rem] top-0.5 size-3.5 bg-background ${item.status === "failed" ? "text-destructive" : item.status === "completed" ? "text-emerald-500" : item.status === "current" ? "text-blue-500" : "text-muted-foreground"}`}
+									className={`absolute -left-[1.68rem] top-0.5 size-3.5 bg-card ${item.status === "failed" ? "text-destructive" : item.status === "completed" ? "text-emerald-500" : item.status === "current" ? "text-blue-500" : "text-muted-foreground"}`}
 								/>
 								<div className="flex flex-wrap items-baseline gap-x-2">
 									<p className="text-sm font-medium">{item.title}</p>
@@ -606,7 +681,7 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 });
 
 const fallback = ({ element }: { element: { type: string } }) => (
-	<div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+	<div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
 		Unsupported component: {element.type}
 	</div>
 );

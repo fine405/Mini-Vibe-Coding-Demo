@@ -49,7 +49,10 @@ export function GenerativeUIRenderer({
 	}
 
 	return (
-		<div className="my-1 min-w-0 max-w-full rounded-xl border border-border bg-background/60 p-3">
+		<div
+			className="generative-ui my-1 min-w-0 max-w-full rounded-xl border border-border bg-background p-4 sm:p-5"
+			data-slot="generative-ui"
+		>
 			<StateProvider initialState={sanitizedSpec.state ?? EMPTY_STATE}>
 				<VisibilityProvider>
 					<LocalActionProvider>

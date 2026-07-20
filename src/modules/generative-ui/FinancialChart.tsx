@@ -12,7 +12,7 @@ import {
 	type Time,
 	type UTCTimestamp,
 } from "lightweight-charts";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type FinancialValuePoint = {
 	time: string | number;
@@ -70,7 +70,12 @@ type FinancialChartProps = {
 	compact?: boolean;
 };
 
-const SERIES_COLORS = ["#3b82f6", "#f59e0b", "#8b5cf6", "#14b8a6"];
+const SERIES_COLOR_TOKENS = [
+	["--primary", "#171717"],
+	["--chart-2", "#737373"],
+	["--chart-3", "#525252"],
+	["--chart-4", "#404040"],
+] as const;
 const POSITIVE_COLOR = "#22c55e";
 const NEGATIVE_COLOR = "#ef4444";
 const NEUTRAL_COLOR = "#64748b";
@@ -96,6 +101,7 @@ export function FinancialChart({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
 	const removeSeriesRef = useRef<Array<() => void>>([]);
+	const [themeRevision, setThemeRevision] = useState(0);
 
 	useEffect(() => {
 		const container = containerRef.current;
@@ -147,6 +153,7 @@ export function FinancialChart({
 				rightPriceScale: { borderColor },
 				timeScale: { borderColor },
 			});
+			setThemeRevision((revision) => revision + 1);
 		};
 
 		const observer = new MutationObserver(applyTheme);
@@ -169,17 +176,26 @@ export function FinancialChart({
 
 		for (const removeSeries of removeSeriesRef.current) removeSeries();
 		removeSeriesRef.current = [];
+		const styles = getComputedStyle(containerRef.current as HTMLDivElement);
+		const positiveColor = readThemeColor(
+			styles,
+			"--app-success",
+			POSITIVE_COLOR,
+		);
+		const negativeColor = readThemeColor(styles, "--app-error", NEGATIVE_COLOR);
 
 		series.forEach((definition, index) => {
-			const color = SERIES_COLORS[index] ?? SERIES_COLORS[0];
+			const [colorToken, fallbackColor] =
+				SERIES_COLOR_TOKENS[index] ?? SERIES_COLOR_TOKENS[0];
+			const color = readThemeColor(styles, colorToken, fallbackColor);
 			if (definition.type === "candlestick") {
 				const api = chart.addSeries(CandlestickSeries, {
 					title: definition.label,
-					upColor: POSITIVE_COLOR,
-					downColor: NEGATIVE_COLOR,
+					upColor: positiveColor,
+					downColor: negativeColor,
 					borderVisible: false,
-					wickUpColor: POSITIVE_COLOR,
-					wickDownColor: NEGATIVE_COLOR,
+					wickUpColor: positiveColor,
+					wickDownColor: negativeColor,
 				});
 				api.setData(
 					definition.data.map((point) => ({
@@ -194,8 +210,8 @@ export function FinancialChart({
 			if (definition.type === "bar") {
 				const api = chart.addSeries(BarSeries, {
 					title: definition.label,
-					upColor: POSITIVE_COLOR,
-					downColor: NEGATIVE_COLOR,
+					upColor: positiveColor,
+					downColor: negativeColor,
 				});
 				api.setData(
 					definition.data.map((point) => ({
@@ -231,12 +247,12 @@ export function FinancialChart({
 						type: "price",
 						price: definition.baseValue ?? definition.data[0]?.value ?? 0,
 					},
-					topLineColor: POSITIVE_COLOR,
-					topFillColor1: "#22c55e55",
-					topFillColor2: "#22c55e08",
-					bottomLineColor: NEGATIVE_COLOR,
-					bottomFillColor1: "#ef444408",
-					bottomFillColor2: "#ef444455",
+					topLineColor: positiveColor,
+					topFillColor1: `${positiveColor}55`,
+					topFillColor2: `${positiveColor}08`,
+					bottomLineColor: negativeColor,
+					bottomFillColor1: `${negativeColor}08`,
+					bottomFillColor2: `${negativeColor}55`,
 				});
 				api.setData(
 					definition.data.map((point) => ({
@@ -259,9 +275,9 @@ export function FinancialChart({
 						value: point.value,
 						color:
 							point.direction === "up"
-								? POSITIVE_COLOR
+								? positiveColor
 								: point.direction === "down"
-									? NEGATIVE_COLOR
+									? negativeColor
 									: point.direction === "neutral"
 										? NEUTRAL_COLOR
 										: color,
@@ -298,18 +314,20 @@ export function FinancialChart({
 		});
 
 		chart.timeScale().fitContent();
-	}, [referenceLines, series]);
+	}, [referenceLines, series, themeRevision]);
 
 	return (
 		<figure
 			aria-label={ariaLabel}
-			className="min-w-0 overflow-hidden rounded-lg border border-border bg-card"
+			className="min-w-0 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm"
 			data-testid="financial-chart"
 			role="img"
 		>
 			{title || subtitle ? (
-				<figcaption className="flex flex-wrap items-baseline gap-x-2 border-b border-border px-3 py-2">
-					{title ? <span className="text-sm font-medium">{title}</span> : null}
+				<figcaption className="flex flex-wrap items-baseline gap-x-2 border-b border-border px-5 py-4">
+					{title ? (
+						<span className="text-sm font-medium tracking-tight">{title}</span>
+					) : null}
 					{subtitle ? (
 						<span className="text-xs text-muted-foreground">{subtitle}</span>
 					) : null}

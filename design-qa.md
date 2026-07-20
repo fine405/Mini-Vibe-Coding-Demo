@@ -1,3 +1,59 @@
+# json-render-inspired Generative UI Design QA
+
+- Source visual truth: `/var/folders/nn/272k0ds16mq_7vpy9jn7xrp80000gn/T/codex-clipboard-076d21db-41e8-43f0-b8df-df24bb88e059.png` and `/var/folders/nn/272k0ds16mq_7vpy9jn7xrp80000gn/T/codex-clipboard-f3e60802-7907-44b8-a442-a61510fadb6a.png`.
+- Source implementation: `https://github.com/vercel-labs/json-render/tree/9d3dfc8917c1c6aa5568acbe0969523f3307376c/apps/web/components/ui` plus the matching `apps/web/lib/render/registry.tsx` and `apps/web/app/globals.css`.
+- Light implementation screenshot: `/tmp/mini-lovable-generative-ui-light.png`.
+- Dark implementation screenshot: `/tmp/mini-lovable-generative-ui-dark.png`.
+- Combined comparisons: `/tmp/mini-lovable-generative-ui-light-comparison.png` and `/tmp/mini-lovable-generative-ui-dark-comparison.png`.
+- Viewport: 1280 × 720 browser viewport; full-page captures are 1280 × 858.
+- State: static representative dashboard covering Card, Stack, Grid, Metric, Chart, DataTable, Button, and Timeline in Day and Night themes.
+
+## Full-view comparison evidence
+
+The final light and dark comparison boards place each supplied json-render reference beside the browser-rendered implementation. The implementation matches the reference's neutral canvas, slightly offset card surface, thin monochrome border, restrained shadow, Geist hierarchy, compact metric treatment, semantic green trend, monochrome chart line and points, subtle area fade, and low-contrast grid. The implementation intentionally uses the host's available catalog and responsive width, so the lower half demonstrates DataTable, Button, and Timeline instead of adding the reference-only Progress component.
+
+## Focused region comparison evidence
+
+The supplied references are already focused component captures, and the implementation's primary Team Performance card remains readable in the combined boards. The browser DOM additionally confirms seven rendered chart points and all seven weekday labels; no smaller crop was needed to judge typography, card edges, metric alignment, grid lines, point markers, or theme contrast.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing Geist Variable remains in use. Card titles now use the reference's 18 px semibold tracked treatment; metrics use 24 px semibold tabular numerals; labels and supporting copy use the reference's 12–14 px muted hierarchy. No clipping or wrapping was observed.
+- Spacing and layout rhythm: generated canvases use 16/20 px responsive padding; cards use 20 px padding, 16 px internal rhythm, 14 px rendered radii, a 1 px border, and restrained shadow. Tables, buttons, and timelines share the same compact density.
+- Colors and visual tokens: Day resolves the generated canvas/card/border to `oklch(1 0 0)`, `oklch(0.98 0 0)`, and `oklch(0.85 0 0)`. Night resolves them to `oklch(0 0 0)`, `oklch(0.08 0 0)`, and `oklch(0.25 0 0)`. Semantic success, warning, danger, and current-state colors retain accessible theme-specific variants.
+- Image quality and asset fidelity: the target contains no raster product imagery or custom icons. Existing Lucide status icons and Recharts/lightweight-charts output remain vector-rendered; no placeholder, custom SVG asset, or generated image was introduced.
+- Copy and content: the reference's Team Performance, Weekly Revenue, `$12,400`, `+18%`, and weekday content was reproduced in the representative preview. Additional table and timeline copy exists only to exercise the other local catalog components.
+
+## Primary interactions and console
+
+- The existing generated Button remains keyboard-focusable and dispatches its existing local action; the regression suite verifies the state toggle path.
+- Table row hover, button hover/focus, chart tooltip, and semantic timeline states retain their existing behavior.
+- Financial charts observe root theme changes and rebuild series colors so light/dark switching does not leave stale line colors.
+- Browser console errors and warnings after both final theme captures: none.
+- Runtime overflow check: generated surface width 896 px, scroll width 894 px, and document scroll width equals the 1280 px viewport.
+
+## Comparison history
+
+### Pass 1
+
+- Earlier finding: [P2] layered borders around standalone Metric and Chart made the generated interface visually fragmented compared with the single-card reference.
+- Fix: moved Metric and generic charts to unboxed content, gave Card the reference's surface, padding, radius, shadow, heading, and child rhythm, and aligned table/button/timeline styling to the same system.
+- Post-fix evidence: light and dark captures show one clear primary surface with secondary cards only where the schema explicitly requests them.
+
+### Pass 2
+
+- Earlier finding: [P2] the chart's default entrance animation produced a partially drawn path during streaming/capture, and the first weekday label was clipped at the left plot edge.
+- Fix: disabled Bar/Area entrance animation, added symmetric 24 px plot margins, rendered point markers, and added a theme-aware area gradient.
+- Post-fix evidence: both final captures show a complete line, seven visible weekday labels, seven DOM point markers, and the correct monochrome line in each theme.
+
+## Findings
+
+No remaining P0, P1, or P2 differences in the shared visual language. Differences in card proportions and lower content are intentional consequences of the local catalog and responsive host width rather than unresolved styling drift.
+
+final result: passed
+
+---
+
 # Trading Default and Expanded Chat Panel Design QA
 
 - Source visual truth: the existing prompt-marquee implementation plus the explicit requirements to default to Trading and modestly widen the chat panel.
