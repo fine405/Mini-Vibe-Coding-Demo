@@ -27,19 +27,27 @@ import {
 	RAIN_LAYER_CONFIG,
 	type RainfallState,
 	setRainSurfaces,
+	setRainTextSurfaces,
 	stepRainfall,
 } from "@/modules/theme/rainfall";
 import {
 	type RainSurfaceGeometry,
 	signedDistanceToRainSurface,
 } from "@/modules/theme/rainSurfaces";
+import {
+	type RainTextSurfaceGeometry,
+	signedDistanceToRainTextSurface,
+} from "@/modules/theme/rainTextSurfaces";
 import { createRainWaterRenderer } from "@/modules/theme/rainWaterWebgl2";
 
 export interface RainSceneHandle {
 	update: (dt: number, audioTime?: number | null) => void;
 	renderStill: () => void;
 	resize: (width: number, height: number) => void;
-	setSurfaces: (surfaces: readonly RainSurfaceGeometry[]) => void;
+	setSurfaces: (
+		surfaces: readonly RainSurfaceGeometry[],
+		textSurfaces?: readonly RainTextSurfaceGeometry[],
+	) => void;
 	dispose: () => void;
 }
 
@@ -85,6 +93,7 @@ const drawDrop = (
 	ctx: CanvasRenderingContext2D,
 	drop: RainfallState["drops"][number],
 	surfaces: RainfallState["surfaces"],
+	textSurfaces: RainfallState["textSurfaces"],
 	forceVisible: boolean,
 ): void => {
 	const config = RAIN_LAYER_CONFIG[drop.layer];
@@ -102,6 +111,14 @@ const drawDrop = (
 			(surface) =>
 				signedDistanceToRainSurface(drop, surface) <= 0 ||
 				signedDistanceToRainSurface(
+					{ x: drop.x - streakX * 0.5, y: drop.y - streakY * 0.5 },
+					surface,
+				) <= 0,
+		) ||
+		textSurfaces.some(
+			(surface) =>
+				signedDistanceToRainTextSurface(drop, surface) <= 0 ||
+				signedDistanceToRainTextSurface(
 					{ x: drop.x - streakX * 0.5, y: drop.y - streakY * 0.5 },
 					surface,
 				) <= 0,
@@ -375,7 +392,7 @@ const draw = (
 	drawLightning(ctx, state, visual);
 
 	for (const drop of state.drops) {
-		drawDrop(ctx, drop, state.surfaces, forceVisible);
+		drawDrop(ctx, drop, state.surfaces, state.textSurfaces, forceVisible);
 	}
 	drawTopSurfaceWater(ctx, state);
 	if (drawFallbackRunoff) drawRunoffWater2d(ctx, state);
@@ -387,6 +404,9 @@ const draw = (
 		if (
 			state.surfaces.some(
 				(surface) => signedDistanceToRainSurface(spray, surface) <= 0,
+			) ||
+			state.textSurfaces.some(
+				(surface) => signedDistanceToRainTextSurface(spray, surface) <= 0,
 			)
 		) {
 			continue;
@@ -474,18 +494,25 @@ export const createRainScene = (
 		renderStill: () => renderFrame(true),
 		resize: (nextWidth: number, nextHeight: number) => {
 			const surfaces = state.surfaces;
+			const textSurfaces = state.textSurfaces;
 			state = createRainfall(nextWidth, nextHeight, random, visual.intensity);
 			setRainSurfaces(state, surfaces);
+			setRainTextSurfaces(state, textSurfaces);
 			applySize();
 		},
-		setSurfaces: (surfaces: readonly RainSurfaceGeometry[]) => {
+		setSurfaces: (
+			surfaces: readonly RainSurfaceGeometry[],
+			textSurfaces: readonly RainTextSurfaceGeometry[] = [],
+		) => {
 			setRainSurfaces(state, surfaces);
+			setRainTextSurfaces(state, textSurfaces);
 		},
 		dispose: () => {
 			state.drops = [];
 			state.sprays = [];
 			state.rings = [];
 			state.surfaces = [];
+			state.textSurfaces = [];
 			state.surfaceBeads = [];
 			state.runoffDrops = [];
 			waterRenderer?.dispose();

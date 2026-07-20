@@ -779,10 +779,17 @@ function AgentChatPane({
 							<ConversationEmptyState className="min-h-full justify-start overflow-y-auto px-4 py-6">
 								<div className="flex w-full max-w-2xl flex-1 flex-col items-center justify-center py-6">
 									<BrandMark className="size-14" rainSurfaceId="agent-brand" />
-									<h2 className="mt-6 text-balance text-xl font-semibold tracking-tight">
+									<h2
+										className="mt-6 text-balance text-xl font-semibold tracking-tight"
+										data-rain-text-surface="agent-title"
+									>
 										Build with a real coding agent
 									</h2>
-									<p className="mt-3 max-w-lg text-pretty text-sm leading-6 text-muted-foreground">
+									<p
+										className="mt-3 max-w-lg text-pretty text-sm leading-6 text-muted-foreground"
+										data-rain-text-impact="subtle"
+										data-rain-text-surface="agent-description"
+									>
 										Ask for a feature, refactor, or bug fix. The agent can
 										inspect and edit a shadow copy, then returns a reviewable
 										ChangeSet.

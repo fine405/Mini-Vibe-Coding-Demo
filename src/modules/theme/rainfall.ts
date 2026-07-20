@@ -24,6 +24,10 @@ import {
 	type RainSurfaceGeometry,
 	type RainSurfaceHit,
 } from "@/modules/theme/rainSurfaces";
+import {
+	findRainTextSurfaceHit,
+	type RainTextSurfaceGeometry,
+} from "@/modules/theme/rainTextSurfaces";
 
 export type RainLayer = "far" | "mid" | "near";
 
@@ -131,6 +135,7 @@ export interface RainfallState {
 	sprays: SprayDroplet[];
 	rings: SplashRing[];
 	surfaces: WetRainSurface[];
+	textSurfaces: RainTextSurfaceGeometry[];
 	surfaceBeads: SurfaceWaterBead[];
 	runoffDrops: RunoffDroplet[];
 	spawnAccumulator: number;
@@ -320,6 +325,7 @@ export const createRainfall = (
 		sprays: [],
 		rings: [],
 		surfaces: [],
+		textSurfaces: [],
 		surfaceBeads: [],
 		runoffDrops: [],
 		spawnAccumulator: 0,
@@ -341,6 +347,7 @@ const spawnImpact = (
 	size: number,
 	random: () => number,
 	dropletScale = 1,
+	impactScale = 1,
 ): void => {
 	const dropletCount = Math.max(
 		1,
@@ -378,7 +385,7 @@ const spawnImpact = (
 		tangentAngle: Math.atan2(tangentY, tangentX),
 		age: 0,
 		lifetime: RING_LIFETIME_SECONDS,
-		maxRadius: getCrownRadius(impactSpeed),
+		maxRadius: getCrownRadius(impactSpeed) * impactScale,
 		alpha: Math.min(0.36, alpha * 1.3),
 	});
 
@@ -444,6 +451,48 @@ export const setRainSurfaces = (
 	state.surfaceBeads = state.surfaceBeads.filter((bead) =>
 		activeIds.has(bead.surfaceId),
 	);
+};
+
+export const setRainTextSurfaces = (
+	state: RainfallState,
+	surfaces: readonly RainTextSurfaceGeometry[],
+): void => {
+	state.textSurfaces = [...surfaces];
+};
+
+const SUBTLE_TEXT_IMPACT_SCALE = 0.4;
+
+interface RainColliderHit {
+	depositsWater: boolean;
+	hit: RainSurfaceHit;
+	impactScale: number;
+	nearOnly: boolean;
+}
+
+const findFirstColliderHit = (
+	start: { x: number; y: number },
+	end: { x: number; y: number },
+	surfaces: readonly RainSurfaceGeometry[],
+	textSurfaces: readonly RainTextSurfaceGeometry[],
+): RainColliderHit | null => {
+	const surfaceHit = findRainSurfaceHit(start, end, surfaces);
+	const textHit = findRainTextSurfaceHit(start, end, textSurfaces);
+	if (textHit && (!surfaceHit || textHit.t < surfaceHit.t)) {
+		const subtle = textHit.impact === "subtle";
+		return {
+			depositsWater: false,
+			hit: textHit,
+			impactScale: subtle ? SUBTLE_TEXT_IMPACT_SCALE : 1,
+			nearOnly: subtle,
+		};
+	}
+	if (!surfaceHit) return null;
+	return {
+		depositsWater: true,
+		hit: surfaceHit,
+		impactScale: 1,
+		nearOnly: false,
+	};
 };
 
 const getSurfaceById = (
@@ -851,16 +900,30 @@ const stepRunoffDrops = (
 						(surface) => surface.id !== drop.sourceSurfaceId,
 					)
 				: state.surfaces;
-		const hit = findRainSurfaceHit(start, drop, candidateSurfaces);
-		if (hit) {
-			depositSurfaceWater(state, hit, drop.volume * 0.8, drop.vx * 0.08);
+		const collision = findFirstColliderHit(
+			start,
+			drop,
+			candidateSurfaces,
+			state.textSurfaces,
+		);
+		if (collision) {
+			if (collision.depositsWater) {
+				depositSurfaceWater(
+					state,
+					collision.hit,
+					drop.volume * 0.8,
+					drop.vx * 0.08,
+				);
+			}
 			spawnImpact(
 				state,
-				hit,
+				collision.hit,
 				Math.hypot(drop.vx, drop.vy),
 				drop.alpha,
-				drop.size,
+				drop.size * collision.impactScale,
 				random,
+				collision.impactScale,
+				collision.impactScale,
 			);
 			state.runoffDrops.splice(index, 1);
 			continue;
@@ -949,33 +1012,39 @@ export const stepRainfall = (
 		drop.x += drop.vx * dt;
 		drop.y += drop.speed * dt;
 
-		const surfaceHit = findRainSurfaceHit(
+		const collision = findFirstColliderHit(
 			{ x: previousX, y: previousY },
 			drop,
 			state.surfaces,
+			state.textSurfaces,
 		);
-		if (surfaceHit) {
-			depositSurfaceWater(
-				state,
-				surfaceHit,
-				DROP_WATER_VOLUME[drop.layer],
-				drop.vx * 0.08,
-			);
+		if (collision) {
+			if (collision.depositsWater) {
+				depositSurfaceWater(
+					state,
+					collision.hit,
+					DROP_WATER_VOLUME[drop.layer],
+					drop.vx * 0.08,
+				);
+			}
 			// Only top-facing hits splash visibly; side grazes recycle silently
 			// so no sideways ejecta reads as a rendering artifact.
 			if (
-				surfaceHit.normalY < -0.2 &&
+				collision.hit.normalY < -0.2 &&
 				(drop.layer === "near" ||
-					(drop.layer === "mid" && random() < MID_SURFACE_SPLASH_CHANCE))
+					(!collision.nearOnly &&
+						drop.layer === "mid" &&
+						random() < MID_SURFACE_SPLASH_CHANCE))
 			) {
 				spawnImpact(
 					state,
-					surfaceHit,
+					collision.hit,
 					drop.speed,
 					drop.alpha,
-					config.strokeWidth,
+					config.strokeWidth * collision.impactScale,
 					random,
-					0.7,
+					0.7 * collision.impactScale,
+					collision.impactScale,
 				);
 			}
 			if (state.drops.length > targetCount) {

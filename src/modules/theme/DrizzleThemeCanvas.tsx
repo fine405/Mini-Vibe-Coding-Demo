@@ -1,7 +1,10 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { getDrizzleAudioTime } from "@/modules/theme/drizzleAudio";
-import { collectRainDomSurfaces } from "@/modules/theme/rainDomSurfaces";
+import {
+	collectRainDomSurfaces,
+	collectRainDomTextSurfaces,
+} from "@/modules/theme/rainDomSurfaces";
 import type { RainSceneHandle } from "@/modules/theme/rainScene2d";
 import { useThemeStore } from "@/modules/theme/store";
 
@@ -34,7 +37,11 @@ export function DrizzleThemeCanvas() {
 		let last = 0;
 		let lastSurfaceRefresh = 0;
 		const reduceMotion = prefersReducedMotion();
-		const syncSurfaces = () => scene?.setSurfaces(collectRainDomSurfaces());
+		const syncSurfaces = () =>
+			scene?.setSurfaces(
+				collectRainDomSurfaces(),
+				collectRainDomTextSurfaces(),
+			);
 
 		const handleResize = () => {
 			if (!scene) return;

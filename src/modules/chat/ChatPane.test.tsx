@@ -206,6 +206,12 @@ describe("AgentChatMessage", () => {
 		expect(
 			document.querySelector('[data-rain-surface="agent-brand"]'),
 		).toBeVisible();
+		expect(
+			document.querySelector('[data-rain-text-surface="agent-title"]'),
+		).toBeVisible();
+		expect(
+			document.querySelector('[data-rain-text-surface="agent-description"]'),
+		).toHaveAttribute("data-rain-text-impact", "subtle");
 		for (const suggestion of screen.getAllByTestId("chat-suggestion")) {
 			expect(suggestion.querySelector("svg")).toHaveClass("text-violet-500");
 		}

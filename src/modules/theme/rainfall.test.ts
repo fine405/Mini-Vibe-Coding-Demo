@@ -17,14 +17,45 @@ import {
 	RAIN_WIND_RANGE,
 	RING_LIFETIME_SECONDS,
 	setRainSurfaces,
+	setRainTextSurfaces,
 	stepRainfall,
 	stepSurfaceWater,
 } from "@/modules/theme/rainfall";
+import {
+	buildRainTextSdf,
+	type RainTextImpact,
+	type RainTextSurfaceGeometry,
+} from "@/modules/theme/rainTextSurfaces";
 
 const steady = (value: number) => () => value;
 const sequence = (...values: number[]) => {
 	let index = 0;
 	return () => values[index++] ?? values.at(-1) ?? 0.5;
+};
+
+const createTextBlockSurface = (
+	impact: RainTextImpact,
+): RainTextSurfaceGeometry => {
+	const fieldWidth = 20;
+	const fieldHeight = 12;
+	const alpha = new Uint8ClampedArray(fieldWidth * fieldHeight);
+	for (let y = 4; y <= 7; y++) {
+		for (let x = 4; x <= 15; x++) alpha[y * fieldWidth + x] = 255;
+	}
+	const field = buildRainTextSdf(alpha, fieldWidth, fieldHeight);
+	expect(field).not.toBeNull();
+	return {
+		field: field as Float32Array,
+		fieldHeight,
+		fieldWidth,
+		height: fieldHeight,
+		id: "text",
+		impact,
+		scale: 1,
+		width: fieldWidth,
+		x: 80,
+		y: 70,
+	};
 };
 
 describe("rainfall simulation", () => {
@@ -177,6 +208,66 @@ describe("rainfall simulation", () => {
 		expect(state.rings.some((ring) => ring.y < 72)).toBe(true);
 		expect(state.surfaceBeads).toHaveLength(1);
 		expect(state.surfaceBeads[0]?.surfaceId).toBe("brand");
+	});
+
+	it("splashes on title glyphs without depositing component water", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainTextSurfaces(state, [createTextBlockSurface("standard")]);
+		for (const candidate of state.drops) {
+			candidate.x = 10;
+			candidate.y = -100;
+		}
+		const drop = state.drops.find((candidate) => candidate.layer === "near");
+		expect(drop).toBeDefined();
+		if (!drop) return;
+		drop.x = 90.5;
+		drop.y = 68;
+		drop.speed = 700;
+		drop.turbulenceAmplitude = 0;
+		drop.windSusceptibility = 0;
+
+		stepRainfall(state, 0.02, steady(0.5));
+
+		expect(drop.y).toBeLessThan(0);
+		expect(state.rings.some((ring) => ring.y >= 73 && ring.y <= 75)).toBe(true);
+		expect(state.surfaceBeads).toHaveLength(0);
+	});
+
+	it("keeps subtle body-copy impacts near-only and scaled down", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainTextSurfaces(state, [createTextBlockSurface("subtle")]);
+		for (const candidate of state.drops) {
+			candidate.x = 10;
+			candidate.y = -100;
+		}
+		const midDrop = state.drops.find((candidate) => candidate.layer === "mid");
+		const nearDrop = state.drops.find(
+			(candidate) => candidate.layer === "near",
+		);
+		expect(midDrop).toBeDefined();
+		expect(nearDrop).toBeDefined();
+		if (!midDrop || !nearDrop) return;
+		for (const drop of [midDrop, nearDrop]) {
+			drop.x = 90.5;
+			drop.speed = 700;
+			drop.turbulenceAmplitude = 0;
+			drop.windSusceptibility = 0;
+		}
+		midDrop.y = 68;
+		nearDrop.y = -100;
+
+		stepRainfall(state, 0.02, steady(0));
+
+		expect(state.rings).toHaveLength(0);
+		nearDrop.y = 68;
+		stepRainfall(state, 0.02, steady(0));
+
+		expect(state.rings).toHaveLength(1);
+		expect(state.rings[0]?.maxRadius).toBeCloseTo(getCrownRadius(700) * 0.4);
+		expect(state.sprays).toHaveLength(1);
+		expect(state.sprays[0]?.size).toBeCloseTo(
+			RAIN_LAYER_CONFIG.near.strokeWidth * 0.4,
+		);
 	});
 
 	it("carries edge water around the side to the bottom before it drips", () => {
