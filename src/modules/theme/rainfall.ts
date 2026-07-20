@@ -26,6 +26,7 @@ import {
 } from "@/modules/theme/rainSurfaces";
 import {
 	findRainTextSurfaceHit,
+	type RainTextImpact,
 	type RainTextSurfaceGeometry,
 } from "@/modules/theme/rainTextSurfaces";
 
@@ -75,6 +76,16 @@ export interface SplashRing {
 	age: number;
 	lifetime: number;
 	maxRadius: number;
+	alpha: number;
+}
+
+/** Brief point highlight where a near drop meets a large title glyph. */
+export interface TextImpactGlint {
+	x: number;
+	y: number;
+	age: number;
+	lifetime: number;
+	radius: number;
 	alpha: number;
 }
 
@@ -134,6 +145,7 @@ export interface RainfallState {
 	drops: Raindrop[];
 	sprays: SprayDroplet[];
 	rings: SplashRing[];
+	textGlints: TextImpactGlint[];
 	surfaces: WetRainSurface[];
 	textSurfaces: RainTextSurfaceGeometry[];
 	surfaceBeads: SurfaceWaterBead[];
@@ -249,6 +261,8 @@ export const RING_LIFETIME_SECONDS = 0.28;
 /** Hard bounds on live splash particles to keep the frame cheap. */
 export const MAX_SPRAY_COUNT = 90;
 export const MAX_RING_COUNT = 36;
+export const MAX_TEXT_GLINT_COUNT = 12;
+export const TEXT_GLINT_LIFETIME_SECONDS = 0.1;
 export const MAX_SURFACE_BEAD_COUNT = 72;
 export const MAX_RUNOFF_DROP_COUNT = 36;
 export const MIN_VISIBLE_SURFACE_WATER_VOLUME = 0.2;
@@ -324,6 +338,7 @@ export const createRainfall = (
 		drops,
 		sprays: [],
 		rings: [],
+		textGlints: [],
 		surfaces: [],
 		textSurfaces: [],
 		surfaceBeads: [],
@@ -397,6 +412,24 @@ const spawnImpact = (
 	}
 };
 
+const spawnTextGlint = (
+	state: RainfallState,
+	point: { x: number; y: number; normalX: number; normalY: number },
+	alpha: number,
+): void => {
+	state.textGlints.push({
+		x: point.x + point.normalX * 0.55,
+		y: point.y + point.normalY * 0.55,
+		age: 0,
+		lifetime: TEXT_GLINT_LIFETIME_SECONDS,
+		radius: 0.72,
+		alpha: Math.min(0.18, alpha * 0.62),
+	});
+	if (state.textGlints.length > MAX_TEXT_GLINT_COUNT) {
+		state.textGlints.splice(0, state.textGlints.length - MAX_TEXT_GLINT_COUNT);
+	}
+};
+
 const getTopTrack = (surface: RainSurfaceGeometry) => {
 	const radius = Math.min(surface.radius, surface.width * 0.5);
 	const left = surface.x + radius;
@@ -460,13 +493,10 @@ export const setRainTextSurfaces = (
 	state.textSurfaces = [...surfaces];
 };
 
-const SUBTLE_TEXT_IMPACT_SCALE = 0.4;
-
 interface RainColliderHit {
 	depositsWater: boolean;
 	hit: RainSurfaceHit;
-	impactScale: number;
-	nearOnly: boolean;
+	textImpact: RainTextImpact | null;
 }
 
 const findFirstColliderHit = (
@@ -478,20 +508,17 @@ const findFirstColliderHit = (
 	const surfaceHit = findRainSurfaceHit(start, end, surfaces);
 	const textHit = findRainTextSurfaceHit(start, end, textSurfaces);
 	if (textHit && (!surfaceHit || textHit.t < surfaceHit.t)) {
-		const subtle = textHit.impact === "subtle";
 		return {
 			depositsWater: false,
 			hit: textHit,
-			impactScale: subtle ? SUBTLE_TEXT_IMPACT_SCALE : 1,
-			nearOnly: subtle,
+			textImpact: textHit.impact,
 		};
 	}
 	if (!surfaceHit) return null;
 	return {
 		depositsWater: true,
 		hit: surfaceHit,
-		impactScale: 1,
-		nearOnly: false,
+		textImpact: null,
 	};
 };
 
@@ -915,16 +942,18 @@ const stepRunoffDrops = (
 					drop.vx * 0.08,
 				);
 			}
-			spawnImpact(
-				state,
-				collision.hit,
-				Math.hypot(drop.vx, drop.vy),
-				drop.alpha,
-				drop.size * collision.impactScale,
-				random,
-				collision.impactScale,
-				collision.impactScale,
-			);
+			if (collision.textImpact === "standard" && collision.hit.normalY < -0.2) {
+				spawnTextGlint(state, collision.hit, drop.alpha);
+			} else if (collision.textImpact === null) {
+				spawnImpact(
+					state,
+					collision.hit,
+					Math.hypot(drop.vx, drop.vy),
+					drop.alpha,
+					drop.size,
+					random,
+				);
+			}
 			state.runoffDrops.splice(index, 1);
 			continue;
 		}
@@ -1027,25 +1056,26 @@ export const stepRainfall = (
 					drop.vx * 0.08,
 				);
 			}
-			// Only top-facing hits splash visibly; side grazes recycle silently
-			// so no sideways ejecta reads as a rendering artifact.
-			if (
-				collision.hit.normalY < -0.2 &&
-				(drop.layer === "near" ||
-					(!collision.nearOnly &&
-						drop.layer === "mid" &&
-						random() < MID_SURFACE_SPLASH_CHANCE))
-			) {
-				spawnImpact(
-					state,
-					collision.hit,
-					drop.speed,
-					drop.alpha,
-					config.strokeWidth * collision.impactScale,
-					random,
-					0.7 * collision.impactScale,
-					collision.impactScale,
-				);
+			// Flat glyphs occlude rain but are not miniature vessels. Large title
+			// hits get only a point glint; body copy stays visually quiet.
+			if (collision.hit.normalY < -0.2) {
+				if (collision.textImpact === "standard" && drop.layer === "near") {
+					spawnTextGlint(state, collision.hit, drop.alpha);
+				} else if (
+					collision.textImpact === null &&
+					(drop.layer === "near" ||
+						(drop.layer === "mid" && random() < MID_SURFACE_SPLASH_CHANCE))
+				) {
+					spawnImpact(
+						state,
+						collision.hit,
+						drop.speed,
+						drop.alpha,
+						config.strokeWidth,
+						random,
+						0.7,
+					);
+				}
 			}
 			if (state.drops.length > targetCount) {
 				state.drops.splice(index, 1);
@@ -1103,6 +1133,14 @@ export const stepRainfall = (
 		ring.age += dt;
 		if (ring.age >= ring.lifetime) {
 			state.rings.splice(i, 1);
+		}
+	}
+
+	for (let i = state.textGlints.length - 1; i >= 0; i--) {
+		const glint = state.textGlints[i];
+		glint.age += dt;
+		if (glint.age >= glint.lifetime) {
+			state.textGlints.splice(i, 1);
 		}
 	}
 };

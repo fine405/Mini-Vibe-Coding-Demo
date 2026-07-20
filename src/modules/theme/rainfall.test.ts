@@ -89,6 +89,7 @@ describe("rainfall simulation", () => {
 		expect(state.drops.length).toBe(getDropCount(1440, 900));
 		expect(state.sprays).toHaveLength(0);
 		expect(state.rings).toHaveLength(0);
+		expect(state.textGlints).toHaveLength(0);
 		for (const drop of state.drops) {
 			const config = RAIN_LAYER_CONFIG[drop.layer];
 			expect(drop.y).toBeGreaterThanOrEqual(0);
@@ -210,7 +211,7 @@ describe("rainfall simulation", () => {
 		expect(state.surfaceBeads[0]?.surfaceId).toBe("brand");
 	});
 
-	it("splashes on title glyphs without depositing component water", () => {
+	it("uses a compact glint instead of a splash ring on title glyphs", () => {
 		const state = createRainfall(240, 180, steady(0.5));
 		setRainTextSurfaces(state, [createTextBlockSurface("standard")]);
 		for (const candidate of state.drops) {
@@ -229,11 +230,15 @@ describe("rainfall simulation", () => {
 		stepRainfall(state, 0.02, steady(0.5));
 
 		expect(drop.y).toBeLessThan(0);
-		expect(state.rings.some((ring) => ring.y >= 73 && ring.y <= 75)).toBe(true);
+		expect(state.textGlints).toHaveLength(1);
+		expect(state.textGlints[0]?.y).toBeGreaterThanOrEqual(73);
+		expect(state.textGlints[0]?.y).toBeLessThanOrEqual(75);
+		expect(state.rings).toHaveLength(0);
+		expect(state.sprays).toHaveLength(0);
 		expect(state.surfaceBeads).toHaveLength(0);
 	});
 
-	it("keeps subtle body-copy impacts near-only and scaled down", () => {
+	it("keeps body-copy collisions visually quiet", () => {
 		const state = createRainfall(240, 180, steady(0.5));
 		setRainTextSurfaces(state, [createTextBlockSurface("subtle")]);
 		for (const candidate of state.drops) {
@@ -258,16 +263,17 @@ describe("rainfall simulation", () => {
 
 		stepRainfall(state, 0.02, steady(0));
 
+		expect(midDrop.y).toBeLessThan(0);
 		expect(state.rings).toHaveLength(0);
+		expect(state.textGlints).toHaveLength(0);
+		midDrop.y = -100;
 		nearDrop.y = 68;
 		stepRainfall(state, 0.02, steady(0));
 
-		expect(state.rings).toHaveLength(1);
-		expect(state.rings[0]?.maxRadius).toBeCloseTo(getCrownRadius(700) * 0.4);
-		expect(state.sprays).toHaveLength(1);
-		expect(state.sprays[0]?.size).toBeCloseTo(
-			RAIN_LAYER_CONFIG.near.strokeWidth * 0.4,
-		);
+		expect(nearDrop.y).toBeLessThan(0);
+		expect(state.textGlints).toHaveLength(0);
+		expect(state.rings).toHaveLength(0);
+		expect(state.sprays).toHaveLength(0);
 	});
 
 	it("carries edge water around the side to the bottom before it drips", () => {

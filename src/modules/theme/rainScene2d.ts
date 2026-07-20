@@ -397,6 +397,17 @@ const draw = (
 	drawTopSurfaceWater(ctx, state);
 	if (drawFallbackRunoff) drawRunoffWater2d(ctx, state);
 
+	for (const glint of state.textGlints) {
+		const progress = glint.age / glint.lifetime;
+		const alpha = glint.alpha * (1 - progress) * (1 - progress);
+		if (alpha <= 0) continue;
+		const radius = glint.radius * (0.8 + progress * 0.2);
+		ctx.fillStyle = `rgba(244, 249, 252, ${alpha})`;
+		ctx.beginPath();
+		ctx.arc(glint.x, glint.y, radius, 0, Math.PI * 2);
+		ctx.fill();
+	}
+
 	for (const spray of state.sprays) {
 		const alpha = spray.alpha * (1 - spray.age / spray.lifetime);
 		if (alpha <= 0) continue;
@@ -511,6 +522,7 @@ export const createRainScene = (
 			state.drops = [];
 			state.sprays = [];
 			state.rings = [];
+			state.textGlints = [];
 			state.surfaces = [];
 			state.textSurfaces = [];
 			state.surfaceBeads = [];
