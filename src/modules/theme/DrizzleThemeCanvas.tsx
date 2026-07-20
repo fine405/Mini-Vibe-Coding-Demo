@@ -13,7 +13,7 @@ const prefersReducedMotion = (): boolean =>
  * Fullscreen drizzle overlay for the Drizzle theme.
  *
  * Always mounted next to the other theme effects but only active in Drizzle
- * mode: entering the theme dynamically imports the Canvas 2D rain scene and
+ * mode: entering the theme dynamically imports the hybrid rain scene and
  * starts the loop; leaving cancels the loop and clears the canvas. The
  * canvas itself fades with the same 700ms transition as the other theme
  * overlays and never intercepts pointer input.
@@ -21,6 +21,7 @@ const prefersReducedMotion = (): boolean =>
 export function DrizzleThemeCanvas() {
 	const mode = useThemeStore((state) => state.mode);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const waterCanvasRef = useRef<HTMLCanvasElement>(null);
 	const isDrizzle = mode === "drizzle";
 
 	useEffect(() => {
@@ -56,7 +57,12 @@ export function DrizzleThemeCanvas() {
 
 		void import("@/modules/theme/rainScene2d").then(({ createRainScene }) => {
 			if (cancelled || !canvasRef.current) return;
-			scene = createRainScene(canvas, window.innerWidth, window.innerHeight);
+			scene = createRainScene(
+				canvas,
+				waterCanvasRef.current,
+				window.innerWidth,
+				window.innerHeight,
+			);
 			if (!scene) return;
 			syncSurfaces();
 			if (reduceMotion) {
@@ -76,15 +82,25 @@ export function DrizzleThemeCanvas() {
 		};
 	}, [isDrizzle]);
 
+	const canvasClassName = cn(
+		"pointer-events-none fixed inset-0 z-40 h-full w-full opacity-0 transition-opacity duration-700 ease-out motion-reduce:transition-none",
+		isDrizzle && "opacity-100",
+	);
+
 	return (
-		<canvas
-			aria-hidden="true"
-			className={cn(
-				"pointer-events-none fixed inset-0 z-40 h-full w-full opacity-0 transition-opacity duration-700 ease-out motion-reduce:transition-none",
-				isDrizzle && "opacity-100",
-			)}
-			data-testid="drizzle-theme-canvas"
-			ref={canvasRef}
-		/>
+		<>
+			<canvas
+				aria-hidden="true"
+				className={canvasClassName}
+				data-testid="drizzle-theme-canvas"
+				ref={canvasRef}
+			/>
+			<canvas
+				aria-hidden="true"
+				className={canvasClassName}
+				data-testid="drizzle-water-canvas"
+				ref={waterCanvasRef}
+			/>
+		</>
 	);
 }

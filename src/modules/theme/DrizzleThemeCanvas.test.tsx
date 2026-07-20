@@ -13,6 +13,7 @@ describe("DrizzleThemeCanvas", () => {
 	it("renders a non-interactive fullscreen canvas that is hidden outside Drizzle", () => {
 		render(<DrizzleThemeCanvas />);
 		const canvas = screen.getByTestId("drizzle-theme-canvas");
+		const waterCanvas = screen.getByTestId("drizzle-water-canvas");
 
 		expect(canvas).toHaveAttribute("aria-hidden", "true");
 		expect(canvas).toHaveClass(
@@ -23,15 +24,19 @@ describe("DrizzleThemeCanvas", () => {
 			"opacity-0",
 		);
 		expect(canvas).not.toHaveClass("opacity-100");
+		expect(waterCanvas).toHaveAttribute("aria-hidden", "true");
+		expect(waterCanvas).toHaveClass("pointer-events-none", "fixed", "z-40");
 	});
 
 	it("fades in when Drizzle becomes active and survives without a 2D context", async () => {
 		const raf = vi.spyOn(window, "requestAnimationFrame");
 		render(<DrizzleThemeCanvas />);
 		const canvas = screen.getByTestId("drizzle-theme-canvas");
+		const waterCanvas = screen.getByTestId("drizzle-water-canvas");
 
 		act(() => useThemeStore.getState().setMode("drizzle"));
 		expect(canvas).toHaveClass("opacity-100");
+		expect(waterCanvas).toHaveClass("opacity-100");
 
 		// jsdom has no Canvas 2D context: the dynamic scene import must
 		// resolve without throwing, and no animation loop may be scheduled.
@@ -39,5 +44,6 @@ describe("DrizzleThemeCanvas", () => {
 
 		act(() => useThemeStore.getState().setMode("night"));
 		expect(canvas).toHaveClass("opacity-0");
+		expect(waterCanvas).toHaveClass("opacity-0");
 	});
 });

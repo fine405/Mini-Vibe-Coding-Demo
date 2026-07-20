@@ -1,11 +1,10 @@
 /**
- * Canvas 2D renderer for the Drizzle rainfall simulation.
+ * Hybrid renderer for the Drizzle rainfall simulation.
  *
- * Rain streaks are short line segments along the drop's velocity vector —
- * the same motion blur a camera produces — so plain Canvas 2D strokes are a
- * better fit than a WebGL scene here: a few hundred round-capped lines per
- * frame, no extra bundle weight, and crisp 1px geometry. The simulation
- * itself lives in rainfall.ts and stays renderer-agnostic.
+ * Rain streaks and impacts remain crisp, inexpensive Canvas 2D strokes.
+ * Attached runoff uses a small WebGL 2 SDF layer for continuous neck and bulb
+ * shapes, with the equivalent Canvas 2D geometry as its compatibility path.
+ * The simulation itself lives in rainfall.ts and stays renderer-agnostic.
  *
  * Exposes the same handle shape as snowScene.ts so the theme component can
  * swap between the two effects uniformly.
@@ -19,13 +18,14 @@ import {
 import {
 	createRainfall,
 	getDropFade,
+	getPendantBulbSize,
+	getSurfaceRunoff,
 	getSurfaceRunoffPathLength,
 	getSurfaceRunoffPoint,
 	getSurfaceRunoffThreshold,
 	MIN_VISIBLE_SURFACE_WATER_VOLUME,
 	RAIN_LAYER_CONFIG,
 	type RainfallState,
-	SURFACE_RUNOFF_HANG_SECONDS,
 	setRainSurfaces,
 	stepRainfall,
 } from "@/modules/theme/rainfall";
@@ -33,6 +33,7 @@ import {
 	type RainSurfaceGeometry,
 	signedDistanceToRainSurface,
 } from "@/modules/theme/rainSurfaces";
+import { createRainWaterRenderer } from "@/modules/theme/rainWaterWebgl2";
 
 export interface RainSceneHandle {
 	update: (dt: number, audioTime?: number | null) => void;
@@ -125,7 +126,7 @@ const drawDrop = (
 	ctx.stroke();
 };
 
-const drawSurfaceWater = (
+const drawTopSurfaceWater = (
 	ctx: CanvasRenderingContext2D,
 	state: RainfallState,
 ): void => {
@@ -180,38 +181,113 @@ const drawSurfaceWater = (
 		);
 		ctx.stroke();
 	}
+};
 
+const drawPendant2d = (
+	ctx: CanvasRenderingContext2D,
+	anchor: { x: number; y: number },
+	volume: number,
+	threshold: number,
+	length: number,
+	pinch: number,
+	alpha: number,
+): void => {
+	const bulb = getPendantBulbSize(volume, threshold, pinch);
+	const bulbCenterY = anchor.y + Math.max(bulb.radiusY * 0.42, length);
+	const neck = Math.max(0.16, bulb.radiusX * (0.44 - pinch * 0.34));
+	ctx.fillStyle = `rgba(${STREAK_RGB}, ${alpha})`;
+	ctx.beginPath();
+	ctx.moveTo(anchor.x - neck, anchor.y);
+	ctx.bezierCurveTo(
+		anchor.x - neck,
+		anchor.y + (bulbCenterY - anchor.y) * 0.48,
+		anchor.x - bulb.radiusX,
+		bulbCenterY - bulb.radiusY * 0.55,
+		anchor.x - bulb.radiusX,
+		bulbCenterY,
+	);
+	ctx.bezierCurveTo(
+		anchor.x - bulb.radiusX,
+		bulbCenterY + bulb.radiusY * 0.72,
+		anchor.x - bulb.radiusX * 0.45,
+		bulbCenterY + bulb.radiusY,
+		anchor.x,
+		bulbCenterY + bulb.radiusY,
+	);
+	ctx.bezierCurveTo(
+		anchor.x + bulb.radiusX * 0.45,
+		bulbCenterY + bulb.radiusY,
+		anchor.x + bulb.radiusX,
+		bulbCenterY + bulb.radiusY * 0.72,
+		anchor.x + bulb.radiusX,
+		bulbCenterY,
+	);
+	ctx.bezierCurveTo(
+		anchor.x + bulb.radiusX,
+		bulbCenterY - bulb.radiusY * 0.55,
+		anchor.x + neck,
+		anchor.y + (bulbCenterY - anchor.y) * 0.48,
+		anchor.x + neck,
+		anchor.y,
+	);
+	ctx.closePath();
+	ctx.fill();
+
+	ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.42})`;
+	ctx.beginPath();
+	ctx.ellipse(
+		anchor.x - bulb.radiusX * 0.3,
+		bulbCenterY - bulb.radiusY * 0.28,
+		bulb.radiusX * 0.16,
+		bulb.radiusY * 0.24,
+		0,
+		0,
+		Math.PI * 2,
+	);
+	ctx.fill();
+};
+
+const drawRunoffWater2d = (
+	ctx: CanvasRenderingContext2D,
+	state: RainfallState,
+): void => {
 	for (const surface of state.surfaces) {
 		for (const side of ["left", "right"] as const) {
-			const volume =
-				side === "left" ? surface.leftReservoir : surface.rightReservoir;
-			const progress =
-				side === "left" ? surface.leftFlowProgress : surface.rightFlowProgress;
-			const fill = Math.min(1, volume / getSurfaceRunoffThreshold(surface));
-			if (volume <= 0.03 || progress <= 0) continue;
+			const runoff = getSurfaceRunoff(surface, side);
+			const threshold = getSurfaceRunoffThreshold(
+				surface,
+				side,
+				runoff.releaseIndex,
+			);
+			const fill = Math.min(1.2, runoff.volume / threshold);
+			if (runoff.progress <= 0) continue;
 
 			// Draw only the local wet trail behind the moving head. Keeping the
 			// whole outline lit would look like a decorative border animation.
-			const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
-			const tailLength = Math.min(14, 4 + fill * 10);
-			const tailProgress = Math.max(0, progress - tailLength / pathLength);
-			ctx.strokeStyle = `rgba(${STREAK_RGB}, ${0.045 + fill * 0.14})`;
-			ctx.lineWidth = 0.5 + fill * 0.55;
-			ctx.beginPath();
-			for (let index = 0; index <= 7; index++) {
-				const sampleProgress =
-					tailProgress + ((progress - tailProgress) * index) / 7;
-				const point = getSurfaceRunoffPoint(surface, side, sampleProgress);
-				if (index === 0) ctx.moveTo(point.x, point.y);
-				else ctx.lineTo(point.x, point.y);
+			if (runoff.volume > 0.02) {
+				const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
+				const tailLength = Math.min(14, 4 + fill * 10);
+				const tailProgress = Math.max(
+					0,
+					runoff.progress - tailLength / pathLength,
+				);
+				ctx.strokeStyle = `rgba(${STREAK_RGB}, ${0.045 + fill * 0.14})`;
+				ctx.lineWidth = 0.5 + fill * 0.55;
+				ctx.beginPath();
+				for (let index = 0; index <= 7; index++) {
+					const sampleProgress =
+						tailProgress + ((runoff.progress - tailProgress) * index) / 7;
+					const point = getSurfaceRunoffPoint(surface, side, sampleProgress);
+					if (index === 0) ctx.moveTo(point.x, point.y);
+					else ctx.lineTo(point.x, point.y);
+				}
+				ctx.stroke();
 			}
-			ctx.stroke();
 
-			const head = getSurfaceRunoffPoint(surface, side, progress);
-			const alpha = 0.07 + fill * 0.2;
-			ctx.fillStyle = `rgba(${STREAK_RGB}, ${alpha})`;
-			ctx.beginPath();
-			if (progress < 1) {
+			const head = getSurfaceRunoffPoint(surface, side, runoff.progress);
+			if (runoff.progress < 1 && runoff.volume > 0.02) {
+				ctx.fillStyle = `rgba(${STREAK_RGB}, ${0.07 + fill * 0.2})`;
+				ctx.beginPath();
 				ctx.ellipse(
 					head.x,
 					head.y,
@@ -221,45 +297,31 @@ const drawSurfaceWater = (
 					0,
 					Math.PI * 2,
 				);
-			} else {
-				const width = 0.48 + fill * 0.65;
-				const height = 0.7 + fill * fill * 3.1;
-				ctx.ellipse(
-					head.x,
-					head.y + height * 0.42,
-					width,
-					height,
-					0,
-					0,
-					Math.PI * 2,
+				ctx.fill();
+			} else if (runoff.recoil > 0 && runoff.pendantLength > 0.05) {
+				ctx.strokeStyle = `rgba(${STREAK_RGB}, ${runoff.recoil * 0.19})`;
+				ctx.lineWidth = 0.34 + runoff.recoil * 0.38;
+				ctx.beginPath();
+				ctx.moveTo(head.x, head.y);
+				ctx.lineTo(head.x, head.y + runoff.pendantLength);
+				ctx.stroke();
+			} else if (runoff.progress >= 1 && runoff.volume > 0.01) {
+				drawPendant2d(
+					ctx,
+					head,
+					runoff.volume,
+					threshold,
+					runoff.pendantLength,
+					runoff.pinch,
+					0.14 + Math.min(1, fill) * 0.25,
 				);
 			}
-			ctx.fill();
 		}
 	}
 
 	for (const drop of state.runoffDrops) {
-		if (drop.age < 0) {
-			const progress = Math.min(1, 1 + drop.age / SURFACE_RUNOFF_HANG_SECONDS);
-			const height = drop.size * (0.7 + progress * 1.8);
-			const alpha = drop.alpha * (0.2 + progress * 0.8);
-			ctx.fillStyle = `rgba(${STREAK_RGB}, ${alpha})`;
-			ctx.beginPath();
-			ctx.ellipse(
-				drop.x,
-				drop.y + height * 0.4,
-				drop.size * (0.52 + progress * 0.12),
-				height,
-				0,
-				0,
-				Math.PI * 2,
-			);
-			ctx.fill();
-			continue;
-		}
-
 		const speed = Math.hypot(drop.vx, drop.vy);
-		const alpha = drop.alpha * Math.min(1, drop.age / 0.06);
+		const alpha = drop.alpha;
 		const tailLength = Math.min(7, speed * 0.012);
 		const directionX = speed > 0 ? drop.vx / speed : 0;
 		const directionY = speed > 0 ? drop.vy / speed : 1;
@@ -274,11 +336,12 @@ const drawSurfaceWater = (
 		ctx.stroke();
 		ctx.fillStyle = `rgba(238, 245, 250, ${alpha})`;
 		ctx.beginPath();
+		const stretch = 1 + Math.min(0.55, speed / 850);
 		ctx.ellipse(
 			drop.x,
 			drop.y,
-			drop.size * 0.55,
-			drop.size,
+			(drop.size * drop.aspect) / Math.sqrt(stretch),
+			drop.size * stretch,
 			Math.atan2(drop.vy, drop.vx) - Math.PI * 0.5,
 			0,
 			Math.PI * 2,
@@ -288,8 +351,8 @@ const drawSurfaceWater = (
 		ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.55})`;
 		ctx.beginPath();
 		ctx.ellipse(
-			drop.x - drop.size * 0.16,
-			drop.y - drop.size * 0.3,
+			drop.x - drop.size * drop.aspect * 0.2,
+			drop.y - drop.size * 0.34,
 			drop.size * 0.16,
 			drop.size * 0.24,
 			0,
@@ -305,6 +368,7 @@ const draw = (
 	state: RainfallState,
 	visual: DrizzleVisualState,
 	forceVisible = false,
+	drawFallbackRunoff = true,
 ): void => {
 	ctx.clearRect(0, 0, state.width, state.height);
 	ctx.lineCap = "round";
@@ -313,7 +377,8 @@ const draw = (
 	for (const drop of state.drops) {
 		drawDrop(ctx, drop, state.surfaces, forceVisible);
 	}
-	drawSurfaceWater(ctx, state);
+	drawTopSurfaceWater(ctx, state);
+	if (drawFallbackRunoff) drawRunoffWater2d(ctx, state);
 
 	for (const spray of state.sprays) {
 		const alpha = spray.alpha * (1 - spray.age / spray.lifetime);
@@ -360,6 +425,7 @@ const draw = (
 
 export const createRainScene = (
 	canvas: HTMLCanvasElement,
+	waterCanvas: HTMLCanvasElement | null,
 	width: number,
 	height: number,
 	random: () => number = Math.random,
@@ -371,17 +437,27 @@ export const createRainScene = (
 	let fallbackTimelineTime = 0;
 	const audioLoopClock = createDrizzleLoopClock();
 	let state = createRainfall(width, height, random, visual.intensity);
-
-	const applySize = () => {
-		const dpr = Math.min(
+	const getDpr = () =>
+		Math.min(
 			MAX_DEVICE_PIXEL_RATIO,
 			typeof window.devicePixelRatio === "number" ? window.devicePixelRatio : 1,
 		);
+	const waterRenderer = waterCanvas
+		? createRainWaterRenderer(waterCanvas, width, height, getDpr())
+		: null;
+
+	const applySize = () => {
+		const dpr = getDpr();
 		canvas.width = Math.round(state.width * dpr);
 		canvas.height = Math.round(state.height * dpr);
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		waterRenderer?.resize(state.width, state.height, dpr);
 	};
 	applySize();
+	const renderFrame = (forceVisible = false) => {
+		const renderedWithWebGl = waterRenderer?.render(state) ?? false;
+		draw(ctx, state, visual, forceVisible, !renderedWithWebGl);
+	};
 
 	return {
 		update: (dt: number, audioTime: number | null = null) => {
@@ -393,9 +469,9 @@ export const createRainScene = (
 					: audioLoopClock.getTime(audioTime);
 			visual = getDrizzleVisualState(timelineTime);
 			stepRainfall(state, safeDt, random, visual);
-			draw(ctx, state, visual);
+			renderFrame();
 		},
-		renderStill: () => draw(ctx, state, visual, true),
+		renderStill: () => renderFrame(true),
 		resize: (nextWidth: number, nextHeight: number) => {
 			const surfaces = state.surfaces;
 			state = createRainfall(nextWidth, nextHeight, random, visual.intensity);
@@ -412,6 +488,7 @@ export const createRainScene = (
 			state.surfaces = [];
 			state.surfaceBeads = [];
 			state.runoffDrops = [];
+			waterRenderer?.dispose();
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 		},
 	};

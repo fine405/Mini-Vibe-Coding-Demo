@@ -74,12 +74,28 @@ export interface SplashRing {
 	alpha: number;
 }
 
-export interface WetRainSurface extends RainSurfaceGeometry {
-	leftReservoir: number;
-	rightReservoir: number;
+export type SurfaceRunoffSide = "left" | "right";
+
+/** Water attached to one side of a rounded component. */
+export interface SurfaceRunoffState {
+	volume: number;
 	/** Normalized travel from the top tangent to the bottom tangent. */
-	leftFlowProgress: number;
-	rightFlowProgress: number;
+	progress: number;
+	/** Tangential velocity along the rounded-rectangle outline, in px/s. */
+	velocity: number;
+	/** Distance from the bottom anchor to the pendant bulb center, in px. */
+	pendantLength: number;
+	pendantVelocity: number;
+	/** 0 while stable, 1 when the attached neck pinches off. */
+	pinch: number;
+	/** Brief wet filament left after a release. */
+	recoil: number;
+	releaseIndex: number;
+}
+
+export interface WetRainSurface extends RainSurfaceGeometry {
+	leftRunoff: SurfaceRunoffState;
+	rightRunoff: SurfaceRunoffState;
 }
 
 /** A small packet of water moving along a component's top edge. */
@@ -102,6 +118,7 @@ export interface RunoffDroplet {
 	volume: number;
 	alpha: number;
 	size: number;
+	aspect: number;
 	sourceSurfaceId: string;
 	sourceSide: "left" | "right";
 }
@@ -230,7 +247,6 @@ export const MAX_RING_COUNT = 36;
 export const MAX_SURFACE_BEAD_COUNT = 72;
 export const MAX_RUNOFF_DROP_COUNT = 36;
 export const MIN_VISIBLE_SURFACE_WATER_VOLUME = 0.2;
-export const SURFACE_RUNOFF_HANG_SECONDS = 0.28;
 
 /** Some near-camera impacts make a visible splash at the bottom edge. */
 export const NEAR_SPLASH_CHANCE = 0.3;
@@ -381,6 +397,37 @@ const getTopTrack = (surface: RainSurfaceGeometry) => {
 	return { left, width: Math.max(1, right - left) };
 };
 
+const createSurfaceRunoff = (
+	previous?: SurfaceRunoffState,
+): SurfaceRunoffState => ({
+	volume: previous?.volume ?? 0,
+	progress: previous?.progress ?? 0,
+	velocity: previous?.velocity ?? 0,
+	pendantLength: previous?.pendantLength ?? 0,
+	pendantVelocity: previous?.pendantVelocity ?? 0,
+	pinch: previous?.pinch ?? 0,
+	recoil: previous?.recoil ?? 0,
+	releaseIndex: previous?.releaseIndex ?? 0,
+});
+
+export const getSurfaceRunoff = (
+	surface: WetRainSurface,
+	side: SurfaceRunoffSide,
+): SurfaceRunoffState =>
+	side === "left" ? surface.leftRunoff : surface.rightRunoff;
+
+const addSurfaceRunoffWater = (
+	surface: WetRainSurface,
+	side: SurfaceRunoffSide,
+	volume: number,
+): void => {
+	const runoff = getSurfaceRunoff(surface, side);
+	runoff.volume += volume;
+	if (runoff.progress < 1) {
+		runoff.velocity = Math.max(runoff.velocity, 7 + Math.min(5, volume * 5));
+	}
+};
+
 export const setRainSurfaces = (
 	state: RainfallState,
 	surfaces: readonly RainSurfaceGeometry[],
@@ -390,10 +437,8 @@ export const setRainSurfaces = (
 	);
 	state.surfaces = surfaces.map((surface) => ({
 		...surface,
-		leftReservoir: previous.get(surface.id)?.leftReservoir ?? 0,
-		rightReservoir: previous.get(surface.id)?.rightReservoir ?? 0,
-		leftFlowProgress: previous.get(surface.id)?.leftFlowProgress ?? 0,
-		rightFlowProgress: previous.get(surface.id)?.rightFlowProgress ?? 0,
+		leftRunoff: createSurfaceRunoff(previous.get(surface.id)?.leftRunoff),
+		rightRunoff: createSurfaceRunoff(previous.get(surface.id)?.rightRunoff),
 	}));
 	const activeIds = new Set(state.surfaces.map((surface) => surface.id));
 	state.surfaceBeads = state.surfaceBeads.filter((bead) =>
@@ -420,11 +465,11 @@ export const depositSurfaceWater = (
 	// tangent. Keep it attached to that side instead of letting wind push it
 	// back onto the horizontal edge.
 	if (hit.normalX < -0.05) {
-		surface.leftReservoir += volume;
+		addSurfaceRunoffWater(surface, "left", volume);
 		return;
 	}
 	if (hit.normalX > 0.05) {
-		surface.rightReservoir += volume;
+		addSurfaceRunoffWater(surface, "right", volume);
 		return;
 	}
 	const track = getTopTrack(surface);
@@ -485,7 +530,18 @@ const getSurfaceRunoffRadius = (surface: RainSurfaceGeometry): number =>
 
 export const getSurfaceRunoffThreshold = (
 	surface: RainSurfaceGeometry,
-): number => Math.min(0.82, 0.38 + getSurfaceRunoffRadius(surface) / 80);
+	side: SurfaceRunoffSide,
+	releaseIndex = 0,
+): number => {
+	const base = Math.min(0.82, 0.38 + getSurfaceRunoffRadius(surface) / 80);
+	const seed = `${surface.id}:${side}:${releaseIndex}`;
+	let hash = 2166136261;
+	for (let index = 0; index < seed.length; index++) {
+		hash = Math.imul(hash ^ seed.charCodeAt(index), 16777619);
+	}
+	const variation = 0.92 + ((hash >>> 0) / 4294967295) * 0.16;
+	return base * variation;
+};
 
 export const getSurfaceRunoffPathLength = (
 	surface: RainSurfaceGeometry,
@@ -497,7 +553,7 @@ export const getSurfaceRunoffPathLength = (
 /** Point along a rounded edge from its top tangent to its bottom tangent. */
 export const getSurfaceRunoffPoint = (
 	surface: RainSurfaceGeometry,
-	side: "left" | "right",
+	side: SurfaceRunoffSide,
 	progress: number,
 ): { x: number; y: number } => {
 	const radius = getSurfaceRunoffRadius(surface);
@@ -542,28 +598,188 @@ export const getSurfaceRunoffPoint = (
 	};
 };
 
+export interface SurfaceRunoffFrame {
+	x: number;
+	y: number;
+	tangentX: number;
+	tangentY: number;
+}
+
+/** Position and downhill tangent of the rounded edge at a normalized point. */
+export const getSurfaceRunoffFrame = (
+	surface: RainSurfaceGeometry,
+	side: SurfaceRunoffSide,
+	progress: number,
+): SurfaceRunoffFrame => {
+	const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
+	const step = Math.min(0.02, 1 / pathLength);
+	const before = getSurfaceRunoffPoint(surface, side, progress - step);
+	const after = getSurfaceRunoffPoint(surface, side, progress + step);
+	const length = Math.hypot(after.x - before.x, after.y - before.y) || 1;
+	const point = getSurfaceRunoffPoint(surface, side, progress);
+	return {
+		...point,
+		tangentX: (after.x - before.x) / length,
+		tangentY: (after.y - before.y) / length,
+	};
+};
+
+export const getPendantBulbSize = (
+	volume: number,
+	threshold: number,
+	pinch: number,
+): { radiusX: number; radiusY: number } => {
+	const fill = Math.min(1.25, Math.max(0, volume / threshold));
+	return {
+		radiusX: 0.88 + Math.sqrt(fill) * 1.52,
+		radiusY: 1.02 + fill * 1.68 + pinch * 0.68,
+	};
+};
+
+const getPendantTargetLength = (
+	volume: number,
+	threshold: number,
+	pinch: number,
+): number => {
+	if (volume <= 0.01) return 0;
+	const fill = Math.min(1.25, Math.max(0, volume / threshold));
+	return 0.3 + 4.35 * fill ** 1.65 + 3.1 * pinch ** 1.7;
+};
+
 const emitRunoff = (
 	state: RainfallState,
 	surface: WetRainSurface,
-	side: "left" | "right",
+	side: SurfaceRunoffSide,
+	runoff: SurfaceRunoffState,
 	volume: number,
+	threshold: number,
 	random: () => number,
 ): void => {
 	if (state.runoffDrops.length >= MAX_RUNOFF_DROP_COUNT) return;
-	const direction = side === "left" ? -1 : 1;
-	const releasePoint = getSurfaceRunoffPoint(surface, side, 1);
+	const releaseFrame = getSurfaceRunoffFrame(surface, side, 1);
+	const bulb = getPendantBulbSize(volume, threshold, 1);
 	state.runoffDrops.push({
-		x: releasePoint.x,
-		y: releasePoint.y + 0.6,
-		vx: direction * (1 + random() * 2),
-		vy: 8 + random() * 8,
-		age: -SURFACE_RUNOFF_HANG_SECONDS,
+		x: releaseFrame.x,
+		y: releaseFrame.y + Math.max(bulb.radiusY * 0.55, runoff.pendantLength),
+		vx: releaseFrame.tangentX * (1.5 + random() * 2.5),
+		vy: Math.max(9, runoff.pendantVelocity + 5 + random() * 4),
+		age: 0,
 		volume,
 		alpha: 0.34,
-		size: 0.9 + Math.sqrt(volume) * 0.26,
+		size: bulb.radiusY,
+		aspect: bulb.radiusX / bulb.radiusY,
 		sourceSurfaceId: surface.id,
 		sourceSide: side,
 	});
+};
+
+const SURFACE_FLOW_GRAVITY = 760;
+const SURFACE_FLOW_DRAG = 3.8;
+const PENDANT_SPRING = 82;
+const PENDANT_DAMPING = 14;
+const PENDANT_RECOIL_SECONDS = 0.12;
+
+const stepAttachedRunoff = (
+	state: RainfallState,
+	surface: WetRainSurface,
+	side: SurfaceRunoffSide,
+	dt: number,
+	random: () => number,
+): void => {
+	const runoff = getSurfaceRunoff(surface, side);
+	runoff.recoil = Math.max(0, runoff.recoil - dt / PENDANT_RECOIL_SECONDS);
+
+	if (runoff.volume > 0.01 && runoff.progress < 1) {
+		const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
+		const frame = getSurfaceRunoffFrame(surface, side, runoff.progress);
+		const lowerCorner = Math.min(
+			1,
+			Math.max(0, (runoff.progress - 0.58) / 0.42),
+		);
+		const drag =
+			SURFACE_FLOW_DRAG + lowerCorner * (1 - Math.max(0, frame.tangentY)) * 9;
+		const wettingPull = Math.max(0, 24 * (1 - runoff.progress / 0.09));
+		const acceleration =
+			SURFACE_FLOW_GRAVITY * Math.max(0, frame.tangentY) +
+			wettingPull -
+			drag * runoff.velocity;
+		runoff.velocity = Math.max(3, runoff.velocity + acceleration * dt);
+		const nextProgress = runoff.progress + (runoff.velocity / pathLength) * dt;
+		if (nextProgress >= 1) {
+			runoff.progress = 1;
+			runoff.pendantVelocity = Math.max(
+				runoff.pendantVelocity,
+				runoff.velocity * Math.max(0, frame.tangentY) * 0.12,
+			);
+			runoff.velocity = 0;
+		} else {
+			runoff.progress = nextProgress;
+		}
+	}
+
+	if (runoff.progress < 1) return;
+
+	const threshold = getSurfaceRunoffThreshold(
+		surface,
+		side,
+		runoff.releaseIndex,
+	);
+	const fill = runoff.volume / threshold;
+	const pinchLimit =
+		fill >= 1 ? 1 : Math.min(0.72, Math.max(0, ((fill - 0.72) / 0.28) * 0.72));
+	if (runoff.pinch < pinchLimit) {
+		// A real pendant neck thins slowly at first, then becomes unstable and
+		// accelerates into release. The fill level controls that instability, so
+		// there is no fixed dwell timer at the bottom tangent.
+		const instability = 0.34 + runoff.pinch * runoff.pinch * 1.66;
+		const pinchRate =
+			(0.62 + Math.max(0, Math.min(1.35, fill) - 0.72) * 5.4) *
+			instability *
+			(1 - runoff.recoil * 0.7);
+		runoff.pinch = Math.min(pinchLimit, runoff.pinch + pinchRate * dt);
+	} else if (runoff.pinch > pinchLimit) {
+		runoff.pinch = Math.max(pinchLimit, runoff.pinch - 2.4 * dt);
+	}
+
+	// The wet filament retracts immediately after separation, even if a small
+	// residual volume remains attached at the contact point.
+	const targetLength =
+		runoff.recoil > 0
+			? 0
+			: getPendantTargetLength(runoff.volume, threshold, runoff.pinch);
+	runoff.pendantVelocity +=
+		(targetLength - runoff.pendantLength) * PENDANT_SPRING * dt;
+	runoff.pendantVelocity *= Math.exp(-PENDANT_DAMPING * dt);
+	runoff.pendantLength = Math.max(
+		0,
+		runoff.pendantLength + runoff.pendantVelocity * dt,
+	);
+
+	if (
+		fill >= 1 &&
+		runoff.pinch >= 0.999 &&
+		state.runoffDrops.length < MAX_RUNOFF_DROP_COUNT
+	) {
+		// The unstable pendant is one connected mass; detaching all of it avoids
+		// a second thin strand appearing from an arbitrary leftover packet.
+		const releaseVolume = runoff.volume;
+		emitRunoff(state, surface, side, runoff, releaseVolume, threshold, random);
+		runoff.volume = 0;
+		runoff.releaseIndex += 1;
+		runoff.recoil = 1;
+		runoff.pinch = 0;
+		runoff.pendantVelocity = -Math.max(9, runoff.pendantVelocity * 0.35);
+		if (runoff.volume <= 0.01) runoff.volume = 0;
+	}
+
+	if (runoff.volume <= 0.01 && runoff.recoil <= 0) {
+		if (runoff.pendantLength <= 0.05) {
+			runoff.progress = 0;
+			runoff.velocity = 0;
+			runoff.pendantLength = 0;
+			runoff.pendantVelocity = 0;
+		}
+	}
 };
 
 export const stepSurfaceWater = (
@@ -593,59 +809,17 @@ export const stepSurfaceWater = (
 		if (bead.volume <= 0.01) {
 			state.surfaceBeads.splice(index, 1);
 		} else if (bead.u <= 0) {
-			surface.leftReservoir += bead.volume;
+			addSurfaceRunoffWater(surface, "left", bead.volume);
 			state.surfaceBeads.splice(index, 1);
 		} else if (bead.u >= 1) {
-			surface.rightReservoir += bead.volume;
+			addSurfaceRunoffWater(surface, "right", bead.volume);
 			state.surfaceBeads.splice(index, 1);
 		}
 	}
 
 	for (const surface of state.surfaces) {
-		const releaseVolume = getSurfaceRunoffThreshold(surface);
 		for (const side of ["left", "right"] as const) {
-			const reservoirKey = side === "left" ? "leftReservoir" : "rightReservoir";
-			const progressKey =
-				side === "left" ? "leftFlowProgress" : "rightFlowProgress";
-			if (surface[reservoirKey] <= 0.01) {
-				surface[reservoirKey] = 0;
-				surface[progressKey] = 0;
-				continue;
-			}
-
-			if (surface[progressKey] < 1) {
-				const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
-				const travelled = surface[progressKey] * pathLength;
-				// Gravity accelerates the attached rivulet as it wraps onto the side.
-				// Adhesion keeps the motion slower than a freely falling droplet.
-				const speed =
-					(22 + Math.sqrt(2 * 360 * travelled)) *
-					Math.min(1.18, 0.88 + surface[reservoirKey] * 0.12);
-				surface[progressKey] = Math.min(
-					1,
-					surface[progressKey] + (speed / pathLength) * dt,
-				);
-			}
-
-			const recentlyReleased = state.runoffDrops.some(
-				(drop) =>
-					drop.sourceSurfaceId === surface.id &&
-					drop.sourceSide === side &&
-					drop.age < 0.22,
-			);
-			if (
-				surface[progressKey] >= 1 &&
-				surface[reservoirKey] >= releaseVolume &&
-				!recentlyReleased &&
-				state.runoffDrops.length < MAX_RUNOFF_DROP_COUNT
-			) {
-				surface[reservoirKey] -= releaseVolume;
-				emitRunoff(state, surface, side, releaseVolume, random);
-				if (surface[reservoirKey] <= 0.01) {
-					surface[reservoirKey] = 0;
-					surface[progressKey] = 0;
-				}
-			}
+			stepAttachedRunoff(state, surface, side, dt, random);
 		}
 	}
 };
@@ -667,7 +841,6 @@ const stepRunoffDrops = (
 		const drop = state.runoffDrops[index];
 		const start = { x: drop.x, y: drop.y };
 		drop.age += dt;
-		if (drop.age < 0) continue;
 		// Detached drips accelerate at the same gravity as the rain field.
 		drop.vy += RAIN_GRAVITY * dt;
 		drop.x += drop.vx * dt;

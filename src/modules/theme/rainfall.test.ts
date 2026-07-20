@@ -8,13 +8,14 @@ import {
 	getDropFade,
 	getLayerDropCounts,
 	getRainWindAt,
+	getSurfaceRunoffPoint,
+	getSurfaceRunoffThreshold,
 	MAX_SPRAY_COUNT,
 	NEAR_SPLASH_CHANCE,
 	RAIN_GRAVITY,
 	RAIN_LAYER_CONFIG,
 	RAIN_WIND_RANGE,
 	RING_LIFETIME_SECONDS,
-	SURFACE_RUNOFF_HANG_SECONDS,
 	setRainSurfaces,
 	stepRainfall,
 	stepSurfaceWater,
@@ -201,8 +202,8 @@ describe("rainfall simulation", () => {
 		stepSurfaceWater(state, 1 / 60, steady(0.5));
 		const surface = state.surfaces[0];
 		expect(surface).toBeDefined();
-		expect(surface?.leftFlowProgress).toBeGreaterThan(0);
-		expect(surface?.leftFlowProgress).toBeLessThan(1);
+		expect(surface?.leftRunoff.progress).toBeGreaterThan(0);
+		expect(surface?.leftRunoff.progress).toBeLessThan(1);
 		expect(state.runoffDrops).toHaveLength(0);
 
 		for (let index = 0; index < 6 * 60; index++) {
@@ -213,7 +214,71 @@ describe("rainfall simulation", () => {
 		expect(state.runoffDrops.length).toBeGreaterThan(0);
 		expect(state.runoffDrops[0]?.x).toBeCloseTo(84, 1);
 		expect(state.runoffDrops[0]?.y).toBeGreaterThan(118);
-		expect(state.runoffDrops[0]?.age).toBe(-SURFACE_RUNOFF_HANG_SECONDS);
+		expect(state.runoffDrops[0]?.age).toBe(0);
+	});
+
+	it("keeps pendant formation continuous with the released bulb", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		const geometry = {
+			height: 48,
+			id: "brand",
+			radius: 14,
+			width: 100,
+			x: 70,
+			y: 70,
+		};
+		setRainSurfaces(state, [geometry]);
+		const threshold = getSurfaceRunoffThreshold(geometry, "left");
+		depositSurfaceWater(
+			state,
+			{
+				normalX: -0.7,
+				normalY: -0.7,
+				surfaceId: "brand",
+				t: 0,
+				x: 76,
+				y: 74,
+			},
+			threshold * 1.04,
+		);
+
+		let previousBulbY = geometry.y + geometry.height;
+		let maxPendantLength = 0;
+		for (let index = 0; index < 8 * 240; index++) {
+			stepSurfaceWater(state, 1 / 240, steady(0.5));
+			const runoff = state.surfaces[0]?.leftRunoff;
+			if (runoff && state.runoffDrops.length === 0) {
+				const anchor = getSurfaceRunoffPoint(geometry, "left", 1);
+				previousBulbY = anchor.y + runoff.pendantLength;
+				maxPendantLength = Math.max(maxPendantLength, runoff.pendantLength);
+			}
+			if (state.runoffDrops.length > 0) break;
+		}
+
+		const released = state.runoffDrops[0];
+		expect(released).toBeDefined();
+		expect(maxPendantLength).toBeGreaterThan(4);
+		expect(released?.age).toBe(0);
+		expect(released?.y).toBeCloseTo(previousBulbY, 0);
+		expect(released?.volume).toBeCloseTo(threshold * 1.04, 5);
+		expect(state.surfaces[0]?.leftRunoff.volume).toBe(0);
+	});
+
+	it("varies adhesion between sides and successive releases", () => {
+		const surface = {
+			height: 48,
+			id: "brand",
+			radius: 14,
+			width: 100,
+			x: 70,
+			y: 70,
+		};
+		expect(getSurfaceRunoffThreshold(surface, "left", 0)).not.toBe(
+			getSurfaceRunoffThreshold(surface, "right", 0),
+		);
+		expect(getSurfaceRunoffThreshold(surface, "left", 0)).not.toBe(
+			getSurfaceRunoffThreshold(surface, "left", 1),
+		);
 	});
 
 	it("routes an upper-corner impact directly onto the attached side flow", () => {
@@ -235,9 +300,9 @@ describe("rainfall simulation", () => {
 		);
 
 		expect(state.surfaceBeads).toHaveLength(0);
-		expect(state.surfaces[0]?.leftReservoir).toBeCloseTo(0.14);
+		expect(state.surfaces[0]?.leftRunoff.volume).toBeCloseTo(0.14);
 		stepSurfaceWater(state, 1 / 60, steady(0.5));
-		expect(state.surfaces[0]?.leftFlowProgress).toBeGreaterThan(0);
+		expect(state.surfaces[0]?.leftRunoff.progress).toBeGreaterThan(0);
 	});
 
 	it("pins a small water patch instead of marching every bead to an edge", () => {
@@ -286,8 +351,8 @@ describe("rainfall simulation", () => {
 		expect(surface).toBeDefined();
 		expect(state.surfaceBeads).toHaveLength(1);
 		expect(state.surfaceBeads[0]?.u).toBeCloseTo(0.5, 2);
-		expect(surface?.leftReservoir).toBe(0);
-		expect(surface?.rightReservoir).toBe(0);
+		expect(surface?.leftRunoff.volume).toBe(0);
+		expect(surface?.rightRunoff.volume).toBe(0);
 		expect(state.runoffDrops).toHaveLength(0);
 	});
 
