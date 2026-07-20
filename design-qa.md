@@ -1,3 +1,136 @@
+# Trading Default and Expanded Chat Panel Design QA
+
+- Source visual truth: the existing prompt-marquee implementation plus the explicit requirements to default to Trading and modestly widen the chat panel.
+- Implementation screenshot: `/tmp/mini-lovable-chat-expanded-trading-default.png`
+- Viewport: 1280 × 720.
+- State: Day theme, empty chat, Trading selected on initial render.
+
+## Full-view and focused comparison evidence
+
+The final full-view capture shows the chat panel at 332.54 px of a 1280 px viewport (26%), up from the previous 22% default. The Trading tab is selected without interaction, and a 288 × 112 px card fits fully inside the wider panel. The full capture keeps the panel boundary, prompt tabs, first two marquee rows, and workbench visible, so no additional focused crop was necessary.
+
+## Required fidelity surfaces
+
+- Fonts and typography: unchanged; Trading card titles and descriptions remain fully visible within the enlarged panel.
+- Spacing and layout rhythm: top-level panel defaults now use 26% chat / 74% workbench while preserving the existing 15% chat minimum, 30% workbench minimum, collapse behavior, and drag handle.
+- Colors and visual tokens: unchanged.
+- Image quality and asset fidelity: the 4:3 media slot remains unchanged and measured at a 1.33331 ratio.
+- Copy and content: Trading is selected initially and its supplied prompt cards render first; the other two tabs remain available.
+
+## Comparison history
+
+### Pass 1
+
+- Earlier findings: [P2] the 22% chat panel made the enlarged 4:3 cards feel cramped; [P2] Starter remained selected despite Trading being the intended default workflow.
+- Fixes: changed the top-level panel split to 26/74 and initialized the prompt tab state to Trading.
+- Post-fix evidence: runtime measurement reports a 332.54 px chat region at 1280 px, selected tab `Trading`, first card `Candlestick + MA`, card size 288 × 112 px, and media ratio 1.33331.
+
+## Findings
+
+No remaining P0, P1, or P2 issues for the requested changes.
+
+final result: passed
+
+---
+
+# Prompt Marquee Edge, Hover, and 4:3 Card Design QA
+
+- Source visual truth: `/var/folders/nn/272k0ds16mq_7vpy9jn7xrp80000gn/T/codex-clipboard-c655aefb-83af-4420-9750-f3ef8223f1e1.png`, plus the explicit requirements to soften the bottom boundary, pause only the hovered row, use 4:3 media, and show every title/description in full.
+- Implementation screenshot: `/tmp/mini-lovable-chat-suggestions-edge-fade-4x3.png`
+- Viewport: 1280 × 720 application view; source is a 762 × 362 focused prompt-region crop.
+- State: Day theme, empty chat, two-row Starter marquee; all three prompt packs were measured separately.
+
+## Full-view comparison evidence
+
+The source and implementation were opened in one comparison input. The implementation keeps the two-row marquee and glass cards while replacing the source's hard lower clipping line with an 8 px shadow buffer and a 12 px transparency feather. The card dimensions were intentionally enlarged to accommodate the new 4:3 media slot and complete copy.
+
+## Focused region comparison evidence
+
+The source itself is a focused crop of the lower marquee edge. In the implementation capture, the last-row shadow decays into the application background instead of ending on one horizontal cut line. Runtime measurements across Starter, Generative UI, and Trading provided the detailed card, media, and text-overflow evidence, so a smaller screenshot crop was not needed.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing Geist sizes, weights, and line heights remain unchanged. Both line-clamp utilities were removed; every measured title and description reports `scrollHeight <= clientHeight` and `scrollWidth <= clientWidth`.
+- Spacing and layout rhythm: all cards are consistently 288 × 112 px. The marquee retains its 8 px row/card gaps and gains 8 px of bottom shadow space.
+- Colors and visual tokens: existing glass backgrounds, borders, icon colors, and theme tokens are unchanged. The bottom treatment uses transparency masking rather than a painted background overlay.
+- Image quality and asset fidelity: every media slot measures 146.664 × 110 px inside the card border, a runtime ratio of 1.33331 (4:3). Images continue to use `object-cover` for a consistent crop.
+- Copy and content: all 18 cards across Starter, Generative UI, and Trading were measured; card, content, title, and description overflow checks all passed.
+
+## Primary interactions
+
+- The pause selector now targets `.chat-suggestion-marquee-track:hover` and `.chat-suggestion-marquee-track:focus-within`, so the other row keeps its independent animation state.
+- Starter, Generative UI, and Trading tabs were selected successfully during measurement.
+- Reduced-motion mode still removes animation, masking, and duplicated loop content.
+
+## Comparison history
+
+### Pass 1
+
+- Earlier findings: [P2] both card-row shadows were clipped at one lower boundary; [P2] hovering the marquee paused both tracks; [P2] the previous media slot was not 4:3 and the two-line clamps could hide longer copy.
+- Fixes: added bottom shadow space plus a transparent vertical mask; scoped hover/focus pause to one track; changed cards to 288 × 112 px with a 4:3 full-height media slot; removed title and description clamps.
+- Post-fix evidence: the final Day capture shows a softened lower edge. Runtime geometry confirms all card sizes and 4:3 media ratios, and all 18 cards pass card/content/title/description overflow checks.
+
+## Findings
+
+No remaining P0, P1, or P2 issues for the requested changes.
+
+## Follow-up polish
+
+- [P3] Recheck focal-point cropping after the final generated 4:3 image set is inserted; the container geometry itself is ready.
+
+final result: passed
+
+---
+
+# Prompt Marquee Card Design QA
+
+- Source visual truth: `/var/folders/nn/272k0ds16mq_7vpy9jn7xrp80000gn/T/codex-clipboard-3775b9cf-5bb5-4fe0-99c5-40663802d94c.png`, with the user's explicit correction that the outer brown/gray backing surface must be removed.
+- Implementation screenshot: `/tmp/mini-lovable-chat-suggestions-dark.png`
+- Viewport: 1280 × 720 application view; the source is a 1080 × 554 focused 2× crop of the prompt area.
+- State: Night theme, empty chat, Starter prompt pack visible; Trading pack was also selected for interaction and size verification.
+
+## Full-view comparison evidence
+
+The rendered prompt area keeps the reference's centered compact tabs, two staggered horizontal rows, split media/content cards, rounded borders, and clipped marquee edges. The large tinted backing surface visible in the source is absent by request: runtime inspection reports a transparent backdrop and no `::before` content.
+
+## Focused region comparison evidence
+
+The supplied source is already a focused prompt-region crop. It and the implementation screenshot were opened in one comparison input. Runtime geometry additionally confirmed that all six original cards are exactly 224 × 88 px and their media slots are consistently 96 px wide. No smaller crop was needed because the relevant card borders, typography, media split, row gap, and surrounding transparency were readable in the focused source and implementation capture.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing Geist hierarchy, two-line title/description clamps, weights, and line heights remain unchanged and readable. Fixed card dimensions prevent copy length from changing layout.
+- Spacing and layout rhythm: every card is 224 × 88 px with a 96 px fixed media column; both marquee rows retain the existing 8 px gaps and staggered motion.
+- Colors and visual tokens: the unwanted decorative brown/gray backdrop was removed. Cards continue to use the product's theme-aware glass surface, border, shadow, and foreground tokens.
+- Image quality and asset fidelity: no new raster assets were requested in this pass. The fixed 96 × 88 px media slot is ready for the user's forthcoming same-ratio image set; existing library icons remain temporary content.
+- Copy and content: Starter, Generative UI, and Trading titles and descriptions are unchanged.
+
+## Primary interactions
+
+- Starter renders six original cards plus non-focusable loop copies.
+- Trading tab selection succeeds and all six Trading cards preserve the same 224 × 88 px dimensions.
+- Two-row marquee motion, hover/focus pause behavior, and reduced-motion fallback remain covered by the existing implementation and tests.
+
+## Comparison history
+
+### Pass 1
+
+- Earlier finding: [P1] the decorative backdrop created a conspicuous brown/gray block around both card rows and competed with the glass cards.
+- Fix: removed the backdrop pseudo-element and its reduced-transparency override; fixed each card and media slot to one shared size.
+- Post-fix evidence: dark-theme capture shows the application background directly between and around the cards; runtime styles report `rgba(0, 0, 0, 0)` for the wrapper background and `none` for its `::before` content. All measured cards are 224 × 88 px.
+
+## Findings
+
+No remaining P0, P1, or P2 issues for the requested change.
+
+## Follow-up polish
+
+- [P3] Replace the temporary library icons with the planned same-ratio image set when those assets are ready.
+
+final result: passed
+
+---
+
 # Nested Dropdown Submenu Design QA
 
 - Source visual truth: `/var/folders/nn/272k0ds16mq_7vpy9jn7xrp80000gn/T/codex-clipboard-9a9c5761-f951-4504-b68d-a5e3f9296388.png`

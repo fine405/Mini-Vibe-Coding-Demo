@@ -14,6 +14,35 @@ const { renderMermaidMock } = vi.hoisted(() => ({
 	renderMermaidMock: vi.fn(),
 }));
 
+const {
+	addFinancialSeriesMock,
+	applyFinancialOptionsMock,
+	createFinancialChartMock,
+	fitFinancialContentMock,
+	removeFinancialChartMock,
+	removeFinancialSeriesMock,
+	setFinancialDataMock,
+} = vi.hoisted(() => ({
+	addFinancialSeriesMock: vi.fn(),
+	applyFinancialOptionsMock: vi.fn(),
+	createFinancialChartMock: vi.fn(),
+	fitFinancialContentMock: vi.fn(),
+	removeFinancialChartMock: vi.fn(),
+	removeFinancialSeriesMock: vi.fn(),
+	setFinancialDataMock: vi.fn(),
+}));
+
+vi.mock("lightweight-charts", () => ({
+	AreaSeries: { type: "Area" },
+	BarSeries: { type: "Bar" },
+	BaselineSeries: { type: "Baseline" },
+	CandlestickSeries: { type: "Candlestick" },
+	ColorType: { Solid: "solid" },
+	createChart: createFinancialChartMock,
+	HistogramSeries: { type: "Histogram" },
+	LineSeries: { type: "Line" },
+}));
+
 vi.mock("@/components/ai-elements/message", () => ({
 	MessageResponse: ({ children }: { children: string }) => (
 		<div>
@@ -131,10 +160,108 @@ const dashboardSpec: Spec = {
 	},
 };
 
+const financialDashboardSpec: Spec = {
+	root: "root",
+	elements: {
+		root: {
+			type: "Stack",
+			props: { gap: "md" },
+			children: ["price", "indicator", "performance", "comparison"],
+		},
+		price: {
+			type: "PriceChart",
+			props: {
+				symbol: "AAPL",
+				interval: "1D",
+				style: "candlestick",
+				data: [
+					{ time: "2026-07-17", open: 10, high: 12, low: 9, close: 11 },
+					{ time: "2026-07-20", open: 11, high: 13, low: 10, close: 12 },
+				],
+			},
+			children: [],
+		},
+		indicator: {
+			type: "IndicatorPane",
+			props: {
+				indicator: "volume",
+				series: [
+					{
+						label: "Volume",
+						style: "histogram",
+						data: [
+							{ time: "2026-07-17", value: 100, direction: "up" },
+							{ time: "2026-07-20", value: 80, direction: "down" },
+						],
+					},
+				],
+			},
+			children: [],
+		},
+		performance: {
+			type: "PerformanceChart",
+			props: {
+				mode: "equity",
+				series: [
+					{
+						label: "Portfolio",
+						data: [
+							{ time: "2026-07-17", value: 100 },
+							{ time: "2026-07-20", value: 104 },
+						],
+					},
+				],
+			},
+			children: [],
+		},
+		comparison: {
+			type: "ComparisonChart",
+			props: {
+				normalization: "percentage",
+				series: [
+					{
+						symbol: "AAPL",
+						data: [
+							{ time: "2026-07-17", value: 10 },
+							{ time: "2026-07-20", value: 11 },
+						],
+					},
+					{
+						symbol: "MSFT",
+						data: [
+							{ time: "2026-07-17", value: 20 },
+							{ time: "2026-07-20", value: 21 },
+						],
+					},
+				],
+			},
+			children: [],
+		},
+	},
+};
+
 describe("GenerativeUIRenderer", () => {
 	beforeEach(() => {
 		renderMermaidMock.mockReset();
 		renderMermaidMock.mockImplementation(() => new Promise(() => {}));
+		addFinancialSeriesMock.mockReset();
+		applyFinancialOptionsMock.mockReset();
+		createFinancialChartMock.mockReset();
+		fitFinancialContentMock.mockReset();
+		removeFinancialChartMock.mockReset();
+		removeFinancialSeriesMock.mockReset();
+		setFinancialDataMock.mockReset();
+		addFinancialSeriesMock.mockImplementation(() => ({
+			createPriceLine: vi.fn(),
+			setData: setFinancialDataMock,
+		}));
+		createFinancialChartMock.mockImplementation(() => ({
+			addSeries: addFinancialSeriesMock,
+			applyOptions: applyFinancialOptionsMock,
+			remove: removeFinancialChartMock,
+			removeSeries: removeFinancialSeriesMock,
+			timeScale: () => ({ fitContent: fitFinancialContentMock }),
+		}));
 	});
 
 	afterEach(() => {
@@ -155,6 +282,33 @@ describe("GenerativeUIRenderer", () => {
 		expect(screen.getByTestId("mermaid-source")).toHaveTextContent(
 			"flowchart LR",
 		);
+	});
+
+	it("renders the approved financial chart components with normalized comparison data", () => {
+		const { unmount } = render(
+			<GenerativeUIRenderer spec={financialDashboardSpec} />,
+		);
+
+		expect(screen.getAllByTestId("financial-chart")).toHaveLength(4);
+		expect(screen.getByText("AAPL")).toBeInTheDocument();
+		expect(screen.getByText("Volume")).toBeInTheDocument();
+		expect(screen.getByText("Equity Curve")).toBeInTheDocument();
+		expect(screen.getByText("Instrument Comparison")).toBeInTheDocument();
+		expect(createFinancialChartMock).toHaveBeenCalledTimes(4);
+		expect(createFinancialChartMock).toHaveBeenCalledWith(
+			expect.any(HTMLElement),
+			expect.objectContaining({
+				layout: expect.objectContaining({ attributionLogo: true }),
+			}),
+		);
+		expect(addFinancialSeriesMock).toHaveBeenCalledTimes(5);
+		expect(setFinancialDataMock).toHaveBeenCalledWith([
+			{ time: "2026-07-17", value: 0 },
+			{ time: "2026-07-20", value: 10 },
+		]);
+
+		unmount();
+		expect(removeFinancialChartMock).toHaveBeenCalledTimes(4);
 	});
 
 	it("renders numeric metric values from literal and state props", () => {

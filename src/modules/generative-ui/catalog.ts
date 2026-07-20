@@ -5,6 +5,99 @@ import { z } from "zod";
 const shortText = z.string().max(200);
 const primitiveCell = z.union([z.string(), z.number(), z.boolean()]).nullable();
 const dataKey = z.string().min(1).max(64);
+const symbolText = z.string().min(1).max(32);
+const finiteNumber = z.number().finite();
+const marketTime = z.union([
+	z.number().int().nonnegative().max(4_102_444_800),
+	z.iso.date(),
+]);
+
+const ensureStrictlyIncreasingTime = (
+	data: Array<{ time: string | number }>,
+	ctx: z.RefinementCtx,
+) => {
+	const firstTimeType = typeof data[0]?.time;
+	for (let index = 1; index < data.length; index += 1) {
+		const previous = data[index - 1]?.time;
+		const current = data[index]?.time;
+		if (previous === undefined || current === undefined) continue;
+		if (typeof current !== firstTimeType) {
+			ctx.addIssue({
+				code: "custom",
+				message: "Chart data must use one consistent time format.",
+				path: [index, "time"],
+			});
+			continue;
+		}
+		const previousValue =
+			typeof previous === "number" ? previous * 1000 : Date.parse(previous);
+		const currentValue =
+			typeof current === "number" ? current * 1000 : Date.parse(current);
+		if (currentValue <= previousValue) {
+			ctx.addIssue({
+				code: "custom",
+				message: "Chart data time values must be strictly increasing.",
+				path: [index, "time"],
+			});
+		}
+	}
+};
+
+export const marketValuePointSchema = z
+	.object({
+		time: marketTime,
+		value: finiteNumber,
+		direction: z.enum(["up", "down", "neutral"]).optional(),
+	})
+	.strict();
+
+export const marketOhlcPointSchema = z
+	.object({
+		time: marketTime,
+		open: finiteNumber,
+		high: finiteNumber,
+		low: finiteNumber,
+		close: finiteNumber,
+	})
+	.strict()
+	.superRefine((point, ctx) => {
+		if (
+			point.high < Math.max(point.open, point.close) ||
+			point.low > Math.min(point.open, point.close) ||
+			point.high < point.low
+		) {
+			ctx.addIssue({
+				code: "custom",
+				message: "OHLC values must fit within the high-low range.",
+			});
+		}
+	});
+
+const marketValueDataSchema = z
+	.array(marketValuePointSchema)
+	.min(2)
+	.max(500)
+	.superRefine(ensureStrictlyIncreasingTime);
+
+const marketOhlcDataSchema = z
+	.array(marketOhlcPointSchema)
+	.min(2)
+	.max(500)
+	.superRefine(ensureStrictlyIncreasingTime);
+
+const overlaySeriesSchema = z
+	.object({
+		label: shortText,
+		data: marketValueDataSchema,
+	})
+	.strict();
+
+const valueSeriesSchema = z
+	.object({
+		label: shortText,
+		data: marketValueDataSchema,
+	})
+	.strict();
 
 export const stackPropsSchema = z
 	.object({
@@ -91,6 +184,110 @@ export const chartPropsSchema = z
 	})
 	.strict();
 
+const priceChartCommon = {
+	title: shortText.optional(),
+	symbol: symbolText,
+	interval: z.string().min(1).max(16).optional(),
+	overlays: z.array(overlaySeriesSchema).max(3).optional(),
+};
+
+export const priceChartPropsSchema = z.discriminatedUnion("style", [
+	z
+		.object({
+			...priceChartCommon,
+			style: z.literal("candlestick"),
+			data: marketOhlcDataSchema,
+		})
+		.strict(),
+	z
+		.object({
+			...priceChartCommon,
+			style: z.literal("ohlc"),
+			data: marketOhlcDataSchema,
+		})
+		.strict(),
+	z
+		.object({
+			...priceChartCommon,
+			style: z.literal("line"),
+			data: marketValueDataSchema,
+		})
+		.strict(),
+	z
+		.object({
+			...priceChartCommon,
+			style: z.literal("area"),
+			data: marketValueDataSchema,
+		})
+		.strict(),
+	z
+		.object({
+			...priceChartCommon,
+			style: z.literal("baseline"),
+			data: marketValueDataSchema,
+			baseValue: finiteNumber.optional(),
+		})
+		.strict(),
+]);
+
+export const indicatorPanePropsSchema = z
+	.object({
+		title: shortText.optional(),
+		indicator: z.enum(["volume", "macd", "rsi", "openInterest", "funding"]),
+		series: z
+			.array(
+				z
+					.object({
+						label: shortText,
+						style: z.enum(["line", "histogram"]),
+						data: marketValueDataSchema,
+					})
+					.strict(),
+			)
+			.min(1)
+			.max(3),
+	})
+	.strict();
+
+export const performanceChartPropsSchema = z
+	.object({
+		title: shortText.optional(),
+		mode: z.enum(["equity", "return", "benchmark", "drawdown"]),
+		series: z.array(valueSeriesSchema).min(1).max(3),
+	})
+	.strict();
+
+export const comparisonChartPropsSchema = z
+	.object({
+		title: shortText.optional(),
+		normalization: z.enum(["percentage", "price"]).optional(),
+		series: z
+			.array(
+				z
+					.object({
+						symbol: symbolText,
+						data: marketValueDataSchema,
+					})
+					.strict(),
+			)
+			.min(2)
+			.max(4),
+	})
+	.strict()
+	.superRefine((props, ctx) => {
+		if (
+			(props.normalization ?? "percentage") === "percentage" &&
+			props.series.some((series) => series.data[0]?.value === 0)
+		) {
+			ctx.addIssue({
+				code: "custom",
+				message:
+					"Percentage comparison series must start with a non-zero value.",
+				path: ["series"],
+			});
+		}
+	});
+
 export const buttonPropsSchema = z
 	.object({
 		label: shortText,
@@ -143,6 +340,10 @@ export const GENERATIVE_UI_COMPONENTS = [
 	"Metric",
 	"DataTable",
 	"Chart",
+	"PriceChart",
+	"IndicatorPane",
+	"PerformanceChart",
+	"ComparisonChart",
 	"Button",
 	"Timeline",
 	"MermaidDiagram",
@@ -209,6 +410,95 @@ export const generativeUiCatalog = defineCatalog(schema, {
 				series: [{ key: "value", label: "Value" }],
 			},
 		},
+		PriceChart: {
+			props: priceChartPropsSchema,
+			slots: [],
+			description:
+				"A financial price chart. Use candlestick or ohlc with valid OHLC data; use line, area, or baseline with single-value data. Time must be ascending Unix seconds or YYYY-MM-DD dates.",
+			example: {
+				symbol: "AAPL",
+				interval: "1D",
+				style: "candlestick",
+				data: [
+					{
+						time: "2026-07-17",
+						open: 210,
+						high: 216,
+						low: 208,
+						close: 214,
+					},
+					{
+						time: "2026-07-20",
+						open: 214,
+						high: 219,
+						low: 212,
+						close: 218,
+					},
+				],
+			},
+		},
+		IndicatorPane: {
+			props: indicatorPanePropsSchema,
+			slots: [],
+			description:
+				"A technical indicator pane for volume, MACD, RSI, open interest, or funding. Use one to three line or histogram series with ascending time data.",
+			example: {
+				indicator: "volume",
+				series: [
+					{
+						label: "Volume",
+						style: "histogram",
+						data: [
+							{ time: "2026-07-17", value: 1200, direction: "up" },
+							{ time: "2026-07-20", value: 980, direction: "down" },
+						],
+					},
+				],
+			},
+		},
+		PerformanceChart: {
+			props: performanceChartPropsSchema,
+			slots: [],
+			description:
+				"An equity, return, benchmark, or drawdown chart for a portfolio, account, or backtest. Values must be calculated by a trusted tool, never by the model.",
+			example: {
+				mode: "equity",
+				series: [
+					{
+						label: "Portfolio",
+						data: [
+							{ time: "2026-07-17", value: 100000 },
+							{ time: "2026-07-20", value: 101400 },
+						],
+					},
+				],
+			},
+		},
+		ComparisonChart: {
+			props: comparisonChartPropsSchema,
+			slots: [],
+			description:
+				"A two-to-four instrument comparison chart. Use percentage normalization for relative performance or price for directly comparable values.",
+			example: {
+				normalization: "percentage",
+				series: [
+					{
+						symbol: "AAPL",
+						data: [
+							{ time: "2026-07-17", value: 210 },
+							{ time: "2026-07-20", value: 218 },
+						],
+					},
+					{
+						symbol: "MSFT",
+						data: [
+							{ time: "2026-07-17", value: 510 },
+							{ time: "2026-07-20", value: 514 },
+						],
+					},
+				],
+			},
+		},
 		Button: {
 			props: buttonPropsSchema,
 			slots: [],
@@ -253,6 +543,8 @@ export function createGenerativeUiInstructions(): string {
 			"Prefer Generative UI over Markdown for a read-only explanation or research result whenever a catalog component or composition is semantically suitable and materially improves the presentation.",
 			"Do not generate a UI spec for workspace mutation tasks; use the existing tools, finalize_changes review, and Sandpack preview instead.",
 			"Choose the most specific semantic catalog component instead of a generic diagram.",
+			"Use PriceChart for instrument prices, IndicatorPane for technical indicators, PerformanceChart for portfolio or backtest performance, and ComparisonChart for comparing two to four instruments. Use the generic Chart only for non-financial bar or line summaries.",
+			"Use only ascending chart data supplied by the user or returned by tools. Never calculate, interpolate, forecast, or invent chart values.",
 			"Use Timeline for chronological events, milestones, schedules, and ordered process steps; use Chart for bar or line data; use DataTable for tabular data.",
 			"Use MermaidDiagram only for flow, sequence, state, class, or ER relationships that are not better represented by another catalog component. Do not substitute MermaidDiagram for Timeline.",
 			"Fall back to Markdown, including Mermaid code blocks, when no catalog component or composition is semantically suitable or Generative UI would not materially improve the presentation.",

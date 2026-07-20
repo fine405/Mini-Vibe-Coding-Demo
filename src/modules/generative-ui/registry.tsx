@@ -30,15 +30,23 @@ import {
 	buttonPropsSchema,
 	cardPropsSchema,
 	chartPropsSchema,
+	comparisonChartPropsSchema,
 	dataTablePropsSchema,
 	generativeUiCatalog,
 	gridPropsSchema,
+	indicatorPanePropsSchema,
 	mermaidDiagramPropsSchema,
 	metricPropsSchema,
+	performanceChartPropsSchema,
+	priceChartPropsSchema,
 	stackPropsSchema,
 	textPropsSchema,
 	timelinePropsSchema,
 } from "@/modules/generative-ui/catalog";
+import {
+	FinancialChart,
+	type FinancialSeries,
+} from "@/modules/generative-ui/FinancialChart";
 import { MermaidDownloadMenu } from "@/modules/generative-ui/MermaidDownloadMenu";
 import { validateMermaidSource } from "@/modules/generative-ui/mermaid-policy";
 
@@ -90,6 +98,9 @@ const chartColors = [
 	"var(--chart-3)",
 	"var(--chart-4)",
 ];
+
+const RSI_REFERENCE_LINES = [30, 70];
+const ZERO_REFERENCE_LINE = [0];
 
 function InvalidComponent({ name }: { name: string }) {
 	return (
@@ -348,6 +359,167 @@ const { registry: generativeUiRegistry } = defineRegistry(generativeUiCatalog, {
 						)}
 					</ResponsiveContainer>
 				</div>
+			);
+		},
+		PriceChart: ({ props }) => {
+			const parsed = priceChartPropsSchema.safeParse(props);
+			if (!parsed.success) return <InvalidComponent name="PriceChart" />;
+			const chartProps = parsed.data;
+			let priceSeries: FinancialSeries;
+			if (chartProps.style === "candlestick") {
+				priceSeries = {
+					type: "candlestick",
+					label: chartProps.symbol,
+					data: chartProps.data,
+				};
+			} else if (chartProps.style === "ohlc") {
+				priceSeries = {
+					type: "bar",
+					label: chartProps.symbol,
+					data: chartProps.data,
+				};
+			} else if (chartProps.style === "baseline") {
+				priceSeries = {
+					type: "baseline",
+					label: chartProps.symbol,
+					data: chartProps.data,
+					baseValue: chartProps.baseValue,
+				};
+			} else {
+				priceSeries = {
+					type: chartProps.style,
+					label: chartProps.symbol,
+					data: chartProps.data,
+				};
+			}
+			const series: FinancialSeries[] = [
+				priceSeries,
+				...(chartProps.overlays ?? []).map(
+					(overlay): FinancialSeries => ({
+						type: "line",
+						label: overlay.label,
+						data: overlay.data,
+					}),
+				),
+			];
+			return (
+				<FinancialChart
+					ariaLabel={`${chartProps.symbol} price chart`}
+					series={series}
+					subtitle={chartProps.interval}
+					title={chartProps.title ?? chartProps.symbol}
+				/>
+			);
+		},
+		IndicatorPane: ({ props }) => {
+			const parsed = indicatorPanePropsSchema.safeParse(props);
+			if (!parsed.success) return <InvalidComponent name="IndicatorPane" />;
+			const chartProps = parsed.data;
+			const title =
+				chartProps.title ??
+				{
+					volume: "Volume",
+					macd: "MACD",
+					rsi: "RSI",
+					openInterest: "Open Interest",
+					funding: "Funding Rate",
+				}[chartProps.indicator];
+			const series = chartProps.series.map(
+				(item): FinancialSeries => ({
+					type: item.style,
+					label: item.label,
+					data: item.data,
+				}),
+			);
+			return (
+				<FinancialChart
+					ariaLabel={`${title} indicator chart`}
+					compact
+					referenceLines={
+						chartProps.indicator === "rsi"
+							? RSI_REFERENCE_LINES
+							: chartProps.indicator === "macd" ||
+									chartProps.indicator === "funding"
+								? ZERO_REFERENCE_LINE
+								: undefined
+					}
+					series={series}
+					title={title}
+				/>
+			);
+		},
+		PerformanceChart: ({ props }) => {
+			const parsed = performanceChartPropsSchema.safeParse(props);
+			if (!parsed.success) return <InvalidComponent name="PerformanceChart" />;
+			const chartProps = parsed.data;
+			const series = chartProps.series.map((item, index): FinancialSeries => {
+				if (chartProps.mode === "return") {
+					return {
+						type: "baseline",
+						label: item.label,
+						data: item.data,
+						baseValue: 0,
+					};
+				}
+				return {
+					type:
+						chartProps.mode === "drawdown" ||
+						(chartProps.mode === "equity" && index === 0)
+							? "area"
+							: "line",
+					label: item.label,
+					data: item.data,
+				};
+			});
+			const title =
+				chartProps.title ??
+				{
+					equity: "Equity Curve",
+					return: "Return",
+					benchmark: "Benchmark Performance",
+					drawdown: "Drawdown",
+				}[chartProps.mode];
+			return (
+				<FinancialChart
+					ariaLabel={`${title} chart`}
+					series={series}
+					title={title}
+				/>
+			);
+		},
+		ComparisonChart: ({ props }) => {
+			const parsed = comparisonChartPropsSchema.safeParse(props);
+			if (!parsed.success) return <InvalidComponent name="ComparisonChart" />;
+			const chartProps = parsed.data;
+			const normalization = chartProps.normalization ?? "percentage";
+			const series = chartProps.series.map((item): FinancialSeries => {
+				const firstValue = item.data[0]?.value ?? 0;
+				return {
+					type: "line",
+					label: item.symbol,
+					data:
+						normalization === "percentage"
+							? item.data.map((point) => ({
+									...point,
+									value:
+										Math.round((point.value / firstValue - 1) * 100 * 100) /
+										100,
+								}))
+							: item.data,
+				};
+			});
+			return (
+				<FinancialChart
+					ariaLabel="Instrument comparison chart"
+					referenceLines={
+						normalization === "percentage" ? ZERO_REFERENCE_LINE : undefined
+					}
+					series={series}
+					subtitle={
+						normalization === "percentage" ? "Normalized return (%)" : undefined
+					}
+					title={chartProps.title ?? "Instrument Comparison"}
+				/>
 			);
 		},
 		Button: ({ props, emit }) => {

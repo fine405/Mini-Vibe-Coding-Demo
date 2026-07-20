@@ -1,8 +1,6 @@
 import { motion } from "framer-motion";
-import { ArrowRightIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 import { Suggestion } from "@/components/ai-elements/suggestion";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
@@ -10,59 +8,124 @@ import {
 	SUGGESTION_GROUPS,
 	type SuggestionTab,
 } from "@/modules/chat/suggestion-prompts";
+import { useThemeStore } from "@/modules/theme/store";
+import type { ResolvedTheme } from "@/modules/theme/types";
 
 const SUGGESTION_TABS: Array<{ id: SuggestionTab; label: string }> = [
 	{ id: "starter", label: "Starter" },
 	{ id: "generative-ui", label: "Generative UI" },
+	{ id: "trading", label: "Trading" },
 ];
 
-const SUGGESTIONS_PER_BATCH = 3;
+function SuggestionCard({
+	disabled,
+	duplicate,
+	onSelect,
+	resolvedTheme,
+	suggestion,
+}: {
+	disabled: boolean;
+	duplicate: boolean;
+	onSelect: (prompt: string) => void;
+	resolvedTheme: ResolvedTheme;
+	suggestion: ChatSuggestion;
+}) {
+	const {
+		description,
+		icon: SuggestionIcon,
+		images,
+		label,
+		prompt,
+	} = suggestion;
+	const imageSrc = images[resolvedTheme];
 
-function visibleSuggestions(
-	tab: SuggestionTab,
-	batch: number,
-): ChatSuggestion[] {
-	const suggestions = SUGGESTION_GROUPS[tab];
-	const batchCount = Math.ceil(suggestions.length / SUGGESTIONS_PER_BATCH);
-	const normalizedBatch = batch % batchCount;
-	const start = normalizedBatch * SUGGESTIONS_PER_BATCH;
-	return suggestions.slice(start, start + SUGGESTIONS_PER_BATCH);
+	return (
+		<Suggestion
+			aria-label={`${label}. ${description}`}
+			className="chat-suggestion-card group h-28 w-72 min-w-0 shrink-0 items-stretch justify-start overflow-hidden whitespace-normal rounded-xl border p-0 text-left font-normal text-foreground focus-visible:border-ring/70 focus-visible:ring-2 focus-visible:ring-ring/20"
+			data-testid={duplicate ? undefined : "chat-suggestion"}
+			disabled={disabled}
+			onClick={onSelect}
+			suggestion={prompt}
+			tabIndex={duplicate ? -1 : undefined}
+			title={prompt}
+			variant="ghost"
+		>
+			<span className="flex h-full w-full min-w-0">
+				<span
+					aria-hidden="true"
+					className="chat-suggestion-media relative flex h-full aspect-[4/3] shrink-0 items-center justify-center overflow-hidden border-r"
+				>
+					{imageSrc ? (
+						<img
+							alt=""
+							className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
+							height={480}
+							loading="lazy"
+							src={imageSrc}
+							width={640}
+						/>
+					) : (
+						<SuggestionIcon className="size-6 text-accent-hover/75 transition-colors duration-300 group-hover:text-accent-hover motion-reduce:transition-none" />
+					)}
+				</span>
+				<span className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2.5">
+					<span className="block text-xs leading-4 font-semibold">{label}</span>
+					<span className="mt-1 block text-[11px] leading-4 text-muted-foreground">
+						{description}
+					</span>
+				</span>
+			</span>
+		</Suggestion>
+	);
 }
 
 function SuggestionList({
 	disabled,
 	onSelect,
+	resolvedTheme,
 	suggestions,
 }: {
 	disabled: boolean;
 	onSelect: (prompt: string) => void;
+	resolvedTheme: ResolvedTheme;
 	suggestions: ChatSuggestion[];
 }) {
+	const rows = [
+		suggestions.filter((_, index) => index % 2 === 0),
+		suggestions.filter((_, index) => index % 2 === 1),
+	];
+
 	return (
-		<div className="flex flex-col gap-2">
-			{suggestions.map(
-				({ description, icon: SuggestionIcon, id, label, prompt }) => (
-					<Suggestion
-						className="group h-auto min-h-12 w-full justify-start gap-3 whitespace-normal rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 text-left font-normal text-foreground shadow-none hover:border-border hover:bg-muted/50"
-						data-testid="chat-suggestion"
-						disabled={disabled}
-						key={id}
-						onClick={onSelect}
-						suggestion={prompt}
-						title={prompt}
-						variant="ghost"
-					>
-						<SuggestionIcon className="size-4 shrink-0 text-violet-500" />
-						<span className="min-w-0 flex-1">
-							<span className="block text-xs font-medium">{label}</span>
-							<span className="mt-0.5 block text-[11px] text-muted-foreground">
-								{description}
-							</span>
-						</span>
-						<ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-					</Suggestion>
-				),
-			)}
+		<div className="chat-suggestion-marquee" role="group">
+			{rows.map((row, rowIndex) => (
+				<div
+					className="chat-suggestion-marquee-track"
+					data-direction={rowIndex === 0 ? "forward" : "reverse"}
+					data-testid="chat-suggestion-row"
+					key={rowIndex === 0 ? "even" : "odd"}
+				>
+					{[false, true].map((duplicate) => (
+						<div
+							aria-hidden={duplicate ? true : undefined}
+							className="chat-suggestion-marquee-group"
+							data-marquee-copy={duplicate ? "duplicate" : "original"}
+							key={duplicate ? "duplicate" : "original"}
+						>
+							{row.map((suggestion) => (
+								<SuggestionCard
+									disabled={disabled}
+									duplicate={duplicate}
+									key={`${suggestion.id}-${duplicate ? "duplicate" : "original"}`}
+									onSelect={onSelect}
+									resolvedTheme={resolvedTheme}
+									suggestion={suggestion}
+								/>
+							))}
+						</div>
+					))}
+				</div>
+			))}
 		</div>
 	);
 }
@@ -74,87 +137,58 @@ export function ChatSuggestions({
 	disabled: boolean;
 	onSelect: (prompt: string) => void;
 }) {
-	const [tab, setTab] = useState<SuggestionTab>("starter");
-	const [batches, setBatches] = useState<Record<SuggestionTab, number>>({
-		starter: 0,
-		"generative-ui": 0,
-	});
-	const refreshLabel = tab === "starter" ? "Starter" : "Generative UI";
-
-	const refresh = () => {
-		setBatches((current) => ({
-			...current,
-			[tab]: current[tab] + 1,
-		}));
-	};
+	const [tab, setTab] = useState<SuggestionTab>("trading");
+	const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
 
 	return (
 		<Tabs className="mt-3 gap-3" value={tab}>
-			<div className="flex items-center justify-between gap-2">
-				<div
-					aria-label="Suggestion categories"
-					className="flex items-center gap-0.5 rounded-lg bg-bg-secondary p-0.5"
-					role="tablist"
-				>
-					{SUGGESTION_TABS.map((suggestionTab) => {
-						const active = tab === suggestionTab.id;
-						return (
-							<button
-								aria-selected={active}
-								className={cn(
-									"relative flex h-6 items-center rounded-md px-2.5 text-xs font-medium transition-colors",
-									active
-										? "text-fg-primary"
-										: "text-fg-muted hover:text-fg-secondary",
-								)}
-								data-state={active ? "active" : "inactive"}
-								key={suggestionTab.id}
-								onClick={() => setTab(suggestionTab.id)}
-								role="tab"
-								type="button"
-							>
-								{active && (
-									<motion.span
-										className="absolute inset-0 rounded-md bg-bg-primary shadow-sm"
-										layoutId="chat-suggestion-tab-pill"
-										transition={{
-											type: "spring",
-											bounce: 0.2,
-											duration: 0.4,
-										}}
-									/>
-								)}
-								<span className="relative z-10">{suggestionTab.label}</span>
-							</button>
-						);
-					})}
-				</div>
-				<Button
-					aria-label={`Refresh ${refreshLabel} suggestions`}
-					onClick={refresh}
-					size="icon-sm"
-					title={`Refresh ${refreshLabel} suggestions`}
-					type="button"
-					variant="ghost"
-				>
-					<RefreshCwIcon />
-				</Button>
+			<div
+				aria-label="Suggestion categories"
+				className="mx-auto flex w-fit max-w-full min-w-0 items-center justify-center gap-0.5 overflow-x-auto rounded-lg bg-bg-secondary p-0.5"
+				role="tablist"
+			>
+				{SUGGESTION_TABS.map((suggestionTab) => {
+					const active = tab === suggestionTab.id;
+					return (
+						<button
+							aria-selected={active}
+							className={cn(
+								"relative flex h-6 shrink-0 items-center rounded-md px-2 text-[11px] font-medium whitespace-nowrap transition-colors sm:text-xs",
+								active
+									? "text-fg-primary"
+									: "text-fg-muted hover:text-fg-secondary",
+							)}
+							data-state={active ? "active" : "inactive"}
+							key={suggestionTab.id}
+							onClick={() => setTab(suggestionTab.id)}
+							role="tab"
+							type="button"
+						>
+							{active && (
+								<motion.span
+									className="absolute inset-0 rounded-md bg-bg-primary shadow-sm"
+									layoutId="chat-suggestion-tab-pill"
+									transition={{
+										type: "spring",
+										bounce: 0.2,
+										duration: 0.4,
+									}}
+								/>
+							)}
+							<span className="relative z-10">{suggestionTab.label}</span>
+						</button>
+					);
+				})}
 			</div>
 
 			{SUGGESTION_TABS.map((suggestionTab) => (
 				<TabsContent key={suggestionTab.id} value={suggestionTab.id}>
-					{/* Keying by batch replays the entrance animation on refresh. */}
-					<div
-						className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
-						key={batches[suggestionTab.id]}
-					>
+					<div className="chat-suggestion-backdrop animate-in fade-in-0 slide-in-from-bottom-1 duration-300 motion-reduce:animate-none">
 						<SuggestionList
 							disabled={disabled}
 							onSelect={onSelect}
-							suggestions={visibleSuggestions(
-								suggestionTab.id,
-								batches[suggestionTab.id],
-							)}
+							resolvedTheme={resolvedTheme}
+							suggestions={SUGGESTION_GROUPS[suggestionTab.id]}
 						/>
 					</div>
 				</TabsContent>

@@ -47,6 +47,7 @@
 		"hono": "4.12.29",
 		"immer": "^10.2.0",
 		"jszip": "^3.10.1",
+		"lightweight-charts": "^5.2.0",
 		"lucide-react": "^0.553.0",
 		"motion": "^12.42.2",
 		"nanoid": "^5.1.16",

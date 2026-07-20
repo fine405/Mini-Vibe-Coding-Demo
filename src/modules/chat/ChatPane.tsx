@@ -836,7 +836,9 @@ function AgentChatPane({
 							))
 						)}
 					</ConversationContent>
-					<ConversationScrollButton />
+					{messages.length > 0 && (
+						<ConversationScrollButton aria-label="Scroll to bottom" />
+					)}
 				</Conversation>
 
 				{messages.length > 0 && (

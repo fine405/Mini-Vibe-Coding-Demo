@@ -11,11 +11,13 @@ import { AgentChatMessage, ChatPane } from "@/modules/chat/ChatPane";
 import {
 	GENERATIVE_UI_SUGGESTIONS,
 	STARTER_SUGGESTIONS,
+	TRADING_SUGGESTIONS,
 } from "@/modules/chat/suggestion-prompts";
 import { EditorPane } from "@/modules/editor/EditorPane";
 import { useEditor } from "@/modules/editor/store";
 import { exportProjectAsJSON } from "@/modules/fs/export";
 import { useFs } from "@/modules/fs/store";
+import { useThemeStore } from "@/modules/theme/store";
 import { TOUR_STEP_IDS } from "@/modules/tour/constants";
 import {
 	browserWorkspace,
@@ -67,6 +69,7 @@ beforeEach(async () => {
 	await useFs.getState().resetFs();
 	useEditor.getState().closeAllFiles();
 	useAgentChangeSessionStore.getState().clear();
+	useThemeStore.setState({ mode: "night", resolvedTheme: "dark" });
 });
 
 afterEach(() => {
@@ -161,6 +164,7 @@ describe("AgentChatMessage", () => {
 
 		expect(STARTER_SUGGESTIONS).toHaveLength(6);
 		expect(GENERATIVE_UI_SUGGESTIONS).toHaveLength(6);
+		expect(TRADING_SUGGESTIONS).toHaveLength(6);
 		for (const component of [
 			"Stack",
 			"Grid",
@@ -177,6 +181,22 @@ describe("AgentChatMessage", () => {
 		}
 		expect(
 			GENERATIVE_UI_SUGGESTIONS.every(({ prompt }) =>
+				prompt.includes("Do not modify the workspace"),
+			),
+		).toBe(true);
+		const tradingPack = TRADING_SUGGESTIONS.map(({ prompt }) => prompt).join(
+			"\n",
+		);
+		for (const component of [
+			"PriceChart",
+			"IndicatorPane",
+			"PerformanceChart",
+			"ComparisonChart",
+		]) {
+			expect(tradingPack).toContain(component);
+		}
+		expect(
+			TRADING_SUGGESTIONS.every(({ prompt }) =>
 				prompt.includes("Do not modify the workspace"),
 			),
 		).toBe(true);
@@ -198,11 +218,34 @@ describe("AgentChatMessage", () => {
 			}),
 		).toBeVisible();
 		expect(screen.getByText("Try a prompt")).toBeVisible();
-		expect(screen.getByRole("tab", { name: "Starter" })).toHaveAttribute(
+		expect(screen.getByRole("tab", { name: "Trading" })).toHaveAttribute(
 			"data-state",
 			"active",
 		);
+		expect(screen.getByRole("tab", { name: "Starter" })).toBeVisible();
 		expect(screen.getByRole("tab", { name: "Generative UI" })).toBeVisible();
+		expect(
+			screen.getByRole("tablist", { name: "Suggestion categories" }),
+		).toHaveClass("mx-auto", "w-fit", "max-w-full", "overflow-x-auto");
+		const suggestions = screen.getAllByTestId("chat-suggestion");
+		expect(suggestions).toHaveLength(6);
+		const rows = screen.getAllByTestId("chat-suggestion-row");
+		expect(rows).toHaveLength(2);
+		expect(rows[0]).toHaveAttribute("data-direction", "forward");
+		expect(rows[1]).toHaveAttribute("data-direction", "reverse");
+		expect(suggestions[0]?.closest(".chat-suggestion-backdrop")).toHaveClass(
+			"chat-suggestion-backdrop",
+		);
+		const duplicateGroups = document.querySelectorAll(
+			'[data-marquee-copy="duplicate"]',
+		);
+		expect(duplicateGroups).toHaveLength(2);
+		for (const duplicateGroup of duplicateGroups) {
+			expect(duplicateGroup).toHaveAttribute("aria-hidden", "true");
+			expect(
+				duplicateGroup.querySelectorAll('button[tabindex="-1"]'),
+			).toHaveLength(3);
+		}
 		expect(
 			document.querySelector('[data-rain-surface="agent-brand"]'),
 		).toBeVisible();
@@ -213,7 +256,26 @@ describe("AgentChatMessage", () => {
 			document.querySelector('[data-rain-text-surface="agent-description"]'),
 		).toHaveAttribute("data-rain-text-impact", "subtle");
 		for (const suggestion of screen.getAllByTestId("chat-suggestion")) {
-			expect(suggestion.querySelector("svg")).toHaveClass("text-violet-500");
+			expect(suggestion).toHaveClass("h-28", "w-72");
+			expect(suggestion.querySelector(".chat-suggestion-media")).toHaveClass(
+				"aspect-[4/3]",
+			);
+			expect(suggestion.querySelectorAll(".line-clamp-2")).toHaveLength(0);
+			expect(suggestion.querySelector("img")).toHaveAttribute(
+				"src",
+				expect.stringMatching(/^\/prompt-images\/dark\/.+\.webp$/),
+			);
+			expect(suggestion.querySelector("img")).toHaveAttribute("width", "640");
+			expect(suggestion.querySelector("img")).toHaveAttribute("height", "480");
+			expect(suggestion.querySelector("svg")).toBeNull();
+		}
+
+		act(() => useThemeStore.getState().setMode("day"));
+		for (const suggestion of screen.getAllByTestId("chat-suggestion")) {
+			expect(suggestion.querySelector("img")).toHaveAttribute(
+				"src",
+				expect.stringMatching(/^\/prompt-images\/light\/.+\.webp$/),
+			);
 		}
 	});
 
@@ -534,7 +596,7 @@ describe("AgentChatMessage", () => {
 		expect(screen.getAllByText("Configured for this page")).toHaveLength(2);
 	});
 
-	it("fills suggestions at the caret without sending and rotates each tab", async () => {
+	it("fills suggestions at the caret without sending and exposes each full prompt pack", async () => {
 		const user = userEvent.setup();
 		const fetchMock = vi.fn((input: string | URL | Request) => {
 			const url =
@@ -557,7 +619,7 @@ describe("AgentChatMessage", () => {
 		await waitFor(() => expect(input).toBeEnabled());
 
 		await user.click(screen.getByRole("tab", { name: "Generative UI" }));
-		expect(screen.getAllByTestId("chat-suggestion")).toHaveLength(3);
+		expect(screen.getAllByTestId("chat-suggestion")).toHaveLength(6);
 		await user.click(
 			screen.getByRole("button", { name: /Project health dashboard/ }),
 		);
@@ -579,30 +641,39 @@ describe("AgentChatMessage", () => {
 			}),
 		).toBe(false);
 
-		await user.click(
-			screen.getByRole("button", {
-				name: "Refresh Generative UI suggestions",
-			}),
-		);
 		expect(
 			screen.getByRole("button", { name: /Product comparison board/ }),
 		).toBeVisible();
 		expect(
-			screen.queryByRole("button", { name: /Project health dashboard/ }),
+			screen.queryByRole("button", { name: /Refresh .* suggestions/ }),
 		).not.toBeInTheDocument();
 		expect(input).toHaveValue(prompt);
+
+		await user.click(screen.getByRole("tab", { name: "Trading" }));
+		expect(screen.getAllByTestId("chat-suggestion")).toHaveLength(6);
+		const tradingCard = screen.getByRole("button", {
+			name: /Candlestick \+ MA/,
+		});
+		expect(tradingCard).toHaveClass(
+			"chat-suggestion-card",
+			"border",
+			"focus-visible:border-ring/70",
+		);
+		expect(tradingCard).not.toHaveClass("hover:-translate-y-px");
+		expect(within(tradingCard).getByText("Candlestick + MA")).not.toHaveClass(
+			"text-amber-700",
+		);
+		await user.click(tradingCard);
+		expect(input).toHaveValue(TRADING_SUGGESTIONS[0].prompt);
 
 		await user.click(screen.getByRole("tab", { name: "Starter" }));
 		expect(
 			screen.getByRole("button", { name: /Review the current app/ }),
 		).toBeVisible();
-		await user.click(
-			screen.getByRole("button", { name: "Refresh Starter suggestions" }),
-		);
 		expect(
 			screen.getByRole("button", { name: /Improve accessibility/ }),
 		).toBeVisible();
-		expect(input).toHaveValue(prompt);
+		expect(input).toHaveValue(TRADING_SUGGESTIONS[0].prompt);
 	});
 
 	it("scrolls to the bottom when the user sends while reading older messages", async () => {

@@ -2,10 +2,12 @@ import type { Spec } from "@json-render/react";
 import { describe, expect, it } from "vitest";
 import {
 	chartPropsSchema,
+	comparisonChartPropsSchema,
 	createGenerativeUiInstructions,
 	dataTablePropsSchema,
 	GENERATIVE_UI_COMPONENTS,
 	generativeUiCatalog,
+	priceChartPropsSchema,
 } from "@/modules/generative-ui/catalog";
 import { sanitizeGenerativeSpec } from "@/modules/generative-ui/spec-policy";
 
@@ -19,11 +21,15 @@ describe("generative UI catalog", () => {
 			"Metric",
 			"DataTable",
 			"Chart",
+			"PriceChart",
+			"IndicatorPane",
+			"PerformanceChart",
+			"ComparisonChart",
 			"Button",
 			"Timeline",
 			"MermaidDiagram",
 		]);
-		expect(GENERATIVE_UI_COMPONENTS).toHaveLength(10);
+		expect(GENERATIVE_UI_COMPONENTS).toHaveLength(14);
 	});
 
 	it("generates an inline prompt without widening coding tasks", () => {
@@ -41,6 +47,12 @@ describe("generative UI catalog", () => {
 		);
 		expect(generativeUiInstructions).toContain(
 			"Use Timeline for chronological events",
+		);
+		expect(generativeUiInstructions).toContain(
+			"Use PriceChart for instrument prices",
+		);
+		expect(generativeUiInstructions).toContain(
+			"Never calculate, interpolate, forecast, or invent chart values",
 		);
 		expect(generativeUiInstructions).toContain(
 			"when no catalog component or composition is semantically suitable",
@@ -104,6 +116,57 @@ describe("generative UI catalog", () => {
 					key: `s${index}`,
 					label: `Series ${index}`,
 				})),
+			}).success,
+		).toBe(false);
+	});
+
+	it("validates financial chart chronology, OHLC ranges, and normalization", () => {
+		const validOhlcData = [
+			{ time: "2026-07-17", open: 10, high: 12, low: 9, close: 11 },
+			{ time: "2026-07-20", open: 11, high: 13, low: 10, close: 12 },
+		];
+		expect(
+			priceChartPropsSchema.safeParse({
+				symbol: "AAPL",
+				style: "candlestick",
+				data: validOhlcData,
+			}).success,
+		).toBe(true);
+		expect(
+			priceChartPropsSchema.safeParse({
+				symbol: "AAPL",
+				style: "candlestick",
+				data: [...validOhlcData].reverse(),
+			}).success,
+		).toBe(false);
+		expect(
+			priceChartPropsSchema.safeParse({
+				symbol: "AAPL",
+				style: "candlestick",
+				data: [
+					{ time: "2026-07-17", open: 10, high: 9, low: 8, close: 11 },
+					validOhlcData[1],
+				],
+			}).success,
+		).toBe(false);
+		expect(
+			comparisonChartPropsSchema.safeParse({
+				series: [
+					{
+						symbol: "ZERO",
+						data: [
+							{ time: "2026-07-17", value: 0 },
+							{ time: "2026-07-20", value: 1 },
+						],
+					},
+					{
+						symbol: "AAPL",
+						data: [
+							{ time: "2026-07-17", value: 10 },
+							{ time: "2026-07-20", value: 11 },
+						],
+					},
+				],
 			}).success,
 		).toBe(false);
 	});

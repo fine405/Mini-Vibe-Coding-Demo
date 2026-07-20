@@ -71,7 +71,7 @@ function AppContent() {
 							}
 							collapsedSize={0}
 							collapsible
-							defaultSize={showChat ? 22 : 0}
+							defaultSize={showChat ? 26 : 0}
 							minSize={15}
 							order={1}
 							ref={chatPanelRef}
@@ -94,7 +94,7 @@ function AppContent() {
 							disabled={!showChat}
 							onDragging={setIsResizingChat}
 						/>
-						<Panel defaultSize={78} minSize={30} order={2}>
+						<Panel defaultSize={74} minSize={30} order={2}>
 							<WorkbenchPane
 								onExportJSON={() => project.requestExport("json")}
 								onExportZip={() => project.requestExport("zip")}
