@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	createRainfall,
+	depositSurfaceWater,
 	getSurfaceRunoffThreshold,
 	setRainSurfaces,
 } from "@/modules/theme/rainfall";
@@ -8,12 +9,64 @@ import {
 	buildRainWaterPrimitives,
 	WATER_CAPSULE,
 	WATER_ELLIPSE,
+	WATER_FILM,
+	WATER_MATERIAL_FILM,
 	WATER_PENDANT,
 } from "@/modules/theme/rainWaterWebgl2";
 
 const steady = (value: number) => () => value;
 
 describe("WebGL 2 rain water geometry", () => {
+	it("renders pinned top-edge water as a shallow film material", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "input", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		depositSurfaceWater(
+			state,
+			{
+				normalX: 0,
+				normalY: -1,
+				surfaceId: "input",
+				t: 0,
+				x: 120,
+				y: 70,
+			},
+			0.5,
+		);
+
+		const films = buildRainWaterPrimitives(state).filter(
+			(primitive) => primitive.kind === WATER_FILM,
+		);
+
+		expect(films).toHaveLength(1);
+		expect(films[0]?.material).toBe(WATER_MATERIAL_FILM);
+		expect(films[0]?.params[0]).toBeGreaterThan(4);
+		expect(films[0]?.params[1]).toBeLessThan(1);
+	});
+
+	it("keeps faded edge residue separate from bulk water", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		const runoff = state.surfaces[0]?.leftRunoff;
+		expect(runoff).toBeDefined();
+		if (!runoff) return;
+		runoff.residue = 0.6;
+		runoff.residueStart = 0.3;
+		runoff.residueEnd = 0.52;
+
+		const residue = buildRainWaterPrimitives(state).filter(
+			(primitive) =>
+				primitive.kind === WATER_CAPSULE &&
+				primitive.material === WATER_MATERIAL_FILM,
+		);
+
+		expect(residue.length).toBeGreaterThan(0);
+		expect(residue.every((primitive) => primitive.alpha < 0.08)).toBe(true);
+	});
+
 	it("replaces the bottom head ellipse with one continuous pendant", () => {
 		const state = createRainfall(240, 180, steady(0.5));
 		const geometry = {

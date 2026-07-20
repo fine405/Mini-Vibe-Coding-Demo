@@ -453,6 +453,29 @@ describe("rainfall simulation", () => {
 		expect(state.runoffDrops).toHaveLength(0);
 	});
 
+	it("fades the local wet trace after attached runoff leaves", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		const runoff = state.surfaces[0]?.leftRunoff;
+		expect(runoff).toBeDefined();
+		if (!runoff) return;
+		runoff.volume = 0.4;
+		runoff.progress = 0.45;
+
+		stepSurfaceWater(state, 1 / 60, steady(0.5));
+
+		expect(runoff.residue).toBe(1);
+		expect(runoff.residueEnd).toBeGreaterThan(runoff.residueStart);
+		runoff.volume = 0;
+		stepSurfaceWater(state, 0.5, steady(0.5));
+		expect(runoff.residue).toBeGreaterThan(0);
+		expect(runoff.residue).toBeLessThan(1);
+		stepSurfaceWater(state, 2, steady(0.5));
+		expect(runoff.residue).toBe(0);
+	});
+
 	it("recycles side-face grazes without visible splashes or deposits", () => {
 		const state = createRainfall(240, 180, steady(0.5));
 		setRainSurfaces(state, [

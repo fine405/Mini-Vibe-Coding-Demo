@@ -5,6 +5,7 @@ import {
 	getSurfaceRunoffPathLength,
 	getSurfaceRunoffPoint,
 	getSurfaceRunoffThreshold,
+	MIN_VISIBLE_SURFACE_WATER_VOLUME,
 	type RainfallState,
 	type SurfaceRunoffSide,
 } from "@/modules/theme/rainfall";
@@ -12,6 +13,9 @@ import {
 export const WATER_ELLIPSE = 0;
 export const WATER_CAPSULE = 1;
 export const WATER_PENDANT = 2;
+export const WATER_FILM = 3;
+export const WATER_MATERIAL_BULK = 0;
+export const WATER_MATERIAL_FILM = 1;
 
 export interface RainWaterPrimitive {
 	alpha: number;
@@ -20,7 +24,8 @@ export interface RainWaterPrimitive {
 	/** Half-size of the shader quad, including its antialias padding. */
 	halfHeight: number;
 	halfWidth: number;
-	kind: 0 | 1 | 2;
+	kind: 0 | 1 | 2 | 3;
+	material: 0 | 1;
 	params: readonly [number, number, number, number];
 	rotation: number;
 }
@@ -42,6 +47,7 @@ const pushEllipse = (
 	radiusY: number,
 	rotation: number,
 	alpha: number,
+	material: 0 | 1 = WATER_MATERIAL_BULK,
 ): void => {
 	primitives.push({
 		alpha,
@@ -50,6 +56,7 @@ const pushEllipse = (
 		halfHeight: radiusY + SHAPE_PADDING,
 		halfWidth: radiusX + SHAPE_PADDING,
 		kind: WATER_ELLIPSE,
+		material,
 		params: [radiusX, radiusY, 0, 0],
 		rotation,
 	});
@@ -61,10 +68,11 @@ const pushCapsule = (
 	end: { x: number; y: number },
 	radius: number,
 	alpha: number,
+	material: 0 | 1 = WATER_MATERIAL_BULK,
 ): void => {
 	const length = Math.hypot(end.x - start.x, end.y - start.y);
 	if (length <= 0.01) {
-		pushEllipse(primitives, end.x, end.y, radius, radius, 0, alpha);
+		pushEllipse(primitives, end.x, end.y, radius, radius, 0, alpha, material);
 		return;
 	}
 	primitives.push({
@@ -74,6 +82,7 @@ const pushCapsule = (
 		halfHeight: length * 0.5 + radius + SHAPE_PADDING,
 		halfWidth: radius + SHAPE_PADDING,
 		kind: WATER_CAPSULE,
+		material,
 		params: [radius, length * 0.5, 0, 0],
 		rotation: Math.atan2(end.y - start.y, end.x - start.x) - Math.PI * 0.5,
 	});
@@ -102,6 +111,7 @@ const pushPendant = (
 		halfHeight,
 		halfWidth: bulb.radiusX + SHAPE_PADDING,
 		kind: WATER_PENDANT,
+		material: WATER_MATERIAL_BULK,
 		params: [
 			anchor.y + bulbOffset - centerY,
 			bulb.radiusX,
@@ -110,6 +120,54 @@ const pushPendant = (
 		],
 		rotation: 0,
 	});
+};
+
+const pushFilm = (
+	primitives: RainWaterPrimitive[],
+	x: number,
+	baselineY: number,
+	halfWidth: number,
+	depth: number,
+	asymmetry: number,
+	alpha: number,
+): void => {
+	primitives.push({
+		alpha,
+		centerX: x,
+		centerY: baselineY,
+		halfHeight: depth + SHAPE_PADDING,
+		halfWidth: halfWidth + SHAPE_PADDING,
+		kind: WATER_FILM,
+		material: WATER_MATERIAL_FILM,
+		params: [halfWidth, depth, asymmetry, 0],
+		rotation: 0,
+	});
+};
+
+const addRunoffPathPrimitives = (
+	primitives: RainWaterPrimitive[],
+	surface: RainfallState["surfaces"][number],
+	side: SurfaceRunoffSide,
+	startProgress: number,
+	endProgress: number,
+	radius: number,
+	alpha: number,
+): void => {
+	let previous = getSurfaceRunoffPoint(surface, side, startProgress);
+	for (let index = 1; index <= 6; index++) {
+		const progress =
+			startProgress + ((endProgress - startProgress) * index) / 6;
+		const point = getSurfaceRunoffPoint(surface, side, progress);
+		pushCapsule(
+			primitives,
+			previous,
+			point,
+			radius,
+			alpha,
+			WATER_MATERIAL_FILM,
+		);
+		previous = point;
+	}
 };
 
 const addAttachedRunoffPrimitives = (
@@ -124,25 +182,37 @@ const addAttachedRunoffPrimitives = (
 		runoff.releaseIndex,
 	);
 	const fill = Math.min(1.2, runoff.volume / threshold);
+	const hasLiveTrail = runoff.volume > 0.02 && runoff.progress > 0;
 
-	if (runoff.volume > 0.02 && runoff.progress > 0) {
+	if (
+		!hasLiveTrail &&
+		runoff.residue > 0.01 &&
+		runoff.residueEnd > runoff.residueStart
+	) {
+		addRunoffPathPrimitives(
+			primitives,
+			surface,
+			side,
+			runoff.residueStart,
+			runoff.residueEnd,
+			0.2 + runoff.residue * 0.08,
+			0.012 + runoff.residue * 0.045,
+		);
+	}
+
+	if (hasLiveTrail) {
 		const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
 		const tailLength = Math.min(14, 4 + fill * 10);
 		const tailProgress = Math.max(0, runoff.progress - tailLength / pathLength);
-		let previous = getSurfaceRunoffPoint(surface, side, tailProgress);
-		for (let index = 1; index <= 6; index++) {
-			const progress =
-				tailProgress + ((runoff.progress - tailProgress) * index) / 6;
-			const point = getSurfaceRunoffPoint(surface, side, progress);
-			pushCapsule(
-				primitives,
-				previous,
-				point,
-				0.28 + fill * 0.32,
-				0.045 + fill * 0.1,
-			);
-			previous = point;
-		}
+		addRunoffPathPrimitives(
+			primitives,
+			surface,
+			side,
+			tailProgress,
+			runoff.progress,
+			0.28 + fill * 0.32,
+			0.045 + fill * 0.1,
+		);
 
 		if (runoff.progress < 1) {
 			const head = getSurfaceRunoffFrame(surface, side, runoff.progress);
@@ -186,6 +256,30 @@ export const buildRainWaterPrimitives = (
 	state: RainfallState,
 ): RainWaterPrimitive[] => {
 	const primitives: RainWaterPrimitive[] = [];
+	for (const bead of state.surfaceBeads) {
+		if (bead.volume < MIN_VISIBLE_SURFACE_WATER_VOLUME) continue;
+		const surface = state.surfaces.find(
+			(candidate) => candidate.id === bead.surfaceId,
+		);
+		if (!surface) continue;
+		const radius = Math.min(surface.radius, surface.width * 0.5);
+		const trackLeft = surface.x + radius;
+		const trackWidth = Math.max(1, surface.width - radius * 2);
+		const x = trackLeft + bead.u * trackWidth;
+		const halfWidth = Math.min(13, 4 + Math.sqrt(bead.volume) * 7);
+		const depth = Math.min(0.9, 0.18 + Math.sqrt(bead.volume) * 0.64);
+		const asymmetry = Math.sin(bead.u * 47 + bead.volume * 3) * 0.12;
+		const alpha = Math.min(0.17, 0.055 + bead.volume * 0.09);
+		pushFilm(
+			primitives,
+			x,
+			surface.y + 0.24,
+			halfWidth,
+			depth,
+			asymmetry,
+			alpha,
+		);
+	}
 	for (const surface of state.surfaces) {
 		for (const side of ["left", "right"] as const) {
 			addAttachedRunoffPrimitives(primitives, surface, side);
@@ -236,6 +330,7 @@ uniform vec2 u_resolution;
 out vec2 v_local;
 out vec2 v_halfSize;
 flat out int v_kind;
+flat out int v_material;
 out float v_alpha;
 out vec4 v_params;
 
@@ -249,6 +344,7 @@ void main() {
 	v_local = local;
 	v_halfSize = a_halfSize;
 	v_kind = int(a_style.x + 0.5);
+	v_material = int(a_style.z + 0.5);
 	v_alpha = a_style.y;
 	v_params = a_params;
 }
@@ -260,6 +356,7 @@ precision highp float;
 in vec2 v_local;
 in vec2 v_halfSize;
 flat in int v_kind;
+flat in int v_material;
 in float v_alpha;
 in vec4 v_params;
 
@@ -300,6 +397,18 @@ float shapeDistance(vec2 point) {
 			v_params.x
 		);
 	}
+	if (v_kind == ${WATER_FILM}) {
+		float halfWidth = max(0.001, v_params.x);
+		float normalizedX = clamp(point.x / halfWidth, -1.0, 1.0);
+		float arch = max(0.0, 1.0 - normalizedX * normalizedX);
+		float top = -v_params.y * arch * (0.88 + v_params.z * normalizedX);
+		float bottom = v_params.y * 0.12 * arch;
+		float center = (top + bottom) * 0.5;
+		float halfDepth = max(0.02, (bottom - top) * 0.5);
+		float vertical = abs(point.y - center) - halfDepth;
+		float horizontal = (abs(point.x) - halfWidth) * 0.35;
+		return max(vertical, horizontal);
+	}
 
 	float anchorY = -v_halfSize.y + ${SHAPE_PADDING.toFixed(1)};
 	vec2 bulbCenter = vec2(0.0, v_params.x);
@@ -323,9 +432,27 @@ void main() {
 	vec2 gradient = vec2(dFdx(distanceToWater), dFdy(distanceToWater));
 	vec2 normal = normalize(gradient + vec2(0.0001));
 	float rim = 1.0 - smoothstep(0.0, 1.35, abs(distanceToWater));
-	float glint = pow(max(0.0, dot(normal, normalize(vec2(-0.58, -0.82)))), 5.0);
-	vec3 water = mix(vec3(0.78, 0.86, 0.92), vec3(0.98, 1.0, 1.0), rim * 0.42 + glint * 0.58);
-	float alpha = coverage * v_alpha * (0.68 + rim * 0.24 + glint * 0.24);
+	vec2 localScale = max(v_halfSize - vec2(${SHAPE_PADDING.toFixed(1)}), vec2(0.5));
+	vec2 localUv = v_local / localScale;
+	float directional = pow(
+		max(0.0, dot(normal, normalize(vec2(-0.58, -0.82)))),
+		7.0
+	);
+	vec2 highlightUv = (localUv - vec2(-0.28, -0.34)) * vec2(2.8, 3.4);
+	float lensHighlight = exp(-dot(highlightUv, highlightUv) * 2.1);
+	float film = float(v_material == ${WATER_MATERIAL_FILM});
+	float glint = mix(max(directional * 0.62, lensHighlight * 0.78), directional * 0.14, film);
+	float highlight = rim * mix(0.34, 0.16, film) + glint;
+	vec3 water = mix(
+		vec3(0.74, 0.83, 0.9),
+		vec3(0.98, 1.0, 1.0),
+		clamp(highlight, 0.0, 1.0)
+	);
+	float alpha = coverage * v_alpha * mix(
+		0.68 + rim * 0.2 + glint * 0.22,
+		0.58 + rim * 0.12 + directional * 0.06,
+		film
+	);
 	alpha = min(alpha, 0.68);
 	// The drawing buffer is premultiplied so translucent SDF edges composite
 	// cleanly over the DOM without dark halos.
@@ -483,7 +610,7 @@ export const createRainWaterRenderer = (
 				data[offset + 4] = primitive.rotation;
 				data[offset + 5] = primitive.kind;
 				data[offset + 6] = primitive.alpha;
-				data[offset + 7] = 0;
+				data[offset + 7] = primitive.material;
 				data[offset + 8] = 0;
 				data.set(primitive.params, offset + 9);
 			}

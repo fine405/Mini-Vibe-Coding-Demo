@@ -277,11 +277,31 @@ const drawRunoffWater2d = (
 				runoff.releaseIndex,
 			);
 			const fill = Math.min(1.2, runoff.volume / threshold);
-			if (runoff.progress <= 0) continue;
+			if (runoff.progress <= 0 && runoff.residue <= 0.01) continue;
+			const hasLiveTrail = runoff.volume > 0.02;
+
+			if (
+				!hasLiveTrail &&
+				runoff.residue > 0.01 &&
+				runoff.residueEnd > runoff.residueStart
+			) {
+				ctx.strokeStyle = `rgba(${STREAK_RGB}, ${runoff.residue * 0.045})`;
+				ctx.lineWidth = 0.26 + runoff.residue * 0.16;
+				ctx.beginPath();
+				for (let index = 0; index <= 7; index++) {
+					const sampleProgress =
+						runoff.residueStart +
+						((runoff.residueEnd - runoff.residueStart) * index) / 7;
+					const point = getSurfaceRunoffPoint(surface, side, sampleProgress);
+					if (index === 0) ctx.moveTo(point.x, point.y);
+					else ctx.lineTo(point.x, point.y);
+				}
+				ctx.stroke();
+			}
 
 			// Draw only the local wet trail behind the moving head. Keeping the
 			// whole outline lit would look like a decorative border animation.
-			if (runoff.volume > 0.02) {
+			if (hasLiveTrail) {
 				const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
 				const tailLength = Math.min(14, 4 + fill * 10);
 				const tailProgress = Math.max(
@@ -394,8 +414,10 @@ const draw = (
 	for (const drop of state.drops) {
 		drawDrop(ctx, drop, state.surfaces, state.textSurfaces, forceVisible);
 	}
-	drawTopSurfaceWater(ctx, state);
-	if (drawFallbackRunoff) drawRunoffWater2d(ctx, state);
+	if (drawFallbackRunoff) {
+		drawTopSurfaceWater(ctx, state);
+		drawRunoffWater2d(ctx, state);
+	}
 
 	for (const glint of state.textGlints) {
 		const progress = glint.age / glint.lifetime;

@@ -105,6 +105,10 @@ export interface SurfaceRunoffState {
 	pinch: number;
 	/** Brief wet filament left after a release. */
 	recoil: number;
+	/** Fading local trace left on the rounded edge after water passes. */
+	residue: number;
+	residueStart: number;
+	residueEnd: number;
 	releaseIndex: number;
 }
 
@@ -447,6 +451,9 @@ const createSurfaceRunoff = (
 	pendantVelocity: previous?.pendantVelocity ?? 0,
 	pinch: previous?.pinch ?? 0,
 	recoil: previous?.recoil ?? 0,
+	residue: previous?.residue ?? 0,
+	residueStart: previous?.residueStart ?? 0,
+	residueEnd: previous?.residueEnd ?? 0,
 	releaseIndex: previous?.releaseIndex ?? 0,
 });
 
@@ -754,6 +761,7 @@ const SURFACE_FLOW_DRAG = 3.8;
 const PENDANT_SPRING = 82;
 const PENDANT_DAMPING = 14;
 const PENDANT_RECOIL_SECONDS = 0.12;
+const SURFACE_RESIDUE_SECONDS = 2.2;
 
 const stepAttachedRunoff = (
 	state: RainfallState,
@@ -764,6 +772,12 @@ const stepAttachedRunoff = (
 ): void => {
 	const runoff = getSurfaceRunoff(surface, side);
 	runoff.recoil = Math.max(0, runoff.recoil - dt / PENDANT_RECOIL_SECONDS);
+	runoff.residue = Math.max(0, runoff.residue - dt / SURFACE_RESIDUE_SECONDS);
+	const threshold = getSurfaceRunoffThreshold(
+		surface,
+		side,
+		runoff.releaseIndex,
+	);
 
 	if (runoff.volume > 0.01 && runoff.progress < 1) {
 		const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
@@ -793,13 +807,20 @@ const stepAttachedRunoff = (
 		}
 	}
 
+	if (runoff.volume > 0.02 && runoff.progress > 0) {
+		const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
+		const fill = Math.min(1.2, runoff.volume / threshold);
+		const tailLength = Math.min(14, 4 + fill * 10);
+		runoff.residueStart = Math.max(
+			0,
+			runoff.progress - tailLength / pathLength,
+		);
+		runoff.residueEnd = runoff.progress;
+		runoff.residue = 1;
+	}
+
 	if (runoff.progress < 1) return;
 
-	const threshold = getSurfaceRunoffThreshold(
-		surface,
-		side,
-		runoff.releaseIndex,
-	);
 	const fill = runoff.volume / threshold;
 	const pinchLimit =
 		fill >= 1 ? 1 : Math.min(0.72, Math.max(0, ((fill - 0.72) / 0.28) * 0.72));
