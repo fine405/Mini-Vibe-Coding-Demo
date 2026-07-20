@@ -14,6 +14,7 @@ import {
 	RAIN_LAYER_CONFIG,
 	RAIN_WIND_RANGE,
 	RING_LIFETIME_SECONDS,
+	SURFACE_RUNOFF_HANG_SECONDS,
 	setRainSurfaces,
 	stepRainfall,
 	stepSurfaceWater,
@@ -177,7 +178,7 @@ describe("rainfall simulation", () => {
 		expect(state.surfaceBeads[0]?.surfaceId).toBe("brand");
 	});
 
-	it("moves accumulated water to a rounded edge and emits a runoff drop", () => {
+	it("carries edge water around the side to the bottom before it drips", () => {
 		const state = createRainfall(240, 180, steady(0.5));
 		setRainSurfaces(state, [
 			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
@@ -197,13 +198,124 @@ describe("rainfall simulation", () => {
 			);
 		}
 
-		for (let index = 0; index < 180; index++) {
+		stepSurfaceWater(state, 1 / 60, steady(0.5));
+		const surface = state.surfaces[0];
+		expect(surface).toBeDefined();
+		expect(surface?.leftFlowProgress).toBeGreaterThan(0);
+		expect(surface?.leftFlowProgress).toBeLessThan(1);
+		expect(state.runoffDrops).toHaveLength(0);
+
+		for (let index = 0; index < 6 * 60; index++) {
 			stepSurfaceWater(state, 1 / 60, steady(0.5));
+			if (state.runoffDrops.length > 0) break;
 		}
 
 		expect(state.runoffDrops.length).toBeGreaterThan(0);
-		expect(state.runoffDrops[0]?.y).toBeGreaterThan(70);
-		expect(state.runoffDrops[0]?.x).toBeLessThan(70);
+		expect(state.runoffDrops[0]?.x).toBeCloseTo(84, 1);
+		expect(state.runoffDrops[0]?.y).toBeGreaterThan(118);
+		expect(state.runoffDrops[0]?.age).toBe(-SURFACE_RUNOFF_HANG_SECONDS);
+	});
+
+	it("routes an upper-corner impact directly onto the attached side flow", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		depositSurfaceWater(
+			state,
+			{
+				normalX: -0.7,
+				normalY: -0.7,
+				surfaceId: "brand",
+				t: 0,
+				x: 76,
+				y: 74,
+			},
+			0.14,
+		);
+
+		expect(state.surfaceBeads).toHaveLength(0);
+		expect(state.surfaces[0]?.leftReservoir).toBeCloseTo(0.14);
+		stepSurfaceWater(state, 1 / 60, steady(0.5));
+		expect(state.surfaces[0]?.leftFlowProgress).toBeGreaterThan(0);
+	});
+
+	it("pins a small water patch instead of marching every bead to an edge", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		depositSurfaceWater(
+			state,
+			{
+				normalX: 0,
+				normalY: -1,
+				surfaceId: "brand",
+				t: 0,
+				x: 120,
+				y: 70,
+			},
+			0.08,
+		);
+
+		for (let index = 0; index < 4 * 60; index++) {
+			stepSurfaceWater(state, 1 / 60, steady(0.5));
+		}
+
+		expect(state.surfaceBeads).toHaveLength(1);
+		expect(state.surfaceBeads[0]?.u).toBeCloseTo(0.5, 2);
+		expect(state.runoffDrops).toHaveLength(0);
+	});
+
+	it("keeps a well-fed top patch pinned without an external slope", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		depositSurfaceWater(
+			state,
+			{ normalX: 0, normalY: -1, surfaceId: "brand", t: 0, x: 120, y: 70 },
+			0.8,
+		);
+
+		for (let index = 0; index < 6 * 60; index++) {
+			stepSurfaceWater(state, 1 / 60, steady(0.5));
+		}
+
+		const surface = state.surfaces[0];
+		expect(surface).toBeDefined();
+		expect(state.surfaceBeads).toHaveLength(1);
+		expect(state.surfaceBeads[0]?.u).toBeCloseTo(0.5, 2);
+		expect(surface?.leftReservoir).toBe(0);
+		expect(surface?.rightReservoir).toBe(0);
+		expect(state.runoffDrops).toHaveLength(0);
+	});
+
+	it("recycles side-face grazes without visible splashes or deposits", () => {
+		const state = createRainfall(240, 180, steady(0.5));
+		setRainSurfaces(state, [
+			{ height: 48, id: "brand", radius: 14, width: 100, x: 70, y: 70 },
+		]);
+		for (const candidate of state.drops) {
+			candidate.x = 10;
+			candidate.y = -100;
+		}
+		const drop = state.drops.find((candidate) => candidate.layer === "near");
+		expect(drop).toBeDefined();
+		if (!drop) return;
+		// Just inside the left face: the contact normal points sideways.
+		drop.x = 72;
+		drop.y = 100;
+		drop.speed = 100;
+		drop.turbulenceAmplitude = 0;
+		drop.windSusceptibility = 0;
+
+		stepRainfall(state, 0.01, steady(0.5));
+
+		expect(drop.y).toBeLessThan(0);
+		expect(state.rings).toHaveLength(0);
+		expect(state.sprays).toHaveLength(0);
+		expect(state.surfaceBeads).toHaveLength(0);
 	});
 
 	it("reserves visible bottom-edge splashes for the near layer", () => {

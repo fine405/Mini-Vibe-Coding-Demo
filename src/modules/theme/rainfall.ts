@@ -77,6 +77,9 @@ export interface SplashRing {
 export interface WetRainSurface extends RainSurfaceGeometry {
 	leftReservoir: number;
 	rightReservoir: number;
+	/** Normalized travel from the top tangent to the bottom tangent. */
+	leftFlowProgress: number;
+	rightFlowProgress: number;
 }
 
 /** A small packet of water moving along a component's top edge. */
@@ -86,6 +89,7 @@ export interface SurfaceWaterBead {
 	u: number;
 	velocity: number;
 	volume: number;
+	age: number;
 }
 
 /** Water released from a rounded component edge back into the rain field. */
@@ -99,6 +103,7 @@ export interface RunoffDroplet {
 	alpha: number;
 	size: number;
 	sourceSurfaceId: string;
+	sourceSide: "left" | "right";
 }
 
 export interface RainfallState {
@@ -224,9 +229,17 @@ export const MAX_SPRAY_COUNT = 90;
 export const MAX_RING_COUNT = 36;
 export const MAX_SURFACE_BEAD_COUNT = 72;
 export const MAX_RUNOFF_DROP_COUNT = 36;
+export const MIN_VISIBLE_SURFACE_WATER_VOLUME = 0.2;
+export const SURFACE_RUNOFF_HANG_SECONDS = 0.28;
 
 /** Some near-camera impacts make a visible splash at the bottom edge. */
 export const NEAR_SPLASH_CHANCE = 0.3;
+
+/**
+ * Mid-layer drops only occasionally read as splashes on components; at full
+ * rate a wide input box sparkles like static noise instead of rain.
+ */
+export const MID_SURFACE_SPLASH_CHANCE = 0.15;
 
 const rand = (
 	random: () => number,
@@ -311,8 +324,12 @@ const spawnImpact = (
 	alpha: number,
 	size: number,
 	random: () => number,
+	dropletScale = 1,
 ): void => {
-	const dropletCount = 2 + Math.round(random());
+	const dropletCount = Math.max(
+		1,
+		Math.round((2 + Math.round(random())) * dropletScale),
+	);
 	const tangentX = -point.normalY;
 	const tangentY = point.normalX;
 
@@ -375,6 +392,8 @@ export const setRainSurfaces = (
 		...surface,
 		leftReservoir: previous.get(surface.id)?.leftReservoir ?? 0,
 		rightReservoir: previous.get(surface.id)?.rightReservoir ?? 0,
+		leftFlowProgress: previous.get(surface.id)?.leftFlowProgress ?? 0,
+		rightFlowProgress: previous.get(surface.id)?.rightFlowProgress ?? 0,
 	}));
 	const activeIds = new Set(state.surfaces.map((surface) => surface.id));
 	state.surfaceBeads = state.surfaceBeads.filter((bead) =>
@@ -392,21 +411,44 @@ export const depositSurfaceWater = (
 	state: RainfallState,
 	hit: RainSurfaceHit,
 	volume: number,
+	initialVelocity = 0,
 ): void => {
 	if (volume <= 0 || hit.normalY > -0.2) return;
 	const surface = getSurfaceById(state, hit.surfaceId);
 	if (!surface) return;
+	// An impact on the upper rounded corner has already crossed the top
+	// tangent. Keep it attached to that side instead of letting wind push it
+	// back onto the horizontal edge.
+	if (hit.normalX < -0.05) {
+		surface.leftReservoir += volume;
+		return;
+	}
+	if (hit.normalX > 0.05) {
+		surface.rightReservoir += volume;
+		return;
+	}
 	const track = getTopTrack(surface);
 	const u = clamp01((hit.x - track.left) / track.width);
-	const mergeDistance = 12 / track.width;
-	const existing = state.surfaceBeads.find(
-		(bead) =>
-			bead.surfaceId === surface.id && Math.abs(bead.u - u) <= mergeDistance,
+	// Merge only genuinely adjacent deposits. A broad merge radius makes a
+	// resting patch teleport toward unrelated impacts elsewhere on the edge.
+	const mergeDistance = 24 / track.width;
+	const existing = state.surfaceBeads.reduce<SurfaceWaterBead | undefined>(
+		(best, bead) => {
+			if (bead.surfaceId !== surface.id) return best;
+			if (Math.abs(bead.u - u) > mergeDistance) return best;
+			if (!best || Math.abs(bead.u - u) < Math.abs(best.u - u)) return bead;
+			return best;
+		},
+		undefined,
 	);
 	if (existing) {
 		const nextVolume = existing.volume + volume;
 		existing.u = (existing.u * existing.volume + u * volume) / nextVolume;
+		existing.velocity =
+			(existing.velocity * existing.volume + initialVelocity * volume) /
+			nextVolume;
 		existing.volume = nextVolume;
+		existing.age = 0;
 		return;
 	}
 
@@ -419,11 +461,85 @@ export const depositSurfaceWater = (
 			},
 			undefined,
 		);
-		if (nearest) nearest.volume += volume;
+		if (nearest) {
+			nearest.volume += volume;
+			nearest.age = 0;
+		}
 		return;
 	}
 
-	state.surfaceBeads.push({ surfaceId: surface.id, u, velocity: 0, volume });
+	state.surfaceBeads.push({
+		age: 0,
+		surfaceId: surface.id,
+		u,
+		velocity: Math.min(16, Math.max(-16, initialVelocity)),
+		volume,
+	});
+};
+
+const getSurfaceRunoffRadius = (surface: RainSurfaceGeometry): number =>
+	Math.max(
+		0,
+		Math.min(surface.radius, surface.width * 0.5, surface.height * 0.5),
+	);
+
+export const getSurfaceRunoffThreshold = (
+	surface: RainSurfaceGeometry,
+): number => Math.min(0.82, 0.38 + getSurfaceRunoffRadius(surface) / 80);
+
+export const getSurfaceRunoffPathLength = (
+	surface: RainSurfaceGeometry,
+): number => {
+	const radius = getSurfaceRunoffRadius(surface);
+	return Math.PI * radius + Math.max(0, surface.height - radius * 2);
+};
+
+/** Point along a rounded edge from its top tangent to its bottom tangent. */
+export const getSurfaceRunoffPoint = (
+	surface: RainSurfaceGeometry,
+	side: "left" | "right",
+	progress: number,
+): { x: number; y: number } => {
+	const radius = getSurfaceRunoffRadius(surface);
+	const arcLength = radius * Math.PI * 0.5;
+	const verticalLength = Math.max(0, surface.height - radius * 2);
+	const pathLength = arcLength * 2 + verticalLength;
+	let distance = clamp01(progress) * pathLength;
+
+	if (radius > 0 && distance <= arcLength) {
+		const arcProgress = distance / arcLength;
+		const angle =
+			side === "left"
+				? -Math.PI * 0.5 - arcProgress * Math.PI * 0.5
+				: -Math.PI * 0.5 + arcProgress * Math.PI * 0.5;
+		const centerX =
+			side === "left" ? surface.x + radius : surface.x + surface.width - radius;
+		return {
+			x: centerX + Math.cos(angle) * radius,
+			y: surface.y + radius + Math.sin(angle) * radius,
+		};
+	}
+
+	distance -= arcLength;
+	if (distance <= verticalLength) {
+		return {
+			x: side === "left" ? surface.x : surface.x + surface.width,
+			y: surface.y + radius + distance,
+		};
+	}
+
+	distance -= verticalLength;
+	const arcProgress = arcLength > 0 ? Math.min(1, distance / arcLength) : 1;
+	const angle =
+		side === "left"
+			? Math.PI - arcProgress * Math.PI * 0.5
+			: arcProgress * Math.PI * 0.5;
+	const centerX =
+		side === "left" ? surface.x + radius : surface.x + surface.width - radius;
+	return {
+		x: centerX + Math.cos(angle) * radius,
+		y: surface.y + surface.height - radius + Math.sin(angle) * radius,
+	};
 };
 
 const emitRunoff = (
@@ -435,16 +551,18 @@ const emitRunoff = (
 ): void => {
 	if (state.runoffDrops.length >= MAX_RUNOFF_DROP_COUNT) return;
 	const direction = side === "left" ? -1 : 1;
+	const releasePoint = getSurfaceRunoffPoint(surface, side, 1);
 	state.runoffDrops.push({
-		x: side === "left" ? surface.x - 0.75 : surface.x + surface.width + 0.75,
-		y: surface.y + Math.max(2, surface.radius * 0.72),
-		vx: direction * (8 + random() * 10),
-		vy: 25 + random() * 20,
-		age: 0,
+		x: releasePoint.x,
+		y: releasePoint.y + 0.6,
+		vx: direction * (1 + random() * 2),
+		vy: 8 + random() * 8,
+		age: -SURFACE_RUNOFF_HANG_SECONDS,
 		volume,
-		alpha: 0.46,
-		size: 1.15 + Math.sqrt(volume) * 0.38,
+		alpha: 0.34,
+		size: 0.9 + Math.sqrt(volume) * 0.26,
 		sourceSurfaceId: surface.id,
+		sourceSide: side,
 	});
 };
 
@@ -462,13 +580,19 @@ export const stepSurfaceWater = (
 			continue;
 		}
 		const track = getTopTrack(surface);
-		const side = bead.u < 0.5 ? -1 : bead.u > 0.5 ? 1 : random() < 0.5 ? -1 : 1;
-		const distanceFromCenter = Math.abs(bead.u - 0.5) * 2;
-		bead.velocity += side * (42 + distanceFromCenter * 96) * dt;
-		bead.velocity *= Math.exp(-3.4 * dt);
+		bead.age += dt;
+		// A level top edge has no sustained tangential force. The landing impulse
+		// can slide a patch briefly, then contact-line pinning brings it to rest.
+		bead.velocity *= Math.exp(-12 * dt);
 		bead.u += (bead.velocity / track.width) * dt;
+		// Unfed specks dry out instead of lingering as static dots.
+		if (bead.age > 4 && bead.volume < 0.2) {
+			bead.volume = Math.max(0, bead.volume - 0.03 * dt);
+		}
 
-		if (bead.u <= 0) {
+		if (bead.volume <= 0.01) {
+			state.surfaceBeads.splice(index, 1);
+		} else if (bead.u <= 0) {
 			surface.leftReservoir += bead.volume;
 			state.surfaceBeads.splice(index, 1);
 		} else if (bead.u >= 1) {
@@ -478,28 +602,58 @@ export const stepSurfaceWater = (
 	}
 
 	for (const surface of state.surfaces) {
-		const releaseVolume = Math.min(2.2, 0.75 + surface.width / 500);
-		while (
-			surface.leftReservoir >= releaseVolume &&
-			state.runoffDrops.length < MAX_RUNOFF_DROP_COUNT
-		) {
-			surface.leftReservoir -= releaseVolume;
-			emitRunoff(state, surface, "left", releaseVolume, random);
-		}
-		while (
-			surface.rightReservoir >= releaseVolume &&
-			state.runoffDrops.length < MAX_RUNOFF_DROP_COUNT
-		) {
-			surface.rightReservoir -= releaseVolume;
-			emitRunoff(state, surface, "right", releaseVolume, random);
+		const releaseVolume = getSurfaceRunoffThreshold(surface);
+		for (const side of ["left", "right"] as const) {
+			const reservoirKey = side === "left" ? "leftReservoir" : "rightReservoir";
+			const progressKey =
+				side === "left" ? "leftFlowProgress" : "rightFlowProgress";
+			if (surface[reservoirKey] <= 0.01) {
+				surface[reservoirKey] = 0;
+				surface[progressKey] = 0;
+				continue;
+			}
+
+			if (surface[progressKey] < 1) {
+				const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
+				const travelled = surface[progressKey] * pathLength;
+				// Gravity accelerates the attached rivulet as it wraps onto the side.
+				// Adhesion keeps the motion slower than a freely falling droplet.
+				const speed =
+					(22 + Math.sqrt(2 * 360 * travelled)) *
+					Math.min(1.18, 0.88 + surface[reservoirKey] * 0.12);
+				surface[progressKey] = Math.min(
+					1,
+					surface[progressKey] + (speed / pathLength) * dt,
+				);
+			}
+
+			const recentlyReleased = state.runoffDrops.some(
+				(drop) =>
+					drop.sourceSurfaceId === surface.id &&
+					drop.sourceSide === side &&
+					drop.age < 0.22,
+			);
+			if (
+				surface[progressKey] >= 1 &&
+				surface[reservoirKey] >= releaseVolume &&
+				!recentlyReleased &&
+				state.runoffDrops.length < MAX_RUNOFF_DROP_COUNT
+			) {
+				surface[reservoirKey] -= releaseVolume;
+				emitRunoff(state, surface, side, releaseVolume, random);
+				if (surface[reservoirKey] <= 0.01) {
+					surface[reservoirKey] = 0;
+					surface[progressKey] = 0;
+				}
+			}
 		}
 	}
 };
 
 const DROP_WATER_VOLUME: Record<RainLayer, number> = {
-	far: 0.08,
-	mid: 0.2,
-	near: 0.48,
+	far: 0,
+	mid: 0.02,
+	near: 0.14,
 };
 
 const WRAP_MARGIN = 24;
@@ -513,7 +667,9 @@ const stepRunoffDrops = (
 		const drop = state.runoffDrops[index];
 		const start = { x: drop.x, y: drop.y };
 		drop.age += dt;
-		drop.vy += 1800 * dt;
+		if (drop.age < 0) continue;
+		// Detached drips accelerate at the same gravity as the rain field.
+		drop.vy += RAIN_GRAVITY * dt;
 		drop.x += drop.vx * dt;
 		drop.y += drop.vy * dt;
 		const candidateSurfaces =
@@ -524,7 +680,7 @@ const stepRunoffDrops = (
 				: state.surfaces;
 		const hit = findRainSurfaceHit(start, drop, candidateSurfaces);
 		if (hit) {
-			depositSurfaceWater(state, hit, drop.volume * 0.8);
+			depositSurfaceWater(state, hit, drop.volume * 0.8, drop.vx * 0.08);
 			spawnImpact(
 				state,
 				hit,
@@ -626,8 +782,19 @@ export const stepRainfall = (
 			state.surfaces,
 		);
 		if (surfaceHit) {
-			depositSurfaceWater(state, surfaceHit, DROP_WATER_VOLUME[drop.layer]);
-			if (drop.layer === "near" || (drop.layer === "mid" && random() < 0.4)) {
+			depositSurfaceWater(
+				state,
+				surfaceHit,
+				DROP_WATER_VOLUME[drop.layer],
+				drop.vx * 0.08,
+			);
+			// Only top-facing hits splash visibly; side grazes recycle silently
+			// so no sideways ejecta reads as a rendering artifact.
+			if (
+				surfaceHit.normalY < -0.2 &&
+				(drop.layer === "near" ||
+					(drop.layer === "mid" && random() < MID_SURFACE_SPLASH_CHANCE))
+			) {
 				spawnImpact(
 					state,
 					surfaceHit,
@@ -635,6 +802,7 @@ export const stepRainfall = (
 					drop.alpha,
 					config.strokeWidth,
 					random,
+					0.7,
 				);
 			}
 			if (state.drops.length > targetCount) {

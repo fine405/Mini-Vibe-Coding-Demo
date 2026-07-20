@@ -19,8 +19,13 @@ import {
 import {
 	createRainfall,
 	getDropFade,
+	getSurfaceRunoffPathLength,
+	getSurfaceRunoffPoint,
+	getSurfaceRunoffThreshold,
+	MIN_VISIBLE_SURFACE_WATER_VOLUME,
 	RAIN_LAYER_CONFIG,
 	type RainfallState,
+	SURFACE_RUNOFF_HANG_SECONDS,
 	setRainSurfaces,
 	stepRainfall,
 } from "@/modules/theme/rainfall";
@@ -81,11 +86,6 @@ const drawDrop = (
 	surfaces: RainfallState["surfaces"],
 	forceVisible: boolean,
 ): void => {
-	if (
-		surfaces.some((surface) => signedDistanceToRainSurface(drop, surface) <= 0)
-	) {
-		return;
-	}
 	const config = RAIN_LAYER_CONFIG[drop.layer];
 	const alpha = drop.alpha * (forceVisible ? 1 : getDropFade(drop));
 	if (alpha <= 0) return;
@@ -93,6 +93,21 @@ const drawDrop = (
 	const velocityLength = Math.hypot(drop.vx, drop.speed) || 1;
 	const streakX = (drop.vx / velocityLength) * drop.streakLength;
 	const streakY = (drop.speed / velocityLength) * drop.streakLength;
+
+	// Cull streaks clipping into a component: the head check catches drops
+	// swallowed by a moving box, the midpoint check catches tails dipping in.
+	if (
+		surfaces.some(
+			(surface) =>
+				signedDistanceToRainSurface(drop, surface) <= 0 ||
+				signedDistanceToRainSurface(
+					{ x: drop.x - streakX * 0.5, y: drop.y - streakY * 0.5 },
+					surface,
+				) <= 0,
+		)
+	) {
+		return;
+	}
 
 	// A dim full tail plus a short brighter head reads as water, not a needle.
 	ctx.strokeStyle = `rgba(${STREAK_RGB}, ${alpha * 0.42})`;
@@ -119,76 +134,168 @@ const drawSurfaceWater = (
 			(candidate) => candidate.id === bead.surfaceId,
 		);
 		if (!surface) continue;
+		if (bead.volume < MIN_VISIBLE_SURFACE_WATER_VOLUME) continue;
 		const radius = Math.min(surface.radius, surface.width * 0.5);
 		const trackLeft = surface.x + radius;
 		const trackWidth = Math.max(1, surface.width - radius * 2);
 		const x = trackLeft + bead.u * trackWidth;
-		const beadRadius = Math.min(3.2, 1 + Math.sqrt(bead.volume) * 0.8);
-		const alpha = Math.min(0.52, 0.22 + bead.volume * 0.12);
+		const halfWidth = Math.min(13, 4 + Math.sqrt(bead.volume) * 7);
+		const depth = Math.min(0.9, 0.18 + Math.sqrt(bead.volume) * 0.64);
+		const baselineY = surface.y + 0.24;
+		const asymmetry = Math.sin(bead.u * 47 + bead.volume * 3) * 0.12;
+		const alpha = Math.min(0.17, 0.055 + bead.volume * 0.09);
+		// A pinned, shallow film follows the edge instead of reading as a row of
+		// identical domed beads. Its position changes only when new water lands.
 		ctx.fillStyle = `rgba(${STREAK_RGB}, ${alpha})`;
 		ctx.beginPath();
-		ctx.ellipse(
-			x,
-			surface.y + 0.15,
-			beadRadius * 1.5,
-			beadRadius,
-			0,
-			0,
-			Math.PI * 2,
+		ctx.moveTo(x - halfWidth, baselineY);
+		ctx.bezierCurveTo(
+			x - halfWidth * 0.68,
+			baselineY - depth * (0.42 + asymmetry),
+			x - halfWidth * 0.28,
+			baselineY - depth * 0.94,
+			x + halfWidth * 0.05,
+			baselineY - depth,
 		);
+		ctx.bezierCurveTo(
+			x + halfWidth * 0.42,
+			baselineY - depth * (0.84 - asymmetry),
+			x + halfWidth * 0.76,
+			baselineY - depth * 0.32,
+			x + halfWidth,
+			baselineY,
+		);
+		ctx.quadraticCurveTo(x, baselineY + 0.16, x - halfWidth, baselineY);
+		ctx.closePath();
 		ctx.fill();
-		ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.55})`;
+		ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(0.13, alpha * 0.8)})`;
+		ctx.lineWidth = 0.45;
 		ctx.beginPath();
-		ctx.ellipse(
-			x - beadRadius * 0.3,
-			surface.y - beadRadius * 0.2,
-			beadRadius * 0.42,
-			beadRadius * 0.22,
-			0,
-			0,
-			Math.PI * 2,
+		ctx.moveTo(x - halfWidth * 0.32, baselineY - depth * 0.72);
+		ctx.quadraticCurveTo(
+			x - halfWidth * 0.12,
+			baselineY - depth * 0.94,
+			x + halfWidth * 0.08,
+			baselineY - depth * 0.88,
 		);
-		ctx.fill();
+		ctx.stroke();
 	}
 
 	for (const surface of state.surfaces) {
 		for (const side of ["left", "right"] as const) {
 			const volume =
 				side === "left" ? surface.leftReservoir : surface.rightReservoir;
-			if (volume <= 0.03) continue;
-			const direction = side === "left" ? -1 : 1;
-			const edgeX =
-				side === "left"
-					? surface.x + surface.radius
-					: surface.x + surface.width - surface.radius;
-			const sideX =
-				side === "left" ? surface.x - 0.2 : surface.x + surface.width + 0.2;
-			const alpha = Math.min(0.48, 0.16 + volume * 0.16);
-			ctx.strokeStyle = `rgba(${STREAK_RGB}, ${alpha})`;
-			ctx.lineWidth = Math.min(2.2, 0.8 + volume * 0.45);
+			const progress =
+				side === "left" ? surface.leftFlowProgress : surface.rightFlowProgress;
+			const fill = Math.min(1, volume / getSurfaceRunoffThreshold(surface));
+			if (volume <= 0.03 || progress <= 0) continue;
+
+			// Draw only the local wet trail behind the moving head. Keeping the
+			// whole outline lit would look like a decorative border animation.
+			const pathLength = Math.max(1, getSurfaceRunoffPathLength(surface));
+			const tailLength = Math.min(14, 4 + fill * 10);
+			const tailProgress = Math.max(0, progress - tailLength / pathLength);
+			ctx.strokeStyle = `rgba(${STREAK_RGB}, ${0.045 + fill * 0.14})`;
+			ctx.lineWidth = 0.5 + fill * 0.55;
 			ctx.beginPath();
-			ctx.moveTo(edgeX, surface.y);
-			ctx.quadraticCurveTo(
-				edgeX + direction * surface.radius * 0.65,
-				surface.y,
-				sideX,
-				surface.y + surface.radius * 0.72,
-			);
+			for (let index = 0; index <= 7; index++) {
+				const sampleProgress =
+					tailProgress + ((progress - tailProgress) * index) / 7;
+				const point = getSurfaceRunoffPoint(surface, side, sampleProgress);
+				if (index === 0) ctx.moveTo(point.x, point.y);
+				else ctx.lineTo(point.x, point.y);
+			}
 			ctx.stroke();
+
+			const head = getSurfaceRunoffPoint(surface, side, progress);
+			const alpha = 0.07 + fill * 0.2;
+			ctx.fillStyle = `rgba(${STREAK_RGB}, ${alpha})`;
+			ctx.beginPath();
+			if (progress < 1) {
+				ctx.ellipse(
+					head.x,
+					head.y,
+					0.4 + fill * 0.42,
+					0.55 + fill * 0.55,
+					0,
+					0,
+					Math.PI * 2,
+				);
+			} else {
+				const width = 0.48 + fill * 0.65;
+				const height = 0.7 + fill * fill * 3.1;
+				ctx.ellipse(
+					head.x,
+					head.y + height * 0.42,
+					width,
+					height,
+					0,
+					0,
+					Math.PI * 2,
+				);
+			}
+			ctx.fill();
 		}
 	}
 
 	for (const drop of state.runoffDrops) {
-		const alpha = drop.alpha * Math.min(1, drop.age / 0.08);
-		ctx.strokeStyle = `rgba(${STREAK_RGB}, ${alpha * 0.7})`;
-		ctx.lineWidth = drop.size;
+		if (drop.age < 0) {
+			const progress = Math.min(1, 1 + drop.age / SURFACE_RUNOFF_HANG_SECONDS);
+			const height = drop.size * (0.7 + progress * 1.8);
+			const alpha = drop.alpha * (0.2 + progress * 0.8);
+			ctx.fillStyle = `rgba(${STREAK_RGB}, ${alpha})`;
+			ctx.beginPath();
+			ctx.ellipse(
+				drop.x,
+				drop.y + height * 0.4,
+				drop.size * (0.52 + progress * 0.12),
+				height,
+				0,
+				0,
+				Math.PI * 2,
+			);
+			ctx.fill();
+			continue;
+		}
+
+		const speed = Math.hypot(drop.vx, drop.vy);
+		const alpha = drop.alpha * Math.min(1, drop.age / 0.06);
+		const tailLength = Math.min(7, speed * 0.012);
+		const directionX = speed > 0 ? drop.vx / speed : 0;
+		const directionY = speed > 0 ? drop.vy / speed : 1;
+		ctx.strokeStyle = `rgba(${STREAK_RGB}, ${alpha * 0.32})`;
+		ctx.lineWidth = drop.size * 0.55;
 		ctx.beginPath();
-		ctx.moveTo(drop.x - drop.vx * 0.025, drop.y - drop.vy * 0.025);
+		ctx.moveTo(
+			drop.x - directionX * tailLength,
+			drop.y - directionY * tailLength,
+		);
 		ctx.lineTo(drop.x, drop.y);
 		ctx.stroke();
-		ctx.fillStyle = `rgba(246, 250, 253, ${alpha})`;
+		ctx.fillStyle = `rgba(238, 245, 250, ${alpha})`;
 		ctx.beginPath();
-		ctx.ellipse(drop.x, drop.y, drop.size * 0.65, drop.size, 0, 0, Math.PI * 2);
+		ctx.ellipse(
+			drop.x,
+			drop.y,
+			drop.size * 0.55,
+			drop.size,
+			Math.atan2(drop.vy, drop.vx) - Math.PI * 0.5,
+			0,
+			Math.PI * 2,
+		);
+		ctx.fill();
+		// Specular glint so the falling drip reads as water, not a dash.
+		ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.55})`;
+		ctx.beginPath();
+		ctx.ellipse(
+			drop.x - drop.size * 0.16,
+			drop.y - drop.size * 0.3,
+			drop.size * 0.16,
+			drop.size * 0.24,
+			0,
+			0,
+			Math.PI * 2,
+		);
 		ctx.fill();
 	}
 };
@@ -211,6 +318,14 @@ const draw = (
 	for (const spray of state.sprays) {
 		const alpha = spray.alpha * (1 - spray.age / spray.lifetime);
 		if (alpha <= 0) continue;
+		// Ejecta that falls back into a component would read as a glitch.
+		if (
+			state.surfaces.some(
+				(surface) => signedDistanceToRainSurface(spray, surface) <= 0,
+			)
+		) {
+			continue;
+		}
 		ctx.strokeStyle = `rgba(${STREAK_RGB}, ${alpha})`;
 		ctx.lineWidth = spray.size;
 		ctx.beginPath();
